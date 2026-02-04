@@ -193,6 +193,9 @@ func main() {
 	if config.Notifications.Feishu.Enabled {
 		log.Printf("  飞书通知: 已启用")
 	}
+	if config.Notifications.WeChatApp.Enabled {
+		log.Printf("  企业微信应用: 已启用")
+	}
 	log.Printf("==========================================")
 	log.Printf("服务器正在运行...")
 
@@ -450,6 +453,27 @@ func sendNotificationsWithContext(ctx context.Context, config *config.Config, re
 		log.Printf("发送飞书消息")
 		if err := notify.SendFeishuWithContext(ctx, config.Notifications.Feishu, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
 			log.Printf("发送飞书消息失败: %v", err)
+		}
+	}
+
+	// 企业微信应用通知 - 支持动态touser参数
+	if config.Notifications.WeChatApp.Enabled {
+		log.Printf("发送企业微信应用消息")
+
+		// 创建配置副本，以便动态修改touser
+		appConfig := config.Notifications.WeChatApp
+
+		// 检查是否有动态传入的touser参数
+		if r, ok := ctx.Value("http_request").(*http.Request); ok {
+			dynamicToUser := r.URL.Query().Get("touser")
+			if dynamicToUser != "" {
+				log.Printf("[NOTIFICATION] 检测到动态touser参数: %s，将覆盖配置文件设置", dynamicToUser)
+				appConfig.ToUser = dynamicToUser
+			}
+		}
+
+		if err := notify.SendWeChatAppWithContext(ctx, appConfig, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+			log.Printf("发送企业微信应用消息失败: %v", err)
 		}
 	}
 

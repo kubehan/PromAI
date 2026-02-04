@@ -513,6 +513,8 @@
                             <input type="text" id="customUrl" placeholder="请输入Prometheus URL" style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px; display: none;">
                             <p style="margin-top: 15px;">企业微信通知：可选</p>
                             <input type="text" id="wechatBotKey" placeholder="请输入企业微信机器人key（可选）" style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
+                            <p style="margin-top: 15px;">巡检人员企业微信邮箱：可选</p>
+                            <input type="text" id="toUser" placeholder="请输入企业邮箱，如 kubehan@kubehan.cn" style="width: 100%; padding: 8px; margin: 10px 0; border: 1px solid #ddd; border-radius: 4px;">
                         </div>
                     `;
                     modalConfirm.textContent = '开始巡检';
@@ -535,6 +537,7 @@
                         const select = document.getElementById('datasourceSelect');
                         const customUrl = document.getElementById('customUrl');
                         const wechatBotKey = document.getElementById('wechatBotKey');
+                        const toUser = document.getElementById('toUser');
                         let datasource = '';
 
                         if (select.value === 'custom') {
@@ -548,7 +551,7 @@
                         }
 
                         // 触发巡检
-                        startInspection(datasource, wechatBotKey.value);
+                        startInspection(datasource, wechatBotKey.value, toUser.value);
                         closeModal();
                     };
                     break;
@@ -558,7 +561,7 @@
         }
 
         // 开始巡检
-        function startInspection(datasource, wechatBotKey) {
+        function startInspection(datasource, wechatBotKey, toUser) {
             // 显示进度提示
             const progressDiv = document.createElement('div');
             progressDiv.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #667eea; color: white; padding: 15px 20px; border-radius: 10px; z-index: 9999;';
@@ -589,6 +592,9 @@
                     params.append('taskid', task.id);
                     if (wechatBotKey) {
                         params.append('wechat_bot_key', wechatBotKey);
+                    }
+                    if (toUser) {
+                        params.append('touser', toUser);
                     }
                     if (params.toString()) {
                         url += '?' + params.toString();

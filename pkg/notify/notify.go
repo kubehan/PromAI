@@ -15,6 +15,8 @@ import (
 	"net/smtp"
 	"net/url"
 	"path/filepath"
+	"strings"
+	"sync"
 	"time"
 
 	"PromAI/pkg/report"
@@ -46,6 +48,16 @@ type WeChatWorkConfig struct {
 	Webhook   string `yaml:"webhook"`
 	ProxyURL  string `yaml:"proxy_url"`
 	ReportURL string `yaml:"report_url"`
+}
+
+type WeChatAppConfig struct {
+	Enabled   bool   `yaml:"enabled"`
+	CorpID    string `yaml:"corpid"`
+	AgentID   int    `yaml:"agentid"`
+	Secret    string `yaml:"secret"`
+	ToUser    string `yaml:"touser"` // 接收人企业微信ID，多个用|分隔，如"user1|user2"，默认"@all"发送给所有人
+	ProxyURL  string `yaml:"proxy_url"`
+	ReportURL string `yaml:"report_url"` // 新增 ReportURL 字段
 }
 
 type FeishuConfig struct {
@@ -329,7 +341,9 @@ func SendDingtalkWithContext(ctx context.Context, config DingtalkConfig, reportP
 	if len(typeSummaries) > 0 {
 		for _, summary := range typeSummaries {
 			var typeStatus string
-			if summary.CriticalCount > 0 {
+			if summary.TotalMetrics == 0 {
+				typeStatus = "⚪" // 无指标
+			} else if summary.CriticalCount > 0 {
 				typeStatus = "❌" // 严重异常
 			} else if summary.WarningCount > 0 {
 				typeStatus = "⚠️" // 警告
@@ -861,5 +875,344 @@ func SendWeChatWorkWithContext(ctx context.Context, config WeChatWorkConfig, rep
 	}
 
 	log.Printf("企业微信通知发送成功")
+	return nil
+}
+
+// EmailToUserIDCache 邮箱到UserID的缓存
+type EmailToUserIDCache struct {
+	cache  map[string]string // email -> userid
+	mutex  sync.RWMutex
+	expiry time.Time
+}
+
+var emailCache = &EmailToUserIDCache{
+	cache: make(map[string]string),
+}
+
+// convertEmailToUserID 将邮箱转换为UserID
+// 支持格式：
+// - kubehan@company.com -> 查询API获取UserID
+// - kubehan -> 直接返回（假设是UserID）
+// - @all -> 直接返回
+func convertEmailToUserID(ctx context.Context, config WeChatAppConfig, toUser string) (string, error) {
+	// 如果是 @all，直接返回
+	if toUser == "@all" {
+		return toUser, nil
+	}
+
+	// 分割多个用户
+	users := strings.Split(toUser, "|")
+	var convertedUsers []string
+
+	for _, user := range users {
+		user = strings.TrimSpace(user)
+
+		// 如果包含@，认为是邮箱，需要转换
+		if strings.Contains(user, "@") {
+			userid, err := getUserIDByEmail(ctx, config, user)
+			if err != nil {
+				log.Printf("警告: 邮箱 %s 转换为UserID失败: %v", user, err)
+				// 转换失败，使用原值（企业微信会返回错误）
+				convertedUsers = append(convertedUsers, user)
+			} else {
+				convertedUsers = append(convertedUsers, userid)
+			}
+		} else {
+			// 不包含@，假设已经是UserID
+			convertedUsers = append(convertedUsers, user)
+		}
+	}
+
+	return strings.Join(convertedUsers, "|"), nil
+}
+
+// getUserIDByEmail 通过邮箱获取UserID（使用企业微信官方API）
+func getUserIDByEmail(ctx context.Context, config WeChatAppConfig, email string) (string, error) {
+	// 检查缓存
+	emailCache.mutex.RLock()
+	if time.Now().Before(emailCache.expiry) {
+		if userid, ok := emailCache.cache[email]; ok {
+			emailCache.mutex.RUnlock()
+			log.Printf("从缓存获取邮箱 %s 对应的UserID: %s", email, userid)
+			return userid, nil
+		}
+	}
+	emailCache.mutex.RUnlock()
+
+	// 获取access_token
+	accessToken, err := getWeChatAccessToken(ctx, config)
+	if err != nil {
+		return "", err
+	}
+
+	// 使用企业微信官方API：通过邮箱获取UserID
+	// API文档: https://developer.work.weixin.qq.com/document/path/95892
+	apiURL := fmt.Sprintf("https://qyapi.weixin.qq.com/cgi-bin/user/get_userid_by_email?access_token=%s", accessToken)
+
+	// 构建请求体
+	requestBody := map[string]interface{}{
+		"email":      email,
+		"email_type": 1, // 1-企业邮箱
+	}
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("构建请求失败: %v", err)
+	}
+
+	client := &http.Client{}
+	if config.ProxyURL != "" {
+		proxyURL, _ := url.Parse(config.ProxyURL)
+		client.Transport = &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", apiURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		ErrCode int    `json:"errcode"`
+		ErrMsg  string `json:"errmsg"`
+		UserID  string `json:"userid"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	if result.ErrCode != 0 {
+		return "", fmt.Errorf("获取UserID失败(errcode=%d): %s", result.ErrCode, result.ErrMsg)
+	}
+
+	if result.UserID == "" {
+		return "", fmt.Errorf("未找到邮箱 %s 对应的用户", email)
+	}
+
+	// 更新缓存
+	emailCache.mutex.Lock()
+	emailCache.cache[email] = result.UserID
+	emailCache.expiry = time.Now().Add(1 * time.Hour)
+	emailCache.mutex.Unlock()
+
+	log.Printf("邮箱 %s 对应的UserID: %s", email, result.UserID)
+	return result.UserID, nil
+}
+
+// WeChatAccessTokenResponse 企业微信获取Token响应
+type WeChatAccessTokenResponse struct {
+	ErrCode     int    `json:"errcode"`
+	ErrMsg      string `json:"errmsg"`
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in"`
+}
+
+// getWeChatAccessToken 获取企业微信应用 access_token
+func getWeChatAccessToken(ctx context.Context, config WeChatAppConfig) (string, error) {
+	apiURL := fmt.Sprintf("https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=%s&corpsecret=%s", config.CorpID, config.Secret)
+
+	client := &http.Client{}
+
+	// 如果配置了代理，设置代理
+	if config.ProxyURL != "" {
+		proxyURL, err := url.Parse(config.ProxyURL)
+		if err != nil {
+			return "", fmt.Errorf("解析代理URL失败: %v", err)
+		}
+		client.Transport = &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("创建请求失败: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("获取access_token失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var result WeChatAccessTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("解析响应失败: %v", err)
+	}
+
+	if result.ErrCode != 0 {
+		return "", fmt.Errorf("获取access_token错误: %s", result.ErrMsg)
+	}
+
+	return result.AccessToken, nil
+}
+
+// SendWeChatApp 发送企业微信应用通知（兼容版本）
+func SendWeChatApp(config WeChatAppConfig, reportPath string, projectName string, Datasource string, alertSummary AlertSummary) error {
+	return SendWeChatAppWithContext(context.Background(), config, reportPath, projectName, Datasource, alertSummary)
+}
+
+// SendWeChatAppWithContext 发送企业微信应用通知
+func SendWeChatAppWithContext(ctx context.Context, config WeChatAppConfig, reportPath string, projectName string, Datasource string, alertSummary AlertSummary) error {
+	if !config.Enabled {
+		log.Printf("企业微信应用通知未启用")
+		return nil
+	}
+	log.Printf("开始发送企业微信应用通知...")
+
+	// 1. 获取 Access Token
+	accessToken, err := getWeChatAccessToken(ctx, config)
+	if err != nil {
+		log.Printf("获取企业微信应用Token失败: %v", err)
+		return err
+	}
+
+	// 尝试从context中获取报告数据，用于分类汇总
+	var typeSummaries []TypeAlertSummary
+	if data, ok := ctx.Value("report_data").(report.ReportData); ok {
+		typeSummaries = CalculateTypeAlertSummary(data)
+		log.Printf("从报告数据中计算出分类汇总")
+	} else {
+		log.Printf("未找到报告数据，使用空分类汇总")
+		typeSummaries = []TypeAlertSummary{}
+	}
+
+	// 生成报告的访问链接
+	reportFileName := filepath.Base(reportPath)
+
+	// 尝试从context中获取HTTP请求对象，用于动态URL生成
+	var reportLink string
+	if r, ok := ctx.Value("http_request").(*http.Request); ok {
+		reportLink = utils.GetReportURL(r, reportFileName)
+		log.Printf("使用动态URL生成报告链接: %s", reportLink)
+	} else {
+		// 回退到配置的静态URL
+		reportLink = fmt.Sprintf("%s/api/promai/reports/%s", config.ReportURL, reportFileName)
+		log.Printf("使用配置的静态URL生成报告链接: %s", reportLink)
+	}
+
+	// 构建消息内容
+	alertStatus := "✅ 正常"
+	if alertSummary.TotalAlerts > 0 {
+		alertStatus = "⚠️ 异常"
+	}
+
+	// 构建分类汇总部分
+	typeSummaryText := ""
+	for _, summary := range typeSummaries {
+		typeStatus := "✅"
+		if summary.TotalMetrics == 0 {
+			typeStatus = "⚪"
+		} else if summary.CriticalCount > 0 {
+			typeStatus = "❌"
+		} else if summary.WarningCount > 0 {
+			typeStatus = "⚠️"
+		}
+		typeSummaryText += fmt.Sprintf("**%s%s**：总%d个，异常%d个（严重%d，警告%d），正常%d个\n",
+			typeStatus, summary.Type, summary.TotalMetrics,
+			summary.CriticalCount+summary.WarningCount, summary.CriticalCount, summary.WarningCount, summary.NormalCount)
+	}
+
+	content := fmt.Sprintf("【监测报告】`%s`巡检结果 %s\n\n"+
+		"### ⏰ 巡检时间\n"+
+		"%s\n\n"+
+		"### 📊 分类巡检结果\n"+
+		"%s\n"+
+		"### 📈 整体统计\n"+
+		"**总指标数**：%d个\n"+
+		"**异常指标**：%d个（严重%d个，警告%d个）\n"+
+		"**正常指标**：%d个\n\n"+
+		"📋[点击查看完整报告](%s)\n\n"+
+		"⏰ 生成时间：%s",
+		Datasource,
+		alertStatus,
+		time.Now().Format("2006-01-02 15:04:05"),
+		typeSummaryText,
+		alertSummary.TotalMetrics,
+		alertSummary.TotalAlerts,
+		alertSummary.CriticalAlerts,
+		alertSummary.WarningAlerts,
+		alertSummary.NormalMetrics,
+		reportLink,
+		time.Now().Format("2006-01-02 15:04:05"))
+
+	// 确定接收人：如果配置了ToUser则使用，否则默认发送给所有人
+	toUser := "@all"
+	if config.ToUser != "" {
+		toUser = config.ToUser
+		log.Printf("使用配置的接收人: %s", toUser)
+	} else {
+		log.Printf("未配置接收人，默认发送给所有人")
+	}
+
+	// 转换邮箱为UserID
+	convertedToUser, err := convertEmailToUserID(ctx, config, toUser)
+	if err != nil {
+		log.Printf("警告: 转换邮箱为UserID时出错: %v，使用原值", err)
+		convertedToUser = toUser
+	} else if convertedToUser != toUser {
+		log.Printf("邮箱转换: %s -> %s", toUser, convertedToUser)
+	}
+
+	messageContent := map[string]interface{}{
+		"touser":  convertedToUser,
+		"msgtype": "markdown",
+		"agentid": config.AgentID,
+		"markdown": map[string]interface{}{
+			"content": content,
+		},
+		"enable_duplicate_check":   0,
+		"duplicate_check_interval": 1800,
+	}
+
+	jsonData, err := json.Marshal(messageContent)
+	if err != nil {
+		log.Printf("JSON编码失败: %v", err)
+		return fmt.Errorf("JSON编码失败: %v", err)
+	}
+
+	// 发送消息
+	sendURL := fmt.Sprintf("https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=%s", accessToken)
+
+	client := &http.Client{}
+	if config.ProxyURL != "" {
+		proxyURL, _ := url.Parse(config.ProxyURL)
+		client.Transport = &http.Transport{
+			Proxy: http.ProxyURL(proxyURL),
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", sendURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("创建请求失败: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	log.Printf("准备发送请求到企业微信API")
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("发送请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("企业微信应用响应状态码: %d, 响应内容: %s", resp.StatusCode, string(respBody))
+
+	var respJson map[string]interface{}
+	json.Unmarshal(respBody, &respJson)
+
+	if errCode, ok := respJson["errcode"].(float64); ok && errCode != 0 {
+		return fmt.Errorf("企业微信应用发送失败: %v", respJson["errmsg"])
+	}
+
+	log.Printf("企业微信应用通知发送成功")
 	return nil
 }

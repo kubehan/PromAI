@@ -35,26 +35,29 @@ PromAI 是一个基于 Prometheus 的智能监控报告生成与巡检系统。�
 
 **前置要求**：Go 1.22+
 
-1.  **克隆代码**
-    ```bash
-    git clone https://github.com/kubehan/PromAI.git
-    cd PromAI
-    ```
+1. **克隆代码**
 
-2.  **编译项目**
-    ```bash
-    go mod download
-    go build -o PromAI main.go
-    ```
+   ```bash
+   git clone https://github.com/kubehan/PromAI.git
+   cd PromAI
+   ```
+2. **编译项目**
 
-3.  **运行**
-    ```bash
-    # 确保配置文件存在
-    cp config/config.yaml.example config/config.yaml # 如果有示例文件
-    # 或者直接使用现有的 config/config.yaml
-    
-    ./PromAI -config config/config.yaml -port :8091
-    ```
+   ```bash
+   go mod download
+   go build -o PromAI main.go
+   ```
+3. **运行**
+
+   ```bash
+   # 确保配置文件存在
+   cp config/config.yaml.example config/config.yaml # 如果有示例文件
+   # 或者直接使用现有的 config/config.yaml
+
+   # 环境变量配置 EXTERNAL_PORT 指定反向代理端口
+
+   ./PromAI -config config/config.yaml -port :8091
+   ```
 
 ### Docker 部署
 
@@ -159,62 +162,71 @@ metric_types:
         labels:
           instance: "节点IP"
 ```
+
 ** 特别注意 **
 资源使用概览部分必须按照现有配置文件中的进行定义，否则无法正常显示,因为代理里面定义了如下内容
+
 ```html
     const cpuData = getHostMetricValues('CPU性能状态监控');
     const memoryData = getHostMetricValues('内存性能状态监控');
     // 获取磁盘数据，只包含/home 挂载点
     const diskData = getDiskMetricValues('/home');
 ```
+
 因此必须要在配置文件包含以下内容才能出来图表
+
 ```yaml
     metrics:
       - name: "CPU性能状态监控"
       - name: "内存性能状态监控"
       - name: "存储设备状态监控"
 ```
+
 ## 使用指南
 
 ### Web 界面
 
 启动服务后，访问 `http://localhost:8091/api/promai` 进入首页。
 
--   **首页**：查看系统概览和入口。
--   **历史报告**：`http://localhost:8091/api/promai/reports/history`，查看所有生成的巡检报告。
--   **实时状态**：`http://localhost:8091/api/promai/status`，查看当前各项指标的实时健康状态。
--   **巡检进度**：`http://localhost:8091/api/promai/progress`，查看当前正在执行的巡检任务进度。
+- **首页**：查看系统概览和入口。
+- **历史报告**：`http://localhost:8091/api/promai/reports/history`，查看所有生成的巡检报告。
+- **实时状态**：`http://localhost:8091/api/promai/status`，查看当前各项指标的实时健康状态。
+- **巡检进度**：`http://localhost:8091/api/promai/progress`，查看当前正在执行的巡检任务进度。
 
 ### API 接口
 
 PromAI 提供了一系列 API 用于集成和自动化。
 
--   **手动触发巡检并生成报告**：
-    ```
-    GET /api/promai/getreport
-    ```
-    参数：
-    -   `datasource` (可选): 指定数据源名称（如 `cluster1`）或完整的 Prometheus URL。
-    -   `wechat_bot_key` (可选): 指定企业微信机器人 Key，用于本次巡检结果通知。
+- **手动触发巡检并生成报告**：
 
-    示例：
-    ```
-    1. 使用配置文件定义的数据源
-    http://localhost:8091/api/promai/getreport?datasource=cluster1
+  ```
+  GET /api/promai/getreport
+  ```
 
-    2. 动态指定数据源
-    http://localhost:8091/api/promai/getreport?datasource=http://prometheus.cluster1.example.com
-    ```
+  参数：
 
--   **获取报告列表**：
-    ```
-    GET /api/promai/reports/list
-    ```
+  - `datasource` (可选): 指定数据源名称（如 `cluster1`）或完整的 Prometheus URL。
+  - `wechat_bot_key` (可选): 指定企业微信机器人 Key，用于本次巡检结果通知。
 
--   **查看实时状态**：
-    ```
-    GET /api/promai/status?datasource=cluster1
-    ```
+  示例：
+
+  ```
+  1. 使用配置文件定义的数据源
+  http://localhost:8091/api/promai/getreport?datasource=cluster1
+
+  2. 动态指定数据源
+  http://localhost:8091/api/promai/getreport?datasource=http://prometheus.cluster1.example.com
+  ```
+- **获取报告列表**：
+
+  ```
+  GET /api/promai/reports/list
+  ```
+- **查看实时状态**：
+
+  ```
+  GET /api/promai/status?datasource=cluster1
+  ```
 
 ### 定时任务
 
@@ -227,6 +239,7 @@ A: 修改 `config/config.yaml`，在 `metric_types` 中添加新的 `metrics` �
 
 **Q: 报告中的资源使用概览图表没有数据？**
 A: 请检查 `config.yaml` 中指标的 `metrics` 是否配置正确，以及 Prometheus 中是否有对应的历史数据。-name需要配置为
+
 ```yaml
     metrics:
       - name: "CPU性能状态监控"

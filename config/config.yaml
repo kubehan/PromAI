@@ -51,6 +51,14 @@ notifications:
     webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0c4ef257-a6f0-430c-b454-d2b82bbd6e53"  # 企业微信机器人webhook地址
     proxy_url: ""  # HTTP代理地址，例如: http://proxy.example.com:8080 或 socks5://proxy.example.com:1080
     report_url: "https://alert.intra.kubehan.cn"  # 报告访问地址
+  wechat_app:
+    enabled: false  # 是否启用企业微信应用通知
+    corpid: "xxxxxxxx"  # 企业ID
+    agentid: 1000009  # 应用AgentID
+    secret: "xxxxxxxxxxxxxxxxxxxx"  # 应用Secret
+    touser: "@all"  # 接收人企业微信ID，多个用|分隔，如"user1|user2|user3"，默认"@all"发送给所有人
+    proxy_url: ""  # HTTP代理地址
+    report_url: "https://alert.kubehan.cn"  # 报告访问地址
   feishu:
     enabled: false  # 是否启用飞书通知
     webhook: "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxxxxxxxxxxxxxx"  # 飞书机器人webhook地址

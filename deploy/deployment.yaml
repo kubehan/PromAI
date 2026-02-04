@@ -41,6 +41,8 @@ spec:
               containerPort: 8091
               protocol: TCP
           env:
+            - name: EXTERNAL_PORT
+              value: '80'
             - name: PROMETHEUS_URL
               value: >-
                 http://prometheus-k8s.kubesphere-monitoring-system.svc.cluster.local:9090
