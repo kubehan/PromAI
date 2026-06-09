@@ -192,7 +192,7 @@ function openCreate() {
 
 function openEdit(row: DataSource) {
   editingId.value = row.id!
-  form.value = { ...row }
+  form.value = { ...row, password: '' }
   selectedChannels.value = row.notify_channels ? JSON.parse(row.notify_channels) : []
   dialogVisible.value = true
 }

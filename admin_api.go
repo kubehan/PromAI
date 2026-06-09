@@ -374,11 +374,18 @@ func parseParentID(path string) (uint, error) {
 	return uint(id), nil
 }
 
+func maskPassword(ds []database.DataSource) {
+	for i := range ds {
+		ds[i].Password = ""
+	}
+}
+
 func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		var ds []database.DataSource
 		database.DB.Order("is_default desc, name asc").Find(&ds)
+		maskPassword(ds)
 		writeJSON(w, ds)
 	case "POST":
 		var d database.DataSource
@@ -392,6 +399,7 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 		}
 		database.DB.Create(&d)
 		w.WriteHeader(201)
+		d.Password = ""
 		writeJSON(w, d)
 	default:
 		writeError(w, 405, "不支持的请求方法")
@@ -420,6 +428,7 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 			writeError(w, 404, "数据源不存在")
 			return
 		}
+		d.Password = ""
 		writeJSON(w, d)
 	case "PUT":
 		var d database.DataSource
@@ -434,7 +443,11 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 		}
 		upd.ID = d.ID
 		upd.CreatedAt = d.CreatedAt
+		if upd.Password == "" {
+			upd.Password = d.Password
+		}
 		database.DB.Save(&upd)
+		upd.Password = ""
 		writeJSON(w, upd)
 	case "DELETE":
 		database.DB.Delete(&database.DataSource{}, id)
