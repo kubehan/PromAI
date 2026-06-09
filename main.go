@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"PromAI/pkg/config"
-	"PromAI/pkg/database"
 	"PromAI/pkg/metrics"
 	"PromAI/pkg/notify"
 	"PromAI/pkg/prometheus"
@@ -84,31 +83,46 @@ func main() {
 	// 设置全局端口
 	utils.SetGlobalPort(strings.TrimPrefix(*port, ":"))
 
-	// 初始化 SQLite 数据库
-	dbPath := "promai.db"
-	if envDB := os.Getenv("PROMAI_DB_PATH"); envDB != "" {
-		dbPath = envDB
-	}
-	if err := database.InitDB(dbPath); err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
-	}
-	// 从配置文件导入初始数据到数据库
-	if err := database.SeedFromConfig(config); err != nil {
-		log.Printf("Warning: failed to seed database: %v", err)
-	}
-
 	// 设置 HTTP 路由
 	setupRoutes(collector, config)
 
-	// 启动全局定时调度器（从配置文件和数据库加载定时任务）
-	startGlobalScheduler(config, collector)
+	// 如果配置了定时任务，启动定时执行
+	if config.CronSchedule != "" {
+		c := cron.New()
+		_, err := c.AddFunc(config.CronSchedule, func() {
+			log.Printf("开始执行定时巡检任务...")
+			data, err := collector.CollectMetrics()
+			if err != nil {
+				log.Printf("Error collecting metrics: %v", err)
+				return
+			}
+
+			reportFilePath, err := report.GenerateReport(*data)
+			if err != nil {
+				log.Printf("Error generating report: %v", err)
+				return
+			}
+
+			// 发送通知
+			sendNotifications(config, reportFilePath, data)
+			log.Printf("定时巡检任务完成，报告已生成: %s", reportFilePath)
+		})
+
+		if err != nil {
+			log.Printf("Failed to schedule cron job: %v", err)
+		} else {
+			c.Start()
+			log.Printf("定时任务已启动，执行周期: %s", config.CronSchedule)
+		}
+	}
 
 	// 配置报告清理
 	if config.ReportCleanup.Enabled {
 		cleanupSchedule := config.ReportCleanup.CronSchedule
 		if cleanupSchedule == "" {
-			cleanupSchedule = "0 2 * * *"
+			cleanupSchedule = "0 2 * * *" // 默认每天凌晨2点清理
 		}
+
 		if cleanupSchedule != "" {
 			c := cron.New()
 			_, err := c.AddFunc(cleanupSchedule, func() {
@@ -118,6 +132,7 @@ func main() {
 				}
 				log.Printf("报告清理成功")
 			})
+
 			if err != nil {
 				log.Printf("设置清理定时任务失败: %v", err)
 			} else {
@@ -135,7 +150,6 @@ func main() {
 	log.Printf("")
 	log.Printf("访问地址:")
 	log.Printf("  首页: http://localhost%s/api/promai", *port)
-	log.Printf("  管理后台: http://localhost%s/api/promai/admin", *port)
 	log.Printf("  巡检进度: http://localhost%s/api/promai/progress", *port)
 	log.Printf("  历史报告: http://localhost%s/api/promai/reports/history", *port)
 	log.Printf("")
@@ -190,9 +204,6 @@ func main() {
 	}
 }
 
-// 全局定时调度器，由 admin API 动态管理
-var globalScheduler *cron.Cron
-
 // setupRoutes 设置 HTTP 路由
 func setupRoutes(collector *metrics.Collector, config *config.Config) {
 	// 设置首页路由
@@ -224,83 +235,6 @@ func setupRoutes(collector *metrics.Collector, config *config.Config) {
 	http.HandleFunc("/api/promai/tasks", tasksHandler)
 	http.HandleFunc("/api/promai/tasks/", taskDetailHandler)
 
-	// 设置管理后台页面 - 优先使用前端构建产物
-	if _, err := os.Stat("frontend/dist"); err == nil {
-		distDir := "frontend/dist"
-		http.Handle("/api/promai/admin/assets/", http.StripPrefix("/api/promai/admin/", http.FileServer(http.Dir(distDir))))
-		http.Handle("/api/promai/admin/favicon.svg", http.StripPrefix("/api/promai/admin/", http.FileServer(http.Dir(distDir))))
-		http.HandleFunc("/api/promai/admin", func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, distDir+"/index.html")
-		})
-		http.HandleFunc("/api/promai/admin/", func(w http.ResponseWriter, r *http.Request) {
-			path := distDir + r.URL.Path[len("/api/promai/admin/"):]
-			if _, err := os.Stat(path); err == nil {
-				http.ServeFile(w, r, path)
-			} else {
-				http.ServeFile(w, r, distDir+"/index.html")
-			}
-		})
-		log.Printf("  前端构建产物已加载 (frontend/dist)")
-	} else {
-		http.HandleFunc("/api/promai/admin", adminHandler)
-	}
-
-	// 注册管理 API 路由
-	adminAPI := NewAdminAPI(collector, config)
-	adminAPI.RegisterHandlers(http.DefaultServeMux)
-
-}
-
-// startGlobalScheduler 启动全局定时调度器
-func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
-	if globalScheduler != nil {
-		globalScheduler.Stop()
-	}
-	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
-
-	// 从数据库加载定时任务
-	var dbJobs []database.CronJob
-	database.DB.Where("enabled = ?", true).Find(&dbJobs)
-	for _, job := range dbJobs {
-		j := job
-		_, err := globalScheduler.AddFunc(j.Schedule, func() {
-			log.Printf("[Cron] 执行定时任务: %s", j.Name)
-			doInspection(config, collector, j)
-		})
-		if err != nil {
-			log.Printf("[Cron] 调度任务 %s 失败 (%s): %v", j.Name, j.Schedule, err)
-		} else {
-			log.Printf("[Cron] 已调度任务: %s (%s)", j.Name, j.Schedule)
-		}
-	}
-
-	// 保留原有配置文件的定时任务（兼容）
-	if config.CronSchedule != "" {
-		_, err := globalScheduler.AddFunc(config.CronSchedule, func() {
-			log.Printf("[Cron] 执行定时巡检任务(配置文件)...")
-			data, err := collector.CollectMetrics()
-			if err != nil {
-				log.Printf("[Cron] 收集指标失败: %v", err)
-				return
-			}
-			reportFilePath, err := report.GenerateReport(*data)
-			if err != nil {
-				log.Printf("[Cron] 生成报告失败: %v", err)
-				return
-			}
-			saveReportRecord(data, reportFilePath)
-			sendNotifications(config, reportFilePath, data)
-			log.Printf("[Cron] 定时巡检任务完成: %s", reportFilePath)
-		})
-		if err != nil {
-			log.Printf("[Cron] 调度配置文件任务失败: %v", err)
-		} else {
-			log.Printf("[Cron] 已调度配置文件任务: %s", config.CronSchedule)
-		}
-	}
-
-	globalScheduler.Start()
-	log.Printf("[Cron] 定时调度器已启动")
 }
 
 // executeInspectionWithProgress 带进度更新的巡检执行
@@ -485,56 +419,6 @@ func sendNotifications(config *config.Config, reportFilePath string, reportData 
 	// 创建包含报告数据的上下文
 	ctx := context.WithValue(context.Background(), "report_data", *reportData)
 	sendNotificationsWithContext(ctx, config, reportFilePath, reportData)
-}
-
-// sendJobNotifications sends notifications to the channels configured in a cron job
-func sendJobNotifications(job database.CronJob, reportFilePath string, reportData *report.ReportData) {
-	if job.NotifyChannels == "" {
-		return
-	}
-	var channelIDs []uint
-	if err := json.Unmarshal([]byte(job.NotifyChannels), &channelIDs); err != nil || len(channelIDs) == 0 {
-		return
-	}
-	var channels []database.NotificationChannel
-	database.DB.Where("id IN ? AND enabled = ?", channelIDs, true).Find(&channels)
-	if len(channels) == 0 {
-		return
-	}
-	alertSummary := notify.CalculateAlertSummary(*reportData)
-	for _, ch := range channels {
-		sendSingleNotification(ch, reportFilePath, reportData.Datasource, alertSummary)
-	}
-}
-
-func sendSingleNotification(ch database.NotificationChannel, reportFilePath, datasource string, summary notify.AlertSummary) {
-	switch ch.ChannelType {
-	case "dingtalk":
-		var cfg notify.DingtalkConfig
-		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendDingtalk(cfg, reportFilePath, "PromAI", datasource, summary)
-		}
-	case "email":
-		var cfg notify.EmailConfig
-		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendEmail(cfg, reportFilePath, "PromAI", datasource, summary)
-		}
-	case "wechat_work":
-		var cfg notify.WeChatWorkConfig
-		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendWeChatWork(cfg, reportFilePath, "PromAI", datasource, summary)
-		}
-	case "wechat_app":
-		var cfg notify.WeChatAppConfig
-		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendWeChatApp(cfg, reportFilePath, "PromAI", datasource, summary)
-		}
-	case "feishu":
-		var cfg notify.FeishuConfig
-		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendFeishu(cfg, reportFilePath, "PromAI", datasource, summary)
-		}
-	}
 }
 
 // sendNotificationsWithContext 发送所有通知（支持动态URL）
@@ -1056,108 +940,6 @@ func recentActivitiesHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(activities); err != nil {
 		log.Printf("Error encoding activities: %v", err)
 	}
-}
-
-// adminHandler 管理后台页面处理器
-func adminHandler(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, "templates/admin.html")
-}
-
-// doInspection 执行巡检并保存报告记录
-func doInspection(cfg *config.Config, collector *metrics.Collector, job database.CronJob) {
-	// 如果任务指定了数据源，创建对应的 collector
-	activeCollector := collector
-	if job.DatasourceID != nil {
-		var ds database.DataSource
-		if database.DB.First(&ds, *job.DatasourceID).Error == nil {
-			client, err := prometheus.NewClient(ds.URL, ds.Username, ds.Password)
-			if err == nil {
-				activeCollector = metrics.NewCollector(client.API, cfg)
-			}
-		}
-	}
-
-	data, err := activeCollector.CollectMetrics()
-	if err != nil {
-		log.Printf("[Cron] 收集指标失败: %v", err)
-		now := time.Now()
-		database.DB.Model(&job).Updates(map[string]interface{}{
-			"last_run_at": now, "last_status": "failed",
-		})
-		return
-	}
-	if job.DatasourceID != nil {
-		var ds database.DataSource
-		if database.DB.First(&ds, *job.DatasourceID).Error == nil {
-			data.Datasource = ds.URL
-		}
-	} else {
-		data.Datasource = cfg.PrometheusURL
-	}
-
-	reportFilePath, err := report.GenerateReport(*data)
-	if err != nil {
-		log.Printf("[Cron] 生成报告失败: %v", err)
-		return
-	}
-
-	saveReportRecord(data, reportFilePath)
-	sendNotifications(cfg, reportFilePath, data)
-	sendJobNotifications(job, reportFilePath, data)
-
-	now := time.Now()
-	database.DB.Model(&job).Updates(map[string]interface{}{
-		"last_run_at": now, "last_status": "success",
-	})
-	log.Printf("[Cron] 定时任务 %s 完成: %s", job.Name, reportFilePath)
-}
-
-// saveReportRecord 保存报告记录到数据库
-func saveReportRecord(data *report.ReportData, reportPath string) {
-	alertCount := 0
-	criticalCount := 0
-	warningCount := 0
-	totalMetrics := 0
-	hasCritical := false
-	hasWarning := false
-
-	for _, group := range data.MetricGroups {
-		for _, metrics := range group.MetricsByName {
-			for _, m := range metrics {
-				totalMetrics++
-				switch m.Status {
-				case "critical":
-					criticalCount++
-					alertCount++
-					hasCritical = true
-				case "warning":
-					warningCount++
-					alertCount++
-					hasWarning = true
-				}
-			}
-		}
-	}
-
-	status := "success"
-	if hasCritical {
-		status = "danger"
-	} else if hasWarning {
-		status = "warning"
-	}
-
-	info, _ := os.Stat(reportPath)
-	database.DB.Create(&database.ReportRecord{
-		Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
-		DatasourceName: data.Datasource,
-		FilePath:       reportPath,
-		FileSize:       func() int64 { if info != nil { return info.Size() }; return 0 }(),
-		TotalMetrics:   totalMetrics,
-		AlertCount:     alertCount,
-		CriticalCount:  criticalCount,
-		WarningCount:   warningCount,
-		Status:         status,
-	})
 }
 
 // tasksHandler 处理任务列表API
