@@ -2078,27 +2078,24 @@ func (a *AdminAPI) handleSyncSourceByID(w http.ResponseWriter, r *http.Request) 
 			writeError(w, 404, "同步源不存在")
 			return
 		}
-		var upd database.SyncSource
+		var upd map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
 			writeError(w, 400, "请求体格式错误")
 			return
 		}
-		upd.ID = s.ID
-		upd.CreatedAt = s.CreatedAt
-		if upd.PasswordField == "" {
-			upd.PasswordField = s.PasswordField
+		delete(upd, "id")
+		delete(upd, "created_at")
+		if pw, ok := upd["auth_password"].(string); ok && pw == "" {
+			delete(upd, "auth_password")
 		}
-		if upd.AuthPassword == "" {
-			upd.AuthPassword = s.AuthPassword
+		if tok, ok := upd["auth_token"].(string); ok && tok == "" {
+			delete(upd, "auth_token")
 		}
-		if upd.AuthToken == "" {
-			upd.AuthToken = s.AuthToken
-		}
-		database.DB.Save(&upd)
-		a.rescheduleSyncSource(&s, &upd)
-		upd.AuthPassword = ""
-		upd.AuthToken = ""
-		writeJSON(w, upd)
+		database.DB.Model(&s).Updates(upd)
+		a.rescheduleSyncSource(&s, nil)
+		s.AuthPassword = ""
+		s.AuthToken = ""
+		writeJSON(w, s)
 	case "DELETE":
 		var s database.SyncSource
 		if database.DB.First(&s, id).Error != nil {
@@ -2376,6 +2373,9 @@ func (a *AdminAPI) scheduleSyncSource(s *database.SyncSource) {
 }
 
 func (a *AdminAPI) rescheduleSyncSource(old, new *database.SyncSource) {
+	if new == nil {
+		return
+	}
 	if old.CronExpr != new.CronExpr || old.Enabled != new.Enabled {
 		a.removeSyncCron(old.ID)
 		a.scheduleSyncSource(new)
