@@ -2187,7 +2187,7 @@ func (a *AdminAPI) executeSync(s *database.SyncSource) {
 	}
 
 	// Set default headers
-	if req.Header.Get("Content-Type") == "" && s.Body != "" {
+	if req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if req.Header.Get("Accept") == "" {
@@ -2217,7 +2217,11 @@ func (a *AdminAPI) executeSync(s *database.SyncSource) {
 	// Parse JSON
 	var data interface{}
 	if err := json.Unmarshal(body, &data); err != nil {
-		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("JSON解析失败: %v", err), 0, 0, 0, 0)
+		snippet := string(body)
+		if len(snippet) > 500 {
+			snippet = snippet[:500]
+		}
+		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("JSON解析失败: %v\n响应体: %s", err, snippet), 0, 0, 0, 0)
 		return
 	}
 
