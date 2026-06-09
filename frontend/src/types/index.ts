@@ -109,6 +109,7 @@ export interface SyncSource {
   data_path?: string
   name_field: string
   url_field?: string
+  url_template?: string
   username_field?: string
   password_field?: string
   cron_expr?: string

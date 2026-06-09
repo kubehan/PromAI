@@ -2239,7 +2239,12 @@ func (a *AdminAPI) executeSync(s *database.SyncSource) {
 			continue
 		}
 		url := ""
-		if s.URLField != "" {
+		if s.URLTemplate != "" {
+			url = s.URLTemplate
+			for k, v := range obj {
+				url = strings.ReplaceAll(url, "{"+k+"}", fmt.Sprintf("%v", v))
+			}
+		} else if s.URLField != "" {
 			url = fmt.Sprintf("%v", obj[s.URLField])
 		}
 		username := ""

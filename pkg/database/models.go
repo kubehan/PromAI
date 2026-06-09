@@ -160,6 +160,7 @@ type SyncSource struct {
 	DataPath      string    `gorm:"size:200" json:"data_path"`     // JSON path to data array (e.g. "data.items")
 	NameField     string    `gorm:"size:100;not null" json:"name_field"`
 	URLField      string    `gorm:"size:100" json:"url_field"`
+	URLTemplate   string    `gorm:"size:500" json:"url_template"`  // e.g. http://{host}:{port}
 	UsernameField string    `gorm:"size:100" json:"username_field"`
 	PasswordField string    `gorm:"size:100" json:"password_field"`
 	CronExpr      string    `gorm:"size:50" json:"cron_expr"`

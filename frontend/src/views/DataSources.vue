@@ -226,6 +226,13 @@
             </el-col>
           </el-row>
           <el-row :gutter="12">
+            <el-col :span="24">
+              <el-form-item label="URL 模板">
+                <el-input v-model="syncForm.url_template" placeholder='http://{host}:{port} — 留空则使用上方 URL 字段' />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
             <el-col :span="12">
               <el-form-item label="用户名字段">
                 <el-input v-model="syncForm.username_field" placeholder="username" />
@@ -330,7 +337,7 @@ function editSync(ss: SyncSource | null) {
     loadLogs(ss.id!)
   } else {
     selectedSyncId.value = null
-    syncForm.value = { name: '', url: '', method: 'GET', headers: '', body: '', auth_type: 'none', auth_username: '', auth_password: '', auth_token: '', data_path: '', name_field: 'name', url_field: '', username_field: '', password_field: '', cron_expr: '', enabled: true }
+    syncForm.value = { name: '', url: '', method: 'GET', headers: '', body: '', auth_type: 'none', auth_username: '', auth_password: '', auth_token: '', data_path: '', name_field: 'name', url_field: '', url_template: '', username_field: '', password_field: '', cron_expr: '', enabled: true }
   }
 }
 
