@@ -178,7 +178,7 @@
             </el-col>
             <el-col :span="18">
               <el-form-item label="请求头">
-                <el-input v-model="syncForm.headers" placeholder='{"Authorization":"Bearer xxx"}' />
+                <el-input v-model="syncForm.headers" type="textarea" :rows="3" placeholder="-H 'authorization: Token xxx'&#10;-H 'Referer: http://...'" />
               </el-form-item>
             </el-col>
           </el-row>

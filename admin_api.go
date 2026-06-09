@@ -2148,13 +2148,27 @@ func (a *AdminAPI) executeSync(s *database.SyncSource) {
 		return
 	}
 
-	// Custom headers
+	// Custom headers (support -H 'Key: Value' lines or JSON)
 	if s.Headers != "" {
-		var headers map[string]string
-		if err := json.Unmarshal([]byte(s.Headers), &headers); err == nil {
-			for k, v := range headers {
-				req.Header.Set(k, v)
+		headers := map[string]string{}
+		if err := json.Unmarshal([]byte(s.Headers), &headers); err != nil {
+			// Parse -H format: one -H 'Key: Value' per line
+			for _, line := range strings.Split(s.Headers, "\n") {
+				line = strings.TrimSpace(line)
+				if line == "" {
+					continue
+				}
+				// Strip optional -H prefix and quotes
+				line = strings.TrimPrefix(line, "-H")
+				line = strings.TrimSpace(line)
+				line = strings.Trim(line, "'\"")
+				if k, v, ok := strings.Cut(line, ":"); ok {
+					headers[strings.TrimSpace(k)] = strings.TrimSpace(v)
+				}
 			}
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
 		}
 	}
 
