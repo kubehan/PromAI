@@ -190,6 +190,8 @@ func getStatus(value, threshold float64, thresholdType, thresholdStatus string) 
 		triggered = value <= threshold
 	case "equal":
 		triggered = value == threshold
+	case "not_equal":
+		triggered = value != threshold
 	}
 
 	if triggered {
@@ -210,6 +212,8 @@ func getStatus(value, threshold float64, thresholdType, thresholdStatus string) 
 		warningTriggered = value <= threshold*0.9
 	case "equal":
 		warningTriggered = math.Abs(value-threshold) <= threshold*0.2
+	case "not_equal":
+		warningTriggered = math.Abs(value-threshold) <= threshold*0.1
 	}
 
 	if warningTriggered {
