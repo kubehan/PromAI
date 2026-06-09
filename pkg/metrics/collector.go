@@ -59,8 +59,12 @@ func (c *Collector) UpdatePrometheusURL(url,username,password string) error {
 
 // CollectMetrics 收集指标数据
 func (c *Collector) CollectMetrics() (*report.ReportData, error) {
+	return c.CollectMetricsWithContext(context.Background())
+}
+
+// CollectMetricsWithContext 使用指定context收集指标数据
+func (c *Collector) CollectMetricsWithContext(ctx context.Context) (*report.ReportData, error) {
 	log.Printf("[DEBUG] 开始收集指标，使用数据源: %s", c.prometheusURL)
-	ctx := context.Background()
 
 	data := &report.ReportData{
 		Timestamp:    time.Now(),
@@ -122,15 +126,16 @@ func (c *Collector) CollectMetrics() (*report.ReportData, error) {
 					}
 
 					metricData := report.MetricData{
-						Name:        metric.Name,
-						Description: metric.Description,
-						Value:       value,
-						Threshold:   metric.Threshold,
-						Unit:        metric.Unit,
-						Status:      getStatus(value, metric.Threshold, metric.ThresholdType, metric.ThresholdStatus),
-						StatusText:  report.GetStatusText(getStatus(value, metric.Threshold, metric.ThresholdType, metric.ThresholdStatus)),
-						Timestamp:   time.Now(),
-						Labels:      labels,
+						Name:          metric.Name,
+						Description:   metric.Description,
+						Value:         value,
+						Threshold:     metric.Threshold,
+						ThresholdType: metric.ThresholdType,
+						Unit:          metric.Unit,
+						Status:        getStatus(value, metric.Threshold, metric.ThresholdType, metric.ThresholdStatus),
+						StatusText:    report.GetStatusText(getStatus(value, metric.Threshold, metric.ThresholdType, metric.ThresholdStatus)),
+						Timestamp:     time.Now(),
+						Labels:        labels,
 					}
 
 					if err := validateMetricData(metricData, metric.Labels); err != nil {
@@ -200,32 +205,33 @@ func getStatus(value, threshold float64, thresholdType, thresholdStatus string) 
 	}
 
 	// 未触发阈值条件，判断是否接近阈值（警告状态）
+	const warningMargin = 0.1 // 10% 的预警告区间
 	warningTriggered := false
 	switch thresholdType {
-	case "greater":
-		warningTriggered = value >= threshold*0.9
-	case "greater_equal":
-		warningTriggered = value >= threshold*0.9
-	case "less":
-		warningTriggered = value <= threshold*0.9
-	case "less_equal":
-		warningTriggered = value <= threshold*0.9
+	case "greater", "greater_equal":
+		if threshold > 0 {
+			warningTriggered = value >= threshold*(1-warningMargin)
+		}
+	case "less", "less_equal":
+		if threshold > 0 {
+			warningTriggered = value <= threshold*(1+warningMargin)
+		}
 	case "equal":
-		warningTriggered = math.Abs(value-threshold) <= threshold*0.2
+		if threshold > 0 {
+			warningTriggered = math.Abs(value-threshold) <= threshold*0.2
+		}
 	case "not_equal":
-		warningTriggered = math.Abs(value-threshold) <= threshold*0.1
+		if threshold > 0 {
+			warningTriggered = math.Abs(value-threshold) <= threshold*0.1
+		}
 	}
 
 	if warningTriggered {
 		return "warning"
 	}
 
-	// 既未触发阈值也未接近阈值，根据threshold_status决定默认状态
-	if thresholdStatus == "critical" {
-		return "normal"
-	} else {
-		return "critical"
-	}
+	// 既未触发阈值也未接近阈值，正常状态
+	return "normal"
 }
 
 // validateLabels 验证标签数据的完整性

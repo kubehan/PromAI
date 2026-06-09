@@ -182,7 +182,7 @@
         <el-row :gutter="16">
           <el-col :span="6">
             <el-form-item label="阈值">
-              <el-input-number v-model="metricEditForm.threshold" :min="0" :step="0.1" style="width: 100%;" :precision="2" />
+              <el-input v-model.number="metricEditForm.threshold" type="number" step="0.1" style="width: 100%;" placeholder="请输入阈值" />
             </el-form-item>
           </el-col>
           <el-col :span="9">

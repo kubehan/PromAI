@@ -196,14 +196,16 @@ func SendFeishuWithContext(ctx context.Context, config FeishuConfig, reportPath 
 	typeSummaryText := ""
 	if len(typeSummaries) > 0 {
 		for _, s := range typeSummaries {
-			status := "✅"
-			if s.CriticalCount > 0 {
-				status = "❌"
-			} else if s.WarningCount > 0 {
-				status = "⚠️"
-			}
-			typeSummaryText += fmt.Sprintf("%s%s：总%d个，异常%d个（严重%d，警告%d），正常%d个\n",
-				status, s.Type, s.TotalMetrics, s.CriticalCount+s.WarningCount, s.CriticalCount, s.WarningCount, s.NormalCount)
+		status := "✅"
+		if s.TotalMetrics == 0 {
+			status = "⚪"
+		} else if s.CriticalCount > 0 {
+			status = "❌"
+		} else if s.WarningCount > 0 {
+			status = "⚠️"
+		}
+		typeSummaryText += fmt.Sprintf("%s%s：总%d个，异常%d个（严重%d，警告%d），正常%d个\n",
+			status, s.Type, s.TotalMetrics, s.CriticalCount+s.WarningCount, s.CriticalCount, s.WarningCount, s.NormalCount)
 		}
 	} else {
 		typeSummaryText = "暂无分类数据\n"
@@ -649,7 +651,9 @@ func SendWeChatWorkWithWebhook(ctx context.Context, botKey string, proxyURL stri
 	typeSummaryText := ""
 	for _, summary := range typeSummaries {
 		typeStatus := "✅"
-		if summary.CriticalCount > 0 {
+		if summary.TotalMetrics == 0 {
+			typeStatus = "⚪"
+		} else if summary.CriticalCount > 0 {
 			typeStatus = "❌"
 		} else if summary.WarningCount > 0 {
 			typeStatus = "⚠️"
@@ -789,7 +793,9 @@ func SendWeChatWorkWithContext(ctx context.Context, config WeChatWorkConfig, rep
 	typeSummaryText := ""
 	for _, summary := range typeSummaries {
 		typeStatus := "✅"
-		if summary.CriticalCount > 0 {
+		if summary.TotalMetrics == 0 {
+			typeStatus = "⚪"
+		} else if summary.CriticalCount > 0 {
 			typeStatus = "❌"
 		} else if summary.WarningCount > 0 {
 			typeStatus = "⚠️"

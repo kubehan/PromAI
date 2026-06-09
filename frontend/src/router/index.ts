@@ -2,6 +2,12 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/Login.vue'),
+    meta: { title: '登录', noAuth: true },
+  },
+  {
     path: '/',
     redirect: '/dashboard',
   },
@@ -60,6 +66,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '触发巡检', icon: 'Monitor' },
   },
   {
+    path: '/inspect-records',
+    name: 'InspectRecords',
+    component: () => import('../views/InspectRecords.vue'),
+    meta: { title: '巡检记录', icon: 'List' },
+  },
+  {
     path: '/templates',
     name: 'Templates',
     component: () => import('../views/InspectionTemplates.vue'),
@@ -70,6 +82,19 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
   history: createWebHistory('/api/promai/admin/'),
   routes,
+})
+
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('token')
+  if (to.meta.noAuth) {
+    next()
+    return
+  }
+  if (!token) {
+    next('/login')
+    return
+  }
+  next()
 })
 
 export default router

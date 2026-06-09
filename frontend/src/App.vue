@@ -1,140 +1,162 @@
 <template>
-  <div class="app-shell">
-    <div class="bg-grid"></div>
-    <el-container class="app-layout">
-      <el-aside :width="sidebarWidth" class="app-sidebar">
-        <div class="sidebar-header">
-          <div class="logo">
-            <div class="logo-icon">
-              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
-                <path d="M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z" fill="white" opacity="0.9"/>
-                <path d="M16 12l-2.5 4h5L16 12z" fill="white"/>
-                <defs>
-                  <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32">
-                    <stop offset="0%" stop-color="#00d4ff"/>
-                    <stop offset="100%" stop-color="#7c3aed"/>
-                  </linearGradient>
-                </defs>
-              </svg>
+  <template v-if="showLayout">
+    <div class="app-shell">
+      <div class="bg-grid"></div>
+      <el-container class="app-layout">
+        <el-aside :width="sidebarWidth" class="app-sidebar">
+          <div class="sidebar-header">
+            <div class="logo">
+              <div class="logo-icon">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                  <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
+                  <path d="M16 8c-4.4 0-8 3.6-8 8s3.6 8 8 8 8-3.6 8-8-3.6-8-8-8zm0 14c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z" fill="white" opacity="0.9"/>
+                  <path d="M16 12l-2.5 4h5L16 12z" fill="white"/>
+                  <defs>
+                    <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32">
+                      <stop offset="0%" stop-color="#00d4ff"/>
+                      <stop offset="100%" stop-color="#7c3aed"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <div class="logo-text-group" v-show="!collapsed">
+                <span class="logo-text">PromAI</span>
+                <span class="logo-sub">运维监控平台</span>
+              </div>
             </div>
-            <div class="logo-text-group" v-show="!collapsed">
-              <span class="logo-text">PromAI</span>
-              <span class="logo-sub">运维监控平台</span>
-            </div>
+            <el-button text class="collapse-btn" @click="toggleCollapse">
+              <el-icon :size="18" color="rgba(255,255,255,0.4)">
+                <Fold v-if="!collapsed" /><Expand v-else />
+              </el-icon>
+            </el-button>
           </div>
-          <el-button text class="collapse-btn" @click="toggleCollapse">
-            <el-icon :size="18" color="rgba(255,255,255,0.4)">
-              <Fold v-if="!collapsed" /><Expand v-else />
-            </el-icon>
-          </el-button>
-        </div>
 
-        <div class="sidebar-nav">
-          <el-menu
-            :default-active="currentRoute"
-            :collapse="collapsed"
-            :collapse-transition="false"
-            background-color="transparent"
-            text-color="rgba(255,255,255,0.5)"
-            active-text-color="#00d4ff"
-            router
-          >
-            <el-menu-item index="/dashboard">
-              <el-icon><Odometer /></el-icon>
-              <span>控制台</span>
-            </el-menu-item>
-            <el-menu-item index="/bi">
-              <el-icon><DataAnalysis /></el-icon>
-              <span>健康大屏</span>
-            </el-menu-item>
-            <el-menu-item index="/datasources">
-              <el-icon><Connection /></el-icon>
-              <span>数据源管理</span>
-            </el-menu-item>
-            <el-menu-item index="/notifications">
-              <el-icon><Bell /></el-icon>
-              <span>通知渠道</span>
-            </el-menu-item>
-            <el-menu-item index="/cronjobs">
-              <el-icon><Clock /></el-icon>
-              <span>定时任务</span>
-            </el-menu-item>
-            <el-menu-item index="/reports">
-              <el-icon><Document /></el-icon>
-              <span>报告管理</span>
-            </el-menu-item>
-            <el-sub-menu index="metrics-group">
-              <template #title>
-                <el-icon><TrendCharts /></el-icon>
-                <span>指标配置</span>
-              </template>
-              <el-menu-item index="/metrics">
-                <el-icon><List /></el-icon>
-                <span>指标列表</span>
+          <div class="sidebar-nav">
+            <el-menu
+              :default-active="currentRoute"
+              :collapse="collapsed"
+              :collapse-transition="false"
+              background-color="transparent"
+              text-color="rgba(255,255,255,0.5)"
+              active-text-color="#00d4ff"
+              router
+            >
+              <el-menu-item index="/dashboard">
+                <el-icon><Odometer /></el-icon>
+                <span>控制台</span>
               </el-menu-item>
-              <el-menu-item index="/templates">
-                <el-icon><Collection /></el-icon>
-                <span>巡检模板</span>
+              <el-menu-item index="/bi">
+                <el-icon><DataAnalysis /></el-icon>
+                <span>健康大屏</span>
               </el-menu-item>
-            </el-sub-menu>
-            <el-menu-item index="/settings">
-              <el-icon><Setting /></el-icon>
-              <span>系统设置</span>
-            </el-menu-item>
+              <el-menu-item index="/datasources">
+                <el-icon><Connection /></el-icon>
+                <span>数据源管理</span>
+              </el-menu-item>
+              <el-menu-item index="/notifications">
+                <el-icon><Bell /></el-icon>
+                <span>通知渠道</span>
+              </el-menu-item>
+              <el-menu-item index="/cronjobs">
+                <el-icon><Clock /></el-icon>
+                <span>定时任务</span>
+              </el-menu-item>
+              <el-menu-item index="/reports">
+                <el-icon><Document /></el-icon>
+                <span>报告管理</span>
+              </el-menu-item>
+              <el-sub-menu index="metrics-group">
+                <template #title>
+                  <el-icon><TrendCharts /></el-icon>
+                  <span>指标配置</span>
+                </template>
+                <el-menu-item index="/metrics">
+                  <el-icon><List /></el-icon>
+                  <span>指标列表</span>
+                </el-menu-item>
+                <el-menu-item index="/templates">
+                  <el-icon><Collection /></el-icon>
+                  <span>巡检模板</span>
+                </el-menu-item>
+              </el-sub-menu>
+              <el-menu-item index="/settings">
+                <el-icon><Setting /></el-icon>
+                <span>系统设置</span>
+              </el-menu-item>
             <el-menu-item index="/inspection">
               <el-icon><Monitor /></el-icon>
               <template #title>触发巡检</template>
             </el-menu-item>
+            <el-menu-item index="/inspect-records">
+              <el-icon><List /></el-icon>
+              <span>巡检记录</span>
+            </el-menu-item>
           </el-menu>
-        </div>
-
-        <div class="sidebar-footer" v-show="!collapsed">
-          <div class="status-dot"></div>
-          <span>系统运行中</span>
-        </div>
-      </el-aside>
-
-      <el-container>
-        <el-header class="app-header">
-          <div class="header-left">
-            <el-breadcrumb separator="/">
-              <el-breadcrumb-item :to="{ path: '/dashboard' }">PromAI</el-breadcrumb-item>
-              <el-breadcrumb-item v-if="currentMeta?.title">{{ currentMeta.title }}</el-breadcrumb-item>
-            </el-breadcrumb>
           </div>
-          <div class="header-right">
-            <div class="header-status">
-              <span class="status-indicator"></span>
-              <span class="status-label">All Systems Normal</span>
+
+          <div class="sidebar-footer" v-show="!collapsed">
+            <div class="status-dot"></div>
+            <span>系统运行中</span>
+          </div>
+        </el-aside>
+
+        <el-container>
+          <el-header class="app-header">
+            <div class="header-left">
+              <el-breadcrumb separator="/">
+                <el-breadcrumb-item :to="{ path: '/dashboard' }">PromAI</el-breadcrumb-item>
+                <el-breadcrumb-item v-if="currentMeta?.title">{{ currentMeta.title }}</el-breadcrumb-item>
+              </el-breadcrumb>
             </div>
-          </div>
-        </el-header>
+            <div class="header-right">
+              <div class="header-user">
+                <el-icon><User /></el-icon>
+                <span class="user-name">{{ username }}</span>
+              </div>
+              <el-button text style="color: rgba(255,255,255,0.4);" @click="handleLogout">
+                <el-icon><SwitchButton /></el-icon>
+                <span style="margin-left: 4px; font-size: 13px;">退出</span>
+              </el-button>
+            </div>
+          </el-header>
 
-        <el-main class="app-main">
-          <router-view v-slot="{ Component }">
-            <transition name="page-fade" mode="out-in">
-              <component :is="Component" />
-            </transition>
-          </router-view>
-        </el-main>
+          <el-main class="app-main">
+            <router-view v-slot="{ Component }">
+              <transition name="page-fade" mode="out-in">
+                <component :is="Component" />
+              </transition>
+            </router-view>
+          </el-main>
+        </el-container>
       </el-container>
-    </el-container>
-  </div>
+    </div>
+  </template>
+  <template v-else>
+    <router-view />
+  </template>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
+const router = useRouter()
 const collapsed = ref(false)
 const sidebarWidth = computed(() => collapsed.value ? '68px' : '260px')
 const currentRoute = computed(() => route.path)
 const currentMeta = computed(() => route.meta)
+const showLayout = computed(() => route.path !== '/login')
+const username = ref(localStorage.getItem('username') || 'Admin')
 
 function toggleCollapse() {
   collapsed.value = !collapsed.value
+}
+
+function handleLogout() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('username')
+  router.push('/login')
 }
 </script>
 
@@ -336,29 +358,23 @@ function toggleCollapse() {
 
 .header-left .el-breadcrumb { font-size: 14px; }
 
-.header-status {
+.header-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
-  border-radius: 20px;
-  background: rgba(16, 185, 129, 0.08);
-  border: 1px solid rgba(16, 185, 129, 0.15);
 }
 
-.status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--emerald);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
 }
 
-.status-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--emerald);
-  letter-spacing: 0.5px;
+.user-name {
+  font-weight: 500;
 }
 
 .app-main {

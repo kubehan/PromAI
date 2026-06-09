@@ -44,13 +44,20 @@
             <span v-else style="color: var(--text-tertiary); font-size: 13px;">-</span>
           </template>
         </el-table-column>
+        <el-table-column label="通知渠道" width="180">
+          <template #default="{ row }">
+            <span v-if="row.notify_channels" style="color: var(--text-secondary); font-size: 13px;">{{ channelNames(row.notify_channels) }}</span>
+            <span v-else style="color: var(--text-tertiary); font-size: 13px;">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="创建时间" width="170">
           <template #default="{ row }">{{ dayjs(row.created_at).format('MM-DD HH:mm') }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="360" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text @click="openEdit(row)" style="color: var(--cyan);">编辑</el-button>
-            <el-button size="small" text @click="inspectDS(row)" style="color: var(--emerald);">巡检</el-button>
+            <el-button size="small" text @click="testConnectivity(row)" style="color: var(--emerald);">测试连接</el-button>
+            <el-button size="small" text @click="inspectDS(row)" style="color: var(--orange);">巡检</el-button>
             <el-dropdown trigger="click" @command="(cmd: string) => handleMore(row, cmd)">
               <el-button size="small" text style="color: var(--text-tertiary);">
                 更多<el-icon><ArrowDown /></el-icon>
@@ -86,6 +93,12 @@
             <el-option v-for="t in templates" :key="t.id" :label="t.name + ' (' + t.metric_count + ' 指标)'" :value="t.id" />
           </el-select>
           <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">绑定的模板在巡检时优先使用，未绑定时使用「导入全局指标」生成的配置</div>
+        </el-form-item>
+        <el-form-item label="通知渠道">
+          <el-select v-model="selectedChannels" multiple placeholder="不发送通知" clearable style="width: 100%;">
+            <el-option v-for="ch in notifChannels" :key="ch.id" :label="ch.name + ' (' + ch.channel_type + ')'" :value="ch.id" />
+          </el-select>
+          <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">点击「巡检」时将自动推送报告到选中的通知渠道</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -126,7 +139,7 @@ import { ref, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, triggerInspect } from '../api'
+import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource } from '../api'
 import type { DataSource } from '../types'
 
 const loading = ref(false)
@@ -134,12 +147,14 @@ const saving = ref(false)
 const importing = ref(false)
 const datasources = ref<DataSource[]>([])
 const templates = ref<any[]>([])
+const notifChannels = ref<any[]>([])
 const dialogVisible = ref(false)
 const importVisible = ref(false)
 const editingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const yamlContent = ref('')
 const form = ref<DataSource>({ name: '', url: '', username: '', password: '' })
+const selectedChannels = ref<number[]>([])
 const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   url: [{ required: true, message: '请输入 URL', trigger: 'blur' }],
@@ -148,10 +163,18 @@ const rules = {
 async function fetchData() {
   loading.value = true
   try {
-    const [dsRes, tmplRes] = await Promise.all([getDataSources(), getTemplates()])
+    const [dsRes, tmplRes, notifRes] = await Promise.all([getDataSources(), getTemplates(), getNotifications()])
     datasources.value = dsRes.data
     templates.value = tmplRes.data
+    notifChannels.value = notifRes.data
   } finally { loading.value = false }
+}
+
+function channelNames(json: string) {
+  try {
+    const ids = JSON.parse(json) as number[]
+    return ids.map(id => notifChannels.value.find(c => c.id === id)?.name || `ID: ${id}`).join(', ')
+  } catch { return '' }
 }
 
 function templateName(id: number | null | undefined) {
@@ -163,12 +186,14 @@ function templateName(id: number | null | undefined) {
 function openCreate() {
   editingId.value = null
   form.value = { name: '', url: '', username: '', password: '' }
+  selectedChannels.value = []
   dialogVisible.value = true
 }
 
 function openEdit(row: DataSource) {
   editingId.value = row.id!
   form.value = { ...row }
+  selectedChannels.value = row.notify_channels ? JSON.parse(row.notify_channels) : []
   dialogVisible.value = true
 }
 
@@ -177,11 +202,15 @@ async function handleSave() {
   if (!valid) return
   saving.value = true
   try {
+    const payload = {
+      ...form.value,
+      notify_channels: selectedChannels.value.length ? JSON.stringify(selectedChannels.value) : '',
+    }
     if (editingId.value) {
-      await updateDataSource(editingId.value, form.value)
+      await updateDataSource(editingId.value, payload)
       ElMessage.success('更新成功')
     } else {
-      await createDataSource(form.value)
+      await createDataSource(payload)
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
@@ -191,14 +220,41 @@ async function handleSave() {
   } finally { saving.value = false }
 }
 
+async function testConnectivity(row: DataSource) {
+  try {
+    const res = await testDataSource(row.id!)
+    if (res.data.success) {
+      ElMessage.success('连接成功')
+    } else {
+      ElMessage.error(res.data.message || '连接失败')
+    }
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  }
+}
+
 async function inspectDS(row: DataSource) {
-  ElMessage.info(`正在对「${row.name}」执行巡检...`)
   try {
     const res = await triggerInspect({ datasource_id: row.id })
-    ElMessage.success('巡检完成')
-    if (res.data.url) {
-      window.open(res.data.url, '_blank')
+    const taskId = res.data.task_id
+    if (!taskId) { ElMessage.error('巡检启动失败'); return }
+
+    ElMessage.info(`巡检已开始，正在等待结果...`)
+    for (let i = 0; i < 120; i++) {
+      await new Promise(r => setTimeout(r, 2000))
+      const taskRes = await getInspectTask(taskId)
+      const task = taskRes.data
+      if (task.status === 'completed') {
+        ElMessage.success('巡检完成')
+        if (task.report_url) window.open(task.report_url, '_blank')
+        return
+      }
+      if (task.status === 'failed') {
+        ElMessage.error(task.error || '巡检失败')
+        return
+      }
     }
+    ElMessage.error('巡检超时')
   } catch (e: any) {
     ElMessage.error(e.message)
   }

@@ -6,6 +6,7 @@ export interface DataSource {
   password?: string
   is_default?: boolean
   template_id?: number | null
+  notify_channels?: string
   created_at?: string
 }
 
@@ -80,6 +81,18 @@ export interface DashboardStats {
   total_reports: number
   total_notifications: number
   recent_reports: ReportRecord[]
+}
+
+export interface InspectRecord {
+  id: number
+  task_id: string
+  status: string
+  datasource_name: string
+  message: string
+  error: string
+  report_url: string
+  started_at: string
+  completed_at: string | null
 }
 
 export interface InspectRequest {

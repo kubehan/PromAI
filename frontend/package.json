@@ -16,7 +16,8 @@
     "element-plus": "^2.7.0",
     "vue": "^3.4.0",
     "vue-echarts": "^8.0.1",
-    "vue-router": "^4.3.0"
+    "vue-router": "^4.3.0",
+    "vue3-grid-layout": "^1.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",

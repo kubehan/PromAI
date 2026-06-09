@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"PromAI/pkg/config"
@@ -23,40 +25,316 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+type InspectTask struct {
+	ID         string `json:"id"`
+	Status     string `json:"status"` // running, completed, failed
+	Message    string `json:"message"`
+	ReportURL  string `json:"report_url,omitempty"`
+	Error      string `json:"error,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+var (
+	inspectTasks   = make(map[string]*InspectTask)
+	inspectTasksMu sync.Mutex
+	taskCounter    int
+)
+
+func newTaskID() string {
+	taskCounter++
+	return fmt.Sprintf("task_%d_%d", time.Now().Unix(), taskCounter)
+}
+
+type MetricHealthData struct {
+	MetricName    string            `json:"metric_name"`
+	TypeName      string            `json:"type_name"`
+	Status        string            `json:"status"`
+	Value         float64           `json:"value"`
+	Unit          string            `json:"unit"`
+	Threshold     float64           `json:"threshold"`
+	ThresholdType string            `json:"threshold_type"`
+	Labels        map[string]string `json:"labels"`
+}
+
+type DatasourceHealthSnapshot struct {
+	DatasourceName string             `json:"datasource_name"`
+	TotalMetrics   int                `json:"total_metrics"`
+	CriticalCount  int                `json:"critical_count"`
+	WarningCount   int                `json:"warning_count"`
+	Metrics        []MetricHealthData `json:"metrics"`
+}
+
+func reportDataToHealth(data *report.ReportData) *DatasourceHealthSnapshot {
+	var metrics []MetricHealthData
+	criticals := 0
+	warnings := 0
+	for _, group := range data.MetricGroups {
+		for metricName, metricList := range group.MetricsByName {
+			for _, m := range metricList {
+				if m.Status == "critical" {
+					criticals++
+				} else if m.Status == "warning" {
+					warnings++
+				}
+				labels := make(map[string]string)
+				for _, l := range m.Labels {
+					key := l.Alias
+					if key == "" {
+						key = l.Name
+					}
+					labels[key] = l.Value
+				}
+				metrics = append(metrics, MetricHealthData{
+					MetricName:    metricName,
+					TypeName:      group.Type,
+					Status:        m.Status,
+					Value:         m.Value,
+					Unit:          m.Unit,
+					Threshold:     m.Threshold,
+					ThresholdType: m.ThresholdType,
+					Labels:        labels,
+				})
+			}
+		}
+	}
+	return &DatasourceHealthSnapshot{
+		DatasourceName: data.Datasource,
+		TotalMetrics:   len(metrics),
+		CriticalCount:  criticals,
+		WarningCount:   warnings,
+		Metrics:        metrics,
+	}
+}
+
+func buildHealthSnapshot(data *report.ReportData) string {
+	var metrics []MetricHealthData
+	for _, group := range data.MetricGroups {
+		for metricName, metricList := range group.MetricsByName {
+			for _, m := range metricList {
+				labels := make(map[string]string)
+				for _, l := range m.Labels {
+					key := l.Alias
+					if key == "" {
+						key = l.Name
+					}
+					labels[key] = l.Value
+				}
+				metrics = append(metrics, MetricHealthData{
+					MetricName:    metricName,
+					TypeName:      group.Type,
+					Status:        m.Status,
+					Value:         m.Value,
+					Unit:          m.Unit,
+					Threshold:     m.Threshold,
+					ThresholdType: m.ThresholdType,
+					Labels:        labels,
+				})
+			}
+		}
+	}
+	snapshot := DatasourceHealthSnapshot{
+		DatasourceName: data.Datasource,
+		TotalMetrics:   len(metrics),
+		Metrics:        metrics,
+	}
+	for _, m := range metrics {
+		if m.Status == "critical" {
+			snapshot.CriticalCount++
+		} else if m.Status == "warning" {
+			snapshot.WarningCount++
+		}
+	}
+	b, _ := json.Marshal(snapshot)
+	return string(b)
+}
+
+var (
+	latestReports   map[string]*DatasourceHealthSnapshot
+	latestReportsMu sync.RWMutex
+)
+
+func setLatestReport(key string, data *DatasourceHealthSnapshot) {
+	latestReportsMu.Lock()
+	defer latestReportsMu.Unlock()
+	if latestReports == nil {
+		latestReports = make(map[string]*DatasourceHealthSnapshot)
+	}
+	latestReports[key] = data
+}
+
+func getLatestReport(key string) *DatasourceHealthSnapshot {
+	latestReportsMu.RLock()
+	defer latestReportsMu.RUnlock()
+	if latestReports == nil {
+		return nil
+	}
+	return latestReports[key]
+}
+
+func loadLatestReports() {
+	var records []database.ReportRecord
+	database.DB.Where("metrics_json != ''").Order("created_at desc").Find(&records)
+	seen := make(map[string]bool)
+	for _, r := range records {
+		key := r.DatasourceName
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		var snapshot DatasourceHealthSnapshot
+		if err := json.Unmarshal([]byte(r.MetricsJSON), &snapshot); err == nil {
+			setLatestReport(key, &snapshot)
+		}
+	}
+	log.Printf("已加载 %d 个数据源的最新巡检快照", len(seen))
+}
+
 type AdminAPI struct {
-	collector *metrics.Collector
-	config    *config.Config
+	collector  *metrics.Collector
+	config     *config.Config
+	authUser   string
+	authPass   string
+	jwtSecret  string
 }
 
 func NewAdminAPI(collector *metrics.Collector, cfg *config.Config) *AdminAPI {
-	return &AdminAPI{collector: collector, config: cfg}
+	authUser := cfg.Auth.Username
+	authPass := cfg.Auth.Password
+	jwtSecret := cfg.Auth.JWTSecret
+
+	if envUser := os.Getenv("PROMAI_AUTH_USERNAME"); envUser != "" {
+		authUser = envUser
+	}
+	if envPass := os.Getenv("PROMAI_AUTH_PASSWORD"); envPass != "" {
+		authPass = envPass
+	}
+	if envSecret := os.Getenv("PROMAI_JWT_SECRET"); envSecret != "" {
+		jwtSecret = envSecret
+	}
+
+	if authUser == "" {
+		authUser = "admin"
+	}
+	if authPass == "" {
+		authPass = "admin"
+	}
+	if jwtSecret == "" {
+		jwtSecret = "promai-default-secret"
+	}
+
+	return &AdminAPI{
+		collector: collector,
+		config:    cfg,
+		authUser:  authUser,
+		authPass:  authPass,
+		jwtSecret: jwtSecret,
+	}
 }
 
 func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
-	mux.HandleFunc("/api/v1/datasources", a.handleDataSources)
-	mux.HandleFunc("/api/v1/datasources/", a.handleDataSourceByID)
-	mux.HandleFunc("/api/v1/notifications", a.handleNotifications)
-	mux.HandleFunc("/api/v1/notifications/", a.handleNotificationByID)
-	mux.HandleFunc("/api/v1/cronjobs", a.handleCronJobs)
-	mux.HandleFunc("/api/v1/cronjobs/", a.handleCronJobByID)
-	mux.HandleFunc("/api/v1/reports", a.handleReports)
-	mux.HandleFunc("/api/v1/reports/", a.handleReportByID)
-	mux.HandleFunc("/api/v1/metrics/types", a.handleMetricTypes)
-	mux.HandleFunc("/api/v1/metrics/types/", a.handleMetricTypeByID)
-	mux.HandleFunc("/api/v1/metrics/configs", a.handleMetricConfigs)
-	mux.HandleFunc("/api/v1/metrics/configs/", a.handleMetricConfigByID)
-	mux.HandleFunc("/api/v1/metrics/validate", a.handleValidatePromQL)
-	mux.HandleFunc("/api/v1/templates", a.handleTemplates)
-	mux.HandleFunc("/api/v1/templates/", a.handleTemplateByID)
-	mux.HandleFunc("/api/v1/settings", a.handleSettings)
-	mux.HandleFunc("/api/v1/inspect", a.handleInspect)
-	mux.HandleFunc("/api/v1/datasources/import", a.handleImportDatasource)
-	mux.HandleFunc("/api/v1/notifications/test", a.handleTestNotification)
-	mux.HandleFunc("/api/v1/dashboard/stats", a.handleDashboardStats)
-	mux.HandleFunc("/api/v1/dashboard/health", a.handleDashboardHealth)
-	mux.HandleFunc("/api/v1/datasources/apply-template", a.handleApplyTemplate)
+	// Public auth routes (no auth required)
+	mux.HandleFunc("/api/v1/auth/login", a.handleLogin)
+
+	// Auth middleware helper
+	auth := a.authMiddleware
+
+	// Protected routes
+	mux.HandleFunc("/api/v1/auth/me", auth(a.handleMe))
+	mux.HandleFunc("/api/v1/datasources", auth(a.handleDataSources))
+	mux.HandleFunc("/api/v1/datasources/", auth(a.handleDataSourceByID))
+	mux.HandleFunc("/api/v1/notifications", auth(a.handleNotifications))
+	mux.HandleFunc("/api/v1/notifications/", auth(a.handleNotificationByID))
+	mux.HandleFunc("/api/v1/cronjobs", auth(a.handleCronJobs))
+	mux.HandleFunc("/api/v1/cronjobs/", auth(a.handleCronJobByID))
+	mux.HandleFunc("/api/v1/reports", auth(a.handleReports))
+	mux.HandleFunc("/api/v1/reports/", auth(a.handleReportByID))
+	mux.HandleFunc("/api/v1/metrics/types", auth(a.handleMetricTypes))
+	mux.HandleFunc("/api/v1/metrics/types/", auth(a.handleMetricTypeByID))
+	mux.HandleFunc("/api/v1/metrics/configs", auth(a.handleMetricConfigs))
+	mux.HandleFunc("/api/v1/metrics/configs/", auth(a.handleMetricConfigByID))
+	mux.HandleFunc("/api/v1/metrics/validate", auth(a.handleValidatePromQL))
+	mux.HandleFunc("/api/v1/templates", auth(a.handleTemplates))
+	mux.HandleFunc("/api/v1/templates/", auth(a.handleTemplateByID))
+	mux.HandleFunc("/api/v1/settings", auth(a.handleSettings))
+	mux.HandleFunc("/api/v1/inspect", auth(a.handleInspect))
+	mux.HandleFunc("/api/v1/inspect/records", auth(a.handleInspectRecords))
+	mux.HandleFunc("/api/v1/inspect/task/", auth(a.handleInspectTask))
+	mux.HandleFunc("/api/v1/datasources/import", auth(a.handleImportDatasource))
+	mux.HandleFunc("/api/v1/notifications/test", auth(a.handleTestNotification))
+	mux.HandleFunc("/api/v1/dashboard/stats", auth(a.handleDashboardStats))
+	mux.HandleFunc("/api/v1/dashboard/health", auth(a.handleDashboardHealth))
+	mux.HandleFunc("/api/v1/dashboard/health/trend", auth(a.handleDashboardHealthTrend))
+	mux.HandleFunc("/api/v1/datasources/apply-template", auth(a.handleApplyTemplate))
 
 	log.Printf("[AdminAPI] 管理接口已注册")
+}
+
+// authMiddleware 验证 JWT Token
+func (a *AdminAPI) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			writeError(w, 401, "未登录")
+			return
+		}
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			writeError(w, 401, "无效的认证令牌")
+			return
+		}
+		claims, err := validateToken(parts[1], a.jwtSecret)
+		if err != nil {
+			writeError(w, 401, "认证令牌无效或已过期")
+			return
+		}
+		ctx := context.WithValue(r.Context(), "username", claims.Username)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+// handleLogin 处理登录请求
+func (a *AdminAPI) handleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, 400, "请求体格式错误")
+		return
+	}
+	if req.Username == "" || req.Password == "" {
+		writeError(w, 400, "用户名和密码不能为空")
+		return
+	}
+	if req.Username != a.authUser || req.Password != a.authPass {
+		writeError(w, 401, "用户名或密码错误")
+		return
+	}
+	token, err := generateToken(req.Username, a.jwtSecret)
+	if err != nil {
+		writeError(w, 500, "生成令牌失败")
+		return
+	}
+	writeJSON(w, map[string]interface{}{
+		"token":    token,
+		"username": req.Username,
+	})
+}
+
+// handleMe 返回当前登录用户信息
+func (a *AdminAPI) handleMe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	username, _ := r.Context().Value("username").(string)
+	writeJSON(w, map[string]interface{}{
+		"username": username,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
@@ -124,6 +402,10 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 	// Check for sub-routes first
 	if strings.HasSuffix(r.URL.Path, "/bind-metrics") {
 		a.handleBindMetrics(w, r)
+		return
+	}
+	if strings.HasSuffix(r.URL.Path, "/test") {
+		a.handleTestDatasource(w, r)
 		return
 	}
 	id, err := getLastPathID(r.URL.Path)
@@ -716,94 +998,220 @@ func (a *AdminAPI) handleInspect(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	client, err := prometheus.NewClient(promURL, promUser, promPass)
-	if err != nil {
-		writeError(w, 500, fmt.Sprintf("创建Prometheus客户端失败: %v", err))
-		return
+	taskID := newTaskID()
+	task := &InspectTask{
+		ID:        taskID,
+		Status:    "running",
+		Message:   "巡检任务已创建，正在执行...",
+		CreatedAt: time.Now(),
 	}
+	inspectTasksMu.Lock()
+	inspectTasks[taskID] = task
+	inspectTasksMu.Unlock()
 
-	// 优先使用显式指定的指标; 其次 datasource 绑定的模板; 再其次绑定的指标; 最后全部指标
-	activeConfig := a.config
-	if len(req.MetricConfigIDs) > 0 {
-		var selectedConfigs []database.MetricConfig
-		database.DB.Where("id IN ?", req.MetricConfigIDs).Find(&selectedConfigs)
-		if len(selectedConfigs) > 0 {
-			activeConfig = a.buildFilteredConfig(activeConfig, selectedConfigs)
-		}
-	} else if req.DatasourceID > 0 {
+	dsName := promURL
+	if req.DatasourceID > 0 {
 		var ds database.DataSource
 		if database.DB.First(&ds, req.DatasourceID).Error == nil {
-			if ds.TemplateID != nil {
-				// 使用数据源绑定的模板
-				var links []database.InspectionTemplateMetric
-				database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
-				if len(links) > 0 {
-					cfgIDs := make([]uint, len(links))
-					for i, l := range links { cfgIDs[i] = l.MetricConfigID }
-					var tmplConfigs []database.MetricConfig
-					database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
-					// Apply template metric overrides
-					for i := range tmplConfigs {
-						var override database.TemplateMetricOverride
-						if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
-							override.Apply(&tmplConfigs[i])
-						}
-					}
-					if len(tmplConfigs) > 0 {
-						activeConfig = a.buildFilteredConfig(activeConfig, tmplConfigs)
-					}
-				}
-			} else {
-				// 使用数据源绑定的指标
-				var dsConfigs []database.MetricConfig
-				database.DB.Where("(datasource_id IS NULL OR datasource_id = ?) AND metric_type_id IS NOT NULL", req.DatasourceID).Find(&dsConfigs)
-				if len(dsConfigs) > 0 {
-					activeConfig = a.buildFilteredConfig(activeConfig, dsConfigs)
-				}
-			}
+			dsName = ds.Name
 		}
 	}
-
-	dataCollector := metrics.NewCollector(client.API, activeConfig)
-	data, err := dataCollector.CollectMetrics()
-	if err != nil {
-		writeError(w, 500, fmt.Sprintf("收集指标失败: %v", err))
-		return
-	}
-	data.Datasource = promURL
-
-	reportPath, err := report.GenerateReport(*data)
-	if err != nil {
-		writeError(w, 500, fmt.Sprintf("生成报告失败: %v", err))
-		return
-	}
-
-	if req.WechatBotKey != "" {
-		alertSummary := notify.CalculateAlertSummary(*data)
-		notify.SendWeChatWorkWithWebhook(r.Context(), req.WechatBotKey, "", reportPath, a.config.ProjectName, promURL, alertSummary)
-	}
-
-	database.DB.Create(&database.ReportRecord{
-		Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
-		DatasourceName: promURL,
-		FilePath:       reportPath,
-		FileSize:       getFileSize(reportPath),
-		TotalMetrics:   countMetrics(data),
-		AlertCount:     countAlerts(data),
-		CriticalCount:  countCritical(data),
-		WarningCount:   countWarning(data),
-		Status:         getReportStatus(data),
+	database.DB.Create(&database.InspectRecord{
+		TaskID:         taskID,
+		Status:         "running",
+		DatasourceID:   func() *uint { if req.DatasourceID > 0 { return &req.DatasourceID }; return nil }(),
+		DatasourceName: dsName,
+		Message:        "巡检任务已创建，正在执行...",
+		StartedAt:      time.Now(),
 	})
 
 	writeJSON(w, map[string]interface{}{
 		"success": true,
-		"report":  reportPath,
-		"url":     "/api/promai/reports/" + filepath.Base(reportPath),
+		"task_id": taskID,
+		"message": "巡检任务已创建",
 	})
+
+	go a.runInspect(task, promURL, promUser, promPass, req)
+}
+
+func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass string, req struct {
+	DatasourceID    uint   `json:"datasource_id"`
+	DatasourceURL   string `json:"datasource_url"`
+	WechatBotKey    string `json:"wechat_bot_key"`
+	ToUser          string `json:"touser"`
+	MetricConfigIDs []uint `json:"metric_config_ids"`
+}) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	done := make(chan struct{})
+	var runErr error
+	var data *report.ReportData
+	var reportPath string
+
+	go func() {
+		defer close(done)
+
+		client, err := prometheus.NewClient(promURL, promUser, promPass)
+		if err != nil {
+			runErr = fmt.Errorf("创建Prometheus客户端失败: %v", err)
+			return
+		}
+
+		activeConfig := a.config
+		if len(req.MetricConfigIDs) > 0 {
+			var selectedConfigs []database.MetricConfig
+			database.DB.Where("id IN ?", req.MetricConfigIDs).Find(&selectedConfigs)
+			if len(selectedConfigs) > 0 {
+				activeConfig = buildFilteredConfig(activeConfig, selectedConfigs)
+			}
+		} else if req.DatasourceID > 0 {
+			var ds database.DataSource
+			if database.DB.First(&ds, req.DatasourceID).Error == nil {
+				if ds.TemplateID != nil {
+					var links []database.InspectionTemplateMetric
+					database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
+					if len(links) > 0 {
+						cfgIDs := make([]uint, len(links))
+						for i, l := range links {
+							cfgIDs[i] = l.MetricConfigID
+						}
+						var tmplConfigs []database.MetricConfig
+						database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
+						for i := range tmplConfigs {
+							var override database.TemplateMetricOverride
+							if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
+								override.Apply(&tmplConfigs[i])
+							}
+						}
+						if len(tmplConfigs) > 0 {
+							activeConfig = buildFilteredConfig(activeConfig, tmplConfigs)
+						}
+					}
+				} else {
+					var dsConfigs []database.MetricConfig
+					database.DB.Where("(datasource_id IS NULL OR datasource_id = ?) AND metric_type_id IS NOT NULL", req.DatasourceID).Find(&dsConfigs)
+					if len(dsConfigs) > 0 {
+						activeConfig = buildFilteredConfig(activeConfig, dsConfigs)
+					}
+				}
+			}
+		}
+
+		dataCollector := metrics.NewCollectorWithURL(client.API, activeConfig, promURL)
+		data, runErr = dataCollector.CollectMetrics()
+		if runErr != nil {
+			runErr = fmt.Errorf("收集指标失败: %v", runErr)
+			return
+		}
+		data.Datasource = promURL
+		setLatestReport(promURL, reportDataToHealth(data))
+
+		reportPath, runErr = report.GenerateReport(*data)
+		if runErr != nil {
+			runErr = fmt.Errorf("生成报告失败: %v", runErr)
+			return
+		}
+
+		if req.WechatBotKey != "" {
+			alertSummary := notify.CalculateAlertSummary(*data)
+			notify.SendWeChatWorkWithWebhook(context.Background(), req.WechatBotKey, "", reportPath, a.config.ProjectName, promURL, alertSummary)
+		}
+
+		if req.DatasourceID > 0 {
+			var ds database.DataSource
+			if database.DB.First(&ds, req.DatasourceID).Error == nil && ds.NotifyChannels != "" {
+				var channelIDs []uint
+				if err := json.Unmarshal([]byte(ds.NotifyChannels), &channelIDs); err == nil && len(channelIDs) > 0 {
+					var channels []database.NotificationChannel
+					database.DB.Where("id IN ? AND enabled = ?", channelIDs, true).Find(&channels)
+					alertSummary := notify.CalculateAlertSummary(*data)
+					for _, ch := range channels {
+						sendSingleNotification(ch, reportPath, data.Datasource, alertSummary, data)
+					}
+				}
+			}
+		}
+
+		database.DB.Create(&database.ReportRecord{
+			Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
+			DatasourceName: promURL,
+			FilePath:       reportPath,
+			FileSize:       getFileSize(reportPath),
+			TotalMetrics:   countMetrics(data),
+			AlertCount:     countAlerts(data),
+			CriticalCount:  countCritical(data),
+			WarningCount:   countWarning(data),
+			Status:         getReportStatus(data),
+			MetricsJSON:    buildHealthSnapshot(data),
+		})
+	}()
+
+	select {
+	case <-done:
+		inspectTasksMu.Lock()
+		if runErr != nil {
+			task.Status = "failed"
+			task.Error = runErr.Error()
+			database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", task.ID).Updates(map[string]interface{}{
+				"status": "failed", "error": runErr.Error(), "completed_at": time.Now(),
+			})
+		} else {
+			reportURL := "/api/promai/reports/" + filepath.Base(reportPath)
+			task.Status = "completed"
+			task.ReportURL = reportURL
+			task.Message = "巡检完成"
+			database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", task.ID).Updates(map[string]interface{}{
+				"status": "completed", "message": "巡检完成", "report_url": reportURL, "completed_at": time.Now(),
+			})
+		}
+		inspectTasksMu.Unlock()
+	case <-ctx.Done():
+		inspectTasksMu.Lock()
+		task.Status = "failed"
+		task.Error = "巡检超时（10分钟）"
+		database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", task.ID).Updates(map[string]interface{}{
+			"status": "failed", "error": "巡检超时（10分钟）", "completed_at": time.Now(),
+		})
+		inspectTasksMu.Unlock()
+	}
+}
+
+func (a *AdminAPI) handleInspectTask(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) < 5 {
+		writeError(w, 400, "缺少任务 ID")
+		return
+	}
+	taskID := parts[4]
+
+	inspectTasksMu.Lock()
+	task, ok := inspectTasks[taskID]
+	inspectTasksMu.Unlock()
+
+	if !ok {
+		writeError(w, 404, "任务不存在")
+		return
+	}
+	writeJSON(w, task)
+}
+
+func (a *AdminAPI) handleInspectRecords(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var records []database.InspectRecord
+	database.DB.Order("created_at desc").Limit(100).Find(&records)
+	writeJSON(w, records)
 }
 
 // buildFilteredConfig builds a config.Config from a filtered set of MetricConfig rows
-func (a *AdminAPI) buildFilteredConfig(base *config.Config, selectedConfigs []database.MetricConfig) *config.Config {
+func buildFilteredConfig(base *config.Config, selectedConfigs []database.MetricConfig) *config.Config {
 	typeMap := make(map[uint][]database.MetricConfig)
 	for _, c := range selectedConfigs {
 		typeMap[c.MetricTypeID] = append(typeMap[c.MetricTypeID], c)
@@ -1149,8 +1557,8 @@ func (a *AdminAPI) handleTemplateInspect(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	activeConfig := a.buildFilteredConfig(a.config, selectedConfigs)
-	dataCollector := metrics.NewCollector(client.API, activeConfig)
+	activeConfig := buildFilteredConfig(a.config, selectedConfigs)
+	dataCollector := metrics.NewCollectorWithURL(client.API, activeConfig, promURL)
 	data, err := dataCollector.CollectMetrics()
 	if err != nil {
 		writeError(w, 500, fmt.Sprintf("收集指标失败: %v", err))
@@ -1234,6 +1642,44 @@ func (a *AdminAPI) handleTestNotification(w http.ResponseWriter, r *http.Request
 	writeJSON(w, map[string]string{"message": "测试通知已发送"})
 }
 
+func (a *AdminAPI) handleTestDatasource(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	id, err := parseParentID(r.URL.Path)
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	var ds database.DataSource
+	if database.DB.First(&ds, id).Error != nil {
+		writeError(w, 404, "数据源不存在")
+		return
+	}
+	client, err := prometheus.NewClient(ds.URL, ds.Username, ds.Password)
+	if err != nil {
+		writeJSON(w, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("创建客户端失败: %v", err),
+		})
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := client.HealthCheck(ctx); err != nil {
+		writeJSON(w, map[string]interface{}{
+			"success": false,
+			"message": fmt.Sprintf("连接失败: %v", err),
+		})
+		return
+	}
+	writeJSON(w, map[string]interface{}{
+		"success": true,
+		"message": "连接成功",
+	})
+}
+
 func (a *AdminAPI) handleDashboardStats(w http.ResponseWriter, r *http.Request) {
 	var dsCount, cronCount, reportCount, notifCount int64
 	database.DB.Model(&database.DataSource{}).Count(&dsCount)
@@ -1253,6 +1699,31 @@ func (a *AdminAPI) handleDashboardStats(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
+func (a *AdminAPI) getDatasourceMetricConfigs(ds database.DataSource) []database.MetricConfig {
+	if ds.TemplateID != nil {
+		var links []database.InspectionTemplateMetric
+		database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
+		if len(links) > 0 {
+			cfgIDs := make([]uint, len(links))
+			for i, l := range links {
+				cfgIDs[i] = l.MetricConfigID
+			}
+			var configs []database.MetricConfig
+			database.DB.Where("id IN ?", cfgIDs).Find(&configs)
+			for i := range configs {
+				var override database.TemplateMetricOverride
+				if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, configs[i].ID).First(&override).Error == nil {
+					override.Apply(&configs[i])
+				}
+			}
+			return configs
+		}
+	}
+	var configs []database.MetricConfig
+	database.DB.Where("(datasource_id IS NULL OR datasource_id = ?) AND metric_type_id IS NOT NULL", ds.ID).Find(&configs)
+	return configs
+}
+
 func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request) {
 	dsIDStr := r.URL.Query().Get("datasource_id")
 
@@ -1263,14 +1734,23 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 	}
 	q.Find(&datasources)
 
+	type TypeSummaryItem struct {
+		TypeName      string `json:"type_name"`
+		TotalMetrics  int    `json:"total_metrics"`
+		CriticalCount int    `json:"critical_count"`
+		WarningCount  int    `json:"warning_count"`
+		NormalCount   int    `json:"normal_count"`
+		Alerts        int    `json:"alerts"`
+	}
 	type HealthMetric struct {
-		MetricTypeID uint   `json:"metric_type_id"`
-		MetricName   string `json:"metric_name"`
-		TypeName     string `json:"type_name"`
-		Status       string `json:"status"`
-		Value        string `json:"value"`
-		Unit         string `json:"unit"`
-		Threshold    float64 `json:"threshold"`
+		MetricName    string            `json:"metric_name"`
+		TypeName      string            `json:"type_name"`
+		Status        string            `json:"status"`
+		Value         float64           `json:"value"`
+		Unit          string            `json:"unit"`
+		Threshold     float64           `json:"threshold"`
+		ThresholdType string            `json:"threshold_type"`
+		Labels        map[string]string `json:"labels"`
 	}
 	type DatasourceHealth struct {
 		Datasource    database.DataSource `json:"datasource"`
@@ -1281,67 +1761,102 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 		NormalCount   int                 `json:"normal_count"`
 		HealthScore   float64             `json:"health_score"`
 		LastReportAt  *time.Time          `json:"last_report_at"`
+		LastReportURL string              `json:"last_report_url"`
 		Metrics       []HealthMetric      `json:"metrics"`
+		TypeSummaries []TypeSummaryItem   `json:"type_summaries"`
 	}
 
 	var results []DatasourceHealth
+
 	for _, ds := range datasources {
-		total := 0
-		alerts := 0
-		criticals := 0
-		warnings := 0
+		var lastReport database.ReportRecord
+		database.DB.Where("datasource_name = ?", ds.URL).Order("created_at desc").First(&lastReport)
+
+		snapshot := getLatestReport(ds.URL)
+		if snapshot == nil {
+		lastReportURL := ""
+		if lastReport.ID > 0 && lastReport.FilePath != "" {
+			lastReportURL = "/api/promai/reports/" + filepath.Base(lastReport.FilePath)
+		}
+		results = append(results, DatasourceHealth{
+			Datasource:    ds,
+			Metrics:       []HealthMetric{},
+			LastReportAt:  func() *time.Time { if lastReport.ID > 0 { return &lastReport.CreatedAt }; return nil }(),
+			LastReportURL: lastReportURL,
+			TypeSummaries: []TypeSummaryItem{},
+		})
+			continue
+		}
+
+		typeMetrics := make(map[string]*TypeSummaryItem)
+		typeOrder := make([]string, 0)
 		var metrics []HealthMetric
-
-		var configs []database.MetricConfig
-		database.DB.Where("(datasource_id IS NULL OR datasource_id = ?)", ds.ID).Find(&configs)
-
-		for _, cfg := range configs {
-			total++
-			var mt database.MetricType
-			database.DB.First(&mt, cfg.MetricTypeID)
-			status := "success"
-			if cfg.Threshold > 0 {
-				status = "warning"
-				if cfg.ThresholdStatus == "critical" {
-					status = "critical"
-				}
+		alerts := 0
+		for _, m := range snapshot.Metrics {
+			if m.Status == "critical" || m.Status == "warning" {
+				alerts++
 			}
-			if status == "critical" { criticals++; alerts++ }
-			if status == "warning" { warnings++; alerts++ }
-
 			metrics = append(metrics, HealthMetric{
-				MetricTypeID: cfg.MetricTypeID,
-				MetricName:   cfg.Name,
-				TypeName:     mt.TypeName,
-				Status:       status,
-				Value:        "-",
-				Unit:         cfg.Unit,
-				Threshold:    cfg.Threshold,
+				MetricName:    m.MetricName,
+				TypeName:      m.TypeName,
+				Status:        m.Status,
+				Value:         m.Value,
+				Unit:          m.Unit,
+				Threshold:     m.Threshold,
+				ThresholdType: m.ThresholdType,
+				Labels:        m.Labels,
 			})
+
+			if _, ok := typeMetrics[m.TypeName]; !ok {
+				typeMetrics[m.TypeName] = &TypeSummaryItem{TypeName: m.TypeName}
+				typeOrder = append(typeOrder, m.TypeName)
+			}
+			item := typeMetrics[m.TypeName]
+			item.TotalMetrics++
+			switch m.Status {
+			case "critical":
+				item.CriticalCount++
+				item.Alerts++
+			case "warning":
+				item.WarningCount++
+				item.Alerts++
+			default:
+				item.NormalCount++
+			}
+		}
+		typeSummaries := make([]TypeSummaryItem, 0, len(typeOrder))
+		for _, tn := range typeOrder {
+			typeSummaries = append(typeSummaries, *typeMetrics[tn])
 		}
 
 		healthScore := 100.0
-		if total > 0 {
-			healthScore = float64(total-alerts) / float64(total) * 100
+		if snapshot.TotalMetrics > 0 {
+			healthScore = float64(snapshot.TotalMetrics-alerts) / float64(snapshot.TotalMetrics) * 100
 		}
 
-		var lastReport database.ReportRecord
-		database.DB.Where("datasource_name LIKE ?", "%"+ds.URL+"%").Or("datasource_id = ?", ds.ID).Order("created_at desc").First(&lastReport)
-
+		lastReportURL := ""
+		if lastReport.ID > 0 && lastReport.FilePath != "" {
+			lastReportURL = "/api/promai/reports/" + filepath.Base(lastReport.FilePath)
+		}
 		results = append(results, DatasourceHealth{
 			Datasource:    ds,
-			TotalMetrics:  total,
+			TotalMetrics:  snapshot.TotalMetrics,
 			Alerts:        alerts,
-			CriticalCount: criticals,
-			WarningCount:  warnings,
-			NormalCount:   total - alerts,
+			CriticalCount: snapshot.CriticalCount,
+			WarningCount:  snapshot.WarningCount,
+			NormalCount:   snapshot.TotalMetrics - alerts,
 			HealthScore:   healthScore,
 			LastReportAt:  func() *time.Time { if lastReport.ID > 0 { return &lastReport.CreatedAt }; return nil }(),
+			LastReportURL: lastReportURL,
 			Metrics:       metrics,
+			TypeSummaries: typeSummaries,
 		})
 	}
 
-	// Global summary
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Datasource.Name < results[j].Datasource.Name
+	})
+
 	var totalAll, alertAll, criticalAll, warningAll int
 	for _, r := range results {
 		totalAll += r.TotalMetrics
@@ -1362,6 +1877,52 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 		"critical_total":  criticalAll,
 		"warning_total":   warningAll,
 		"normal_total":    totalAll - alertAll,
+	})
+}
+
+func (a *AdminAPI) handleDashboardHealthTrend(w http.ResponseWriter, r *http.Request) {
+	daysStr := r.URL.Query().Get("days")
+	days := 14
+	if d, err := strconv.Atoi(daysStr); err == nil && d > 0 && d <= 90 {
+		days = d
+	}
+
+	since := time.Now().AddDate(0, 0, -days)
+
+	type DailyTrend struct {
+		Date         string `json:"date"`
+		TotalMetrics int    `json:"total_metrics"`
+		Critical     int    `json:"critical"`
+		Warning      int    `json:"warning"`
+		Alerts       int    `json:"alerts"`
+	}
+
+	var records []database.ReportRecord
+	database.DB.Where("created_at >= ?", since).Order("created_at asc").Find(&records)
+
+	dailyMap := make(map[string]*DailyTrend)
+	dateKeys := make([]string, 0)
+
+	for _, rec := range records {
+		date := rec.CreatedAt.Format("2006-01-02")
+		if _, ok := dailyMap[date]; !ok {
+			dailyMap[date] = &DailyTrend{Date: date}
+			dateKeys = append(dateKeys, date)
+		}
+		d := dailyMap[date]
+		d.TotalMetrics += rec.TotalMetrics
+		d.Critical += rec.CriticalCount
+		d.Warning += rec.WarningCount
+		d.Alerts += rec.AlertCount
+	}
+
+	trend := make([]DailyTrend, 0, len(dateKeys))
+	for _, k := range dateKeys {
+		trend = append(trend, *dailyMap[k])
+	}
+
+	writeJSON(w, map[string]interface{}{
+		"trend": trend,
 	})
 }
 

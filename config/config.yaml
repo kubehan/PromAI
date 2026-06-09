@@ -2,6 +2,12 @@ prometheus_url: "http://prometheus-k8s.monitoring.svc.cluster.local:9090"
 prometheus_username: "admin"  # 无鉴权可不填
 prometheus_password: "admin"  # 无鉴权可不填
 
+# 管理后台登录认证
+auth:
+  username: "admin"
+  password: "promai2024"
+  jwt_secret: "promai-jwt-secret-change-in-production"
+
 # 多数据源配置
 data_sources:
   - name: "cluster1"

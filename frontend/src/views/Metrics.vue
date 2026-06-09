@@ -98,12 +98,12 @@
         </el-form-item>
         <el-form-item label="PromQL" prop="query">
           <el-input v-model="configForm.query" type="textarea" :rows="2" placeholder="avg(rate(node_cpu_seconds_total[5m])) * 100" />
-          <template #extra>
-            <el-button size="small" :loading="validating" @click="handleValidate" style="margin-top: 4px; color: var(--cyan);">
-              <el-icon><Connection /></el-icon> 验证语法
-            </el-button>
-          </template>
         </el-form-item>
+        <div style="display: flex; justify-content: flex-end; margin-top: -16px; margin-bottom: 12px;">
+          <el-button size="small" :loading="validating" @click="handleValidate" style="color: var(--cyan);">
+            <el-icon><Connection /></el-icon> 验证语法
+          </el-button>
+        </div>
 
         <div v-if="validationResult" :class="['validation-panel', validationResult.valid ? 'valid' : 'invalid']">
           <div v-if="validationResult.valid">
@@ -134,12 +134,12 @@
           <el-input v-model="configForm.description" placeholder="可选" />
         </el-form-item>
         <el-row :gutter="16">
-          <el-col :span="6">
+          <el-col :span="7">
             <el-form-item label="阈值">
-              <el-input-number v-model="configForm.threshold" :min="0" :step="0.1" style="width: 100%;" :precision="2" />
+              <el-input v-model.number="configForm.threshold" type="number" step="0.5" style="width: 100%;" placeholder="请输入阈值" />
             </el-form-item>
           </el-col>
-          <el-col :span="9">
+          <el-col :span="8">
             <el-form-item label="条件">
               <el-select v-model="configForm.threshold_type" style="width: 100%;">
                 <el-option label="大于 >" value="greater" />
@@ -151,7 +151,7 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="9">
+          <el-col :span="8">
             <el-form-item label="级别">
               <el-select v-model="configForm.threshold_status" style="width: 100%;">
                 <el-option label="严重 critical" value="critical" />

@@ -1,8 +1,9 @@
 import axios from 'axios'
+import router from '../router'
 import type {
   DataSource, MetricType, MetricConfig,
   NotificationChannel, CronJob, ReportRecord,
-  InspectRequest, DashboardStats
+  InspectRecord, InspectRequest, DashboardStats
 } from '../types'
 
 const api = axios.create({
@@ -10,13 +11,30 @@ const api = axios.create({
   timeout: 30000,
 })
 
+api.interceptors.request.use(config => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 api.interceptors.response.use(
   r => r,
   e => {
+    if (e.response?.status === 401) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('username')
+      router.push('/login')
+    }
     const msg = e.response?.data?.error || e.message || '请求失败'
     return Promise.reject(new Error(msg))
   }
 )
+
+// Auth
+export const login = (username: string, password: string) => api.post('/auth/login', { username, password })
+export const getMe = () => api.get('/auth/me')
 
 // Data Sources
 export const getDataSources = () => api.get<DataSource[]>('/datasources')
@@ -26,6 +44,7 @@ export const updateDataSource = (id: number, d: DataSource) => api.put<DataSourc
 export const deleteDataSource = (id: number) => api.delete(`/datasources/${id}`)
 export const importDatasources = (yaml: string) => api.post('/datasources/import', { yaml_content: yaml })
 export const applyTemplate = (datasourceId: number) => api.post('/datasources/apply-template', { datasource_id: datasourceId })
+export const testDataSource = (id: number) => api.post(`/datasources/${id}/test`)
 
 // Notifications
 export const getNotifications = () => api.get<NotificationChannel[]>('/notifications')
@@ -62,11 +81,16 @@ export const updateSettings = (s: Record<string, string>) => api.put('/settings'
 
 // Inspect
 export const triggerInspect = (req: InspectRequest) => api.post('/inspect', req)
+export const getInspectTask = (taskId: string) => api.get(`/inspect/task/${taskId}`)
+export const getInspectRecords = () => api.get<InspectRecord[]>('/inspect/records')
 
 // Dashboard
-export const getDashboardStats = () => axios.get<DashboardStats>('/api/v1/dashboard/stats')
+export const getDashboardStats = () => api.get<DashboardStats>('/dashboard/stats')
 export const getDashboardHealth = (datasourceId?: number) =>
-  axios.get('/api/v1/dashboard/health', { params: datasourceId ? { datasource_id: datasourceId } : {} })
+  api.get('/dashboard/health', { params: datasourceId ? { datasource_id: datasourceId } : {} })
+
+export const getDashboardHealthTrend = (days: number = 14) =>
+  api.get('/dashboard/health/trend', { params: { days } })
 
 // Templates
 export const getTemplates = () => api.get('/templates')

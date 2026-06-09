@@ -97,6 +97,9 @@ func main() {
 		log.Printf("Warning: failed to seed database: %v", err)
 	}
 
+	// 从数据库加载历史巡检快照到内存
+	loadLatestReports()
+
 	// 设置 HTTP 路由
 	setupRoutes(collector, config)
 
@@ -503,36 +506,40 @@ func sendJobNotifications(job database.CronJob, reportFilePath string, reportDat
 	}
 	alertSummary := notify.CalculateAlertSummary(*reportData)
 	for _, ch := range channels {
-		sendSingleNotification(ch, reportFilePath, reportData.Datasource, alertSummary)
+		sendSingleNotification(ch, reportFilePath, reportData.Datasource, alertSummary, reportData)
 	}
 }
 
-func sendSingleNotification(ch database.NotificationChannel, reportFilePath, datasource string, summary notify.AlertSummary) {
+func sendSingleNotification(ch database.NotificationChannel, reportFilePath, datasource string, summary notify.AlertSummary, reportData *report.ReportData) {
+	ctx := context.Background()
+	if reportData != nil {
+		ctx = context.WithValue(ctx, "report_data", *reportData)
+	}
 	switch ch.ChannelType {
 	case "dingtalk":
 		var cfg notify.DingtalkConfig
 		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendDingtalk(cfg, reportFilePath, "PromAI", datasource, summary)
+			notify.SendDingtalkWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
 		}
 	case "email":
 		var cfg notify.EmailConfig
 		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendEmail(cfg, reportFilePath, "PromAI", datasource, summary)
+			notify.SendEmailWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
 		}
 	case "wechat_work":
 		var cfg notify.WeChatWorkConfig
 		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendWeChatWork(cfg, reportFilePath, "PromAI", datasource, summary)
+			notify.SendWeChatWorkWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
 		}
 	case "wechat_app":
 		var cfg notify.WeChatAppConfig
 		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendWeChatApp(cfg, reportFilePath, "PromAI", datasource, summary)
+			notify.SendWeChatAppWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
 		}
 	case "feishu":
 		var cfg notify.FeishuConfig
 		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
-			notify.SendFeishu(cfg, reportFilePath, "PromAI", datasource, summary)
+			notify.SendFeishuWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
 		}
 	}
 }
@@ -1065,14 +1072,37 @@ func adminHandler(w http.ResponseWriter, r *http.Request) {
 
 // doInspection 执行巡检并保存报告记录
 func doInspection(cfg *config.Config, collector *metrics.Collector, job database.CronJob) {
-	// 如果任务指定了数据源，创建对应的 collector
 	activeCollector := collector
+	activeCfg := cfg
+
 	if job.DatasourceID != nil {
 		var ds database.DataSource
 		if database.DB.First(&ds, *job.DatasourceID).Error == nil {
 			client, err := prometheus.NewClient(ds.URL, ds.Username, ds.Password)
 			if err == nil {
-				activeCollector = metrics.NewCollector(client.API, cfg)
+				// Apply template filtering if the datasource has a template
+				if ds.TemplateID != nil {
+					var links []database.InspectionTemplateMetric
+					database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
+					if len(links) > 0 {
+						cfgIDs := make([]uint, len(links))
+						for i, l := range links {
+							cfgIDs[i] = l.MetricConfigID
+						}
+						var tmplConfigs []database.MetricConfig
+						database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
+						for i := range tmplConfigs {
+							var override database.TemplateMetricOverride
+							if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
+								override.Apply(&tmplConfigs[i])
+							}
+						}
+						if len(tmplConfigs) > 0 {
+							activeCfg = buildFilteredConfig(cfg, tmplConfigs)
+						}
+					}
+				}
+				activeCollector = metrics.NewCollectorWithURL(client.API, activeCfg, ds.URL)
 			}
 		}
 	}
@@ -1094,6 +1124,7 @@ func doInspection(cfg *config.Config, collector *metrics.Collector, job database
 	} else {
 		data.Datasource = cfg.PrometheusURL
 	}
+	setLatestReport(data.Datasource, reportDataToHealth(data))
 
 	reportFilePath, err := report.GenerateReport(*data)
 	if err != nil {
@@ -1157,6 +1188,7 @@ func saveReportRecord(data *report.ReportData, reportPath string) {
 		CriticalCount:  criticalCount,
 		WarningCount:   warningCount,
 		Status:         status,
+		MetricsJSON:    buildHealthSnapshot(data),
 	})
 }
 

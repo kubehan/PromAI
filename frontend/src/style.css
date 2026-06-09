@@ -258,10 +258,25 @@ body {
 .status-badge.warning::before { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
 
 .status-badge.info {
-  background: rgba(99, 102, 241, 0.1);
-  color: #818cf8;
+	background: rgba(99, 102, 241, 0.1);
+	color: #818cf8;
 }
 .status-badge.info::before { background: #818cf8; box-shadow: 0 0 8px #818cf8; }
+.status-badge.normal {
+	background: var(--emerald-dim);
+	color: var(--emerald);
+}
+.status-badge.normal::before { background: var(--emerald); box-shadow: 0 0 8px var(--emerald); }
+.status-badge.critical {
+	background: var(--red-dim);
+	color: var(--red);
+}
+.status-badge.critical::before { background: var(--red); box-shadow: 0 0 8px var(--red); }
+
+.status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.status-dot.normal { background: #10b981; box-shadow: 0 0 6px #10b981; }
+.status-dot.warning { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+.status-dot.critical { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
 
 /* Action bar */
 .action-bar {

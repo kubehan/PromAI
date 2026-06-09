@@ -113,7 +113,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getDataSources, getMetricTypes, triggerInspect } from '../api'
+import { getDataSources, getMetricTypes, triggerInspect, getInspectTask } from '../api'
 import type { DataSource, MetricType } from '../types'
 
 const route = useRoute()
@@ -182,8 +182,29 @@ async function handleInspect() {
       touser: form.value.touser || undefined,
       metric_config_ids: selectedConfigIds.value.length > 0 ? selectedConfigIds.value : undefined,
     })
-    lastResult.value = { success: true, report: res.data.report, url: res.data.url }
-    ElMessage.success('巡检完成，报告已生成')
+    const taskId = res.data.task_id
+    if (!taskId) { ElMessage.error('巡检启动失败'); inspecting.value = false; return }
+
+    ElMessage.info('巡检已开始，正在等待结果...')
+    for (let i = 0; i < 120; i++) {
+      await new Promise(r => setTimeout(r, 2000))
+      const taskRes = await getInspectTask(taskId)
+      const task = taskRes.data
+      if (task.status === 'completed') {
+        lastResult.value = { success: true, report: '', url: task.report_url || '' }
+        ElMessage.success('巡检完成，报告已生成')
+        inspecting.value = false
+        return
+      }
+      if (task.status === 'failed') {
+        lastResult.value = { success: false, error: task.error || '巡检失败' }
+        ElMessage.error(task.error || '巡检失败')
+        inspecting.value = false
+        return
+      }
+    }
+    lastResult.value = { success: false, error: '巡检超时' }
+    ElMessage.error('巡检超时')
   } catch (e: any) {
     lastResult.value = { success: false, error: e.message }
     ElMessage.error(e.message)

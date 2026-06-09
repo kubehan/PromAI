@@ -7,15 +7,16 @@ import (
 )
 
 type DataSource struct {
-	ID         uint      `gorm:"primaryKey" json:"id"`
-	Name       string    `gorm:"uniqueIndex;size:100;not null" json:"name"`
-	URL        string    `gorm:"size:500;not null" json:"url"`
-	Username   string    `gorm:"size:100" json:"username"`
-	Password   string    `gorm:"size:100" json:"password"`
-	IsDefault  bool      `gorm:"default:false" json:"is_default"`
-	TemplateID *uint     `json:"template_id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	Name           string    `gorm:"uniqueIndex;size:100;not null" json:"name"`
+	URL            string    `gorm:"size:500;not null" json:"url"`
+	Username       string    `gorm:"size:100" json:"username"`
+	Password       string    `gorm:"size:100" json:"password"`
+	IsDefault      bool      `gorm:"default:false" json:"is_default"`
+	TemplateID     *uint     `json:"template_id"`
+	NotifyChannels string    `gorm:"type:text" json:"notify_channels"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 type MetricType struct {
@@ -80,6 +81,7 @@ type ReportRecord struct {
 	WarningCount    int       `json:"warning_count"`
 	Status          string    `gorm:"size:50" json:"status"`
 	Duration        string    `gorm:"size:50" json:"duration"`
+	MetricsJSON     string    `gorm:"type:text" json:"metrics_json"`
 	CreatedAt       time.Time `json:"created_at"`
 }
 
@@ -115,6 +117,22 @@ type TemplateMetricOverride struct {
 	LabelsJSON      string  `gorm:"type:text" json:"labels_json"`
 }
 
+// InspectRecord 巡检任务记录（持久化）
+type InspectRecord struct {
+	ID             uint       `gorm:"primaryKey" json:"id"`
+	TaskID         string     `gorm:"size:100;index" json:"task_id"`
+	Status         string     `gorm:"size:50;default:running" json:"status"`
+	DatasourceID   *uint      `json:"datasource_id"`
+	DatasourceName string     `gorm:"size:200" json:"datasource_name"`
+	Message        string     `gorm:"size:500" json:"message"`
+	Error          string     `gorm:"size:500" json:"error"`
+	ReportURL      string     `gorm:"size:500" json:"report_url"`
+	StartedAt      time.Time  `json:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
 // Apply applies a template-level override onto a MetricConfig
 func (o *TemplateMetricOverride) Apply(cfg *MetricConfig) {
 	if o.ID == 0 {
@@ -140,5 +158,6 @@ func AutoMigrate(db *gorm.DB) error {
 		&InspectionTemplate{},
 		&InspectionTemplateMetric{},
 		&TemplateMetricOverride{},
+		&InspectRecord{},
 	)
 }
