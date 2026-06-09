@@ -12,6 +12,9 @@
           <el-button plain @click="importVisible = true">
             <el-icon><Upload /></el-icon> YAML 导入
           </el-button>
+          <el-button plain @click="syncDialogVisible = true">
+            <el-icon><Refresh /></el-icon> 数据源同步
+          </el-button>
           <el-button type="primary" @click="openCreate">
             <el-icon><Plus /></el-icon> 新增数据源
           </el-button>
@@ -131,16 +134,160 @@
       </template>
     </el-dialog>
 
+    <!-- Sync Source Dialog -->
+    <el-dialog v-model="syncDialogVisible" title="数据源同步" width="800" :close-on-click-modal="false">
+      <div style="display: flex; gap: 16px; flex-direction: column;">
+        <!-- Sync Source List -->
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <template v-for="ss in syncSources" :key="ss.id">
+            <el-tag
+              style="cursor: pointer;"
+              :type="selectedSyncId === ss.id ? '' : 'info'"
+              :effect="selectedSyncId === ss.id ? 'dark' : 'plain'"
+              closable
+              @click="selectSync(ss.id!)"
+              @close="handleDeleteSync(ss.id!)"
+            >
+              {{ ss.name }}
+            </el-tag>
+          </template>
+          <el-button size="small" circle @click="editSync(null)">
+            <el-icon><Plus /></el-icon>
+          </el-button>
+          <el-button v-if="selectedSyncId" size="small" :loading="syncing" @click="handleTriggerSync">
+            <el-icon><Refresh /></el-icon> 立即同步
+          </el-button>
+        </div>
+
+        <!-- Edit Form -->
+        <el-form v-if="syncForm" :model="syncForm" label-width="120" size="small">
+          <el-form-item label="名称">
+            <el-input v-model="syncForm.name" placeholder="同步源名称" />
+          </el-form-item>
+          <el-form-item label="请求 URL">
+            <el-input v-model="syncForm.url" placeholder="https://example.com/api/endpoints" />
+          </el-form-item>
+          <el-row :gutter="12">
+            <el-col :span="6">
+              <el-form-item label="方法">
+                <el-select v-model="syncForm.method" style="width: 100%;">
+                  <el-option label="GET" value="GET" />
+                  <el-option label="POST" value="POST" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="18">
+              <el-form-item label="请求头">
+                <el-input v-model="syncForm.headers" placeholder='{"Authorization":"Bearer xxx"}' />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item v-if="syncForm.method === 'POST'" label="请求体">
+            <el-input v-model="syncForm.body" type="textarea" :rows="3" placeholder='{"key":"value"}' />
+          </el-form-item>
+          <el-form-item label="认证方式">
+            <el-select v-model="syncForm.auth_type" style="width: 200px;">
+              <el-option label="无" value="none" />
+              <el-option label="Basic Auth" value="basic" />
+              <el-option label="Bearer Token" value="bearer" />
+            </el-select>
+          </el-form-item>
+          <template v-if="syncForm.auth_type === 'basic'">
+            <el-row :gutter="12">
+              <el-col :span="12">
+                <el-form-item label="用户名">
+                  <el-input v-model="syncForm.auth_username" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="密码">
+                  <el-input v-model="syncForm.auth_password" type="password" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </template>
+          <el-form-item v-if="syncForm.auth_type === 'bearer'" label="Token">
+            <el-input v-model="syncForm.auth_token" type="password" />
+          </el-form-item>
+          <el-divider content-position="left">字段映射</el-divider>
+          <el-form-item label="数据路径">
+            <el-input v-model="syncForm.data_path" placeholder='例如: data.items（留空表示直接使用根数组）' />
+          </el-form-item>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="名称字段" required>
+                <el-input v-model="syncForm.name_field" placeholder="name" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="URL 字段">
+                <el-input v-model="syncForm.url_field" placeholder="url / endpoint" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="用户名字段">
+                <el-input v-model="syncForm.username_field" placeholder="username" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="密码字段">
+                <el-input v-model="syncForm.password_field" placeholder="password" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-divider content-position="left">定时同步</el-divider>
+          <el-row :gutter="12">
+            <el-col :span="8">
+              <el-form-item label="Cron 表达式">
+                <el-input v-model="syncForm.cron_expr" placeholder="0 */30 * * * *" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="启用">
+                <el-switch v-model="syncForm.enabled" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+        <div v-if="syncForm" style="display: flex; gap: 8px; justify-content: flex-end;">
+          <el-button @click="syncForm = null">取消编辑</el-button>
+          <el-button type="primary" :loading="savingSync" @click="handleSaveSync">保存</el-button>
+        </div>
+
+        <!-- Sync Logs -->
+        <div v-if="selectedSyncId" style="margin-top: 8px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-weight: 600; font-size: 13px; color: var(--text-primary);">同步日志</span>
+            <el-button size="small" text @click="loadLogs(selectedSyncId)">
+              <el-icon><Refresh /></el-icon> 刷新
+            </el-button>
+          </div>
+          <el-timeline v-if="logs.length > 0">
+            <el-timeline-item
+              v-for="log in logs" :key="log.id"
+              :timestamp="log.created_at"
+              :type="log.status === 'success' ? 'success' : log.status === 'partial' ? 'warning' : 'danger'"
+            >
+              <span style="font-size: 13px;">{{ log.message }}</span>
+            </el-timeline-item>
+          </el-timeline>
+          <div v-else style="text-align: center; color: var(--text-tertiary); font-size: 13px; padding: 16px;">暂无同步日志</div>
+        </div>
+      </div>
+    </el-dialog>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource } from '../api'
-import type { DataSource } from '../types'
+import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs } from '../api'
+import type { DataSource, SyncSource } from '../types'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -159,6 +306,108 @@ const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   url: [{ required: true, message: '请输入 URL', trigger: 'blur' }],
 }
+
+// Sync source state
+const syncDialogVisible = ref(false)
+const syncSources = ref<SyncSource[]>([])
+const selectedSyncId = ref<number | null>(null)
+const syncForm = ref<SyncSource | null>(null)
+const savingSync = ref(false)
+const syncing = ref(false)
+const logs = ref<any[]>([])
+
+function selectSync(id: number) {
+  selectedSyncId.value = id
+  const ss = syncSources.value.find(s => s.id === id)
+  syncForm.value = ss ? { ...ss, auth_password: '', auth_token: '' } : null
+  loadLogs(id)
+}
+
+function editSync(ss: SyncSource | null) {
+  if (ss) {
+    selectedSyncId.value = ss.id!
+    syncForm.value = { ...ss, auth_password: '', auth_token: '' }
+    loadLogs(ss.id!)
+  } else {
+    selectedSyncId.value = null
+    syncForm.value = { name: '', url: '', method: 'GET', headers: '', body: '', auth_type: 'none', auth_username: '', auth_password: '', auth_token: '', data_path: '', name_field: 'name', url_field: '', username_field: '', password_field: '', cron_expr: '', enabled: true }
+  }
+}
+
+async function loadSyncSources() {
+  try {
+    const res = await getSyncSources()
+    syncSources.value = res.data
+  } catch { /* ignore */ }
+}
+
+async function loadLogs(id: number) {
+  try {
+    const res = await getSyncLogs(id)
+    logs.value = res.data
+  } catch { /* ignore */ }
+}
+
+async function handleSaveSync() {
+  if (!syncForm.value) return
+  if (!syncForm.value.name || !syncForm.value.url || !syncForm.value.name_field) {
+    ElMessage.warning('名称、URL、名称字段不能为空')
+    return
+  }
+  savingSync.value = true
+  try {
+    if (syncForm.value.id) {
+      await updateSyncSource(syncForm.value.id, syncForm.value)
+      ElMessage.success('更新成功')
+    } else {
+      const res = await createSyncSource(syncForm.value)
+      selectedSyncId.value = res.data.id!
+      ElMessage.success('创建成功')
+    }
+    await loadSyncSources()
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    savingSync.value = false
+  }
+}
+
+async function handleDeleteSync(id: number) {
+  try {
+    await ElMessageBox.confirm('确定删除此同步源？', '确认')
+    await deleteSyncSource(id)
+    if (selectedSyncId.value === id) {
+      selectedSyncId.value = null
+      syncForm.value = null
+      logs.value = []
+    }
+    await loadSyncSources()
+    ElMessage.success('已删除')
+  } catch { /* ignore */ }
+}
+
+async function handleTriggerSync() {
+  if (!selectedSyncId.value) return
+  syncing.value = true
+  try {
+    await triggerSync(selectedSyncId.value)
+    ElMessage.success('同步任务已启动，请稍后查看日志')
+    setTimeout(() => loadLogs(selectedSyncId.value!), 3000)
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    syncing.value = false
+  }
+}
+
+watch(syncDialogVisible, (v) => {
+  if (v) {
+    loadSyncSources()
+    selectedSyncId.value = null
+    syncForm.value = null
+    logs.value = []
+  }
+})
 
 async function fetchData() {
   loading.value = true

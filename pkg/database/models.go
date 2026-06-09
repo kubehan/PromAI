@@ -146,6 +146,40 @@ func (o *TemplateMetricOverride) Apply(cfg *MetricConfig) {
 	cfg.LabelsJSON = o.LabelsJSON
 }
 
+type SyncSource struct {
+	ID            uint      `gorm:"primaryKey" json:"id"`
+	Name          string    `gorm:"size:200;not null" json:"name"`
+	URL           string    `gorm:"size:500;not null" json:"url"`
+	Method        string    `gorm:"size:10;default:GET" json:"method"`
+	Headers       string    `gorm:"type:text" json:"headers"`      // JSON object
+	Body          string    `gorm:"type:text" json:"body"`         // request body template
+	AuthType      string    `gorm:"size:20;default:none" json:"auth_type"` // none, basic, bearer
+	AuthUsername  string    `gorm:"size:100" json:"auth_username"`
+	AuthPassword  string    `gorm:"size:100" json:"auth_password"`
+	AuthToken     string    `gorm:"size:500" json:"auth_token"`
+	DataPath      string    `gorm:"size:200" json:"data_path"`     // JSON path to data array (e.g. "data.items")
+	NameField     string    `gorm:"size:100;not null" json:"name_field"`
+	URLField      string    `gorm:"size:100" json:"url_field"`
+	UsernameField string    `gorm:"size:100" json:"username_field"`
+	PasswordField string    `gorm:"size:100" json:"password_field"`
+	CronExpr      string    `gorm:"size:50" json:"cron_expr"`
+	Enabled       bool      `gorm:"default:true" json:"enabled"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+}
+
+type SyncLog struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	SyncSourceID uint      `json:"sync_source_id"`
+	Status       string    `gorm:"size:20" json:"status"` // success, partial, failed
+	Message      string    `gorm:"type:text" json:"message"`
+	TotalItems   int       `json:"total_items"`
+	CreatedItems int       `json:"created_items"`
+	UpdatedItems int       `json:"updated_items"`
+	ErrorItems   int       `json:"error_items"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&DataSource{},
@@ -159,5 +193,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&InspectionTemplateMetric{},
 		&TemplateMetricOverride{},
 		&InspectRecord{},
+		&SyncSource{},
+		&SyncLog{},
 	)
 }

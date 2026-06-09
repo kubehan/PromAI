@@ -3,7 +3,8 @@ import router from '../router'
 import type {
   DataSource, MetricType, MetricConfig,
   NotificationChannel, CronJob, ReportRecord,
-  InspectRecord, InspectRequest, DashboardStats
+  InspectRecord, InspectRequest, DashboardStats,
+  SyncSource, SyncLog
 } from '../types'
 
 const api = axios.create({
@@ -91,6 +92,14 @@ export const getDashboardHealth = (datasourceId?: number) =>
 
 export const getDashboardHealthTrend = (days: number = 14) =>
   api.get('/dashboard/health/trend', { params: { days } })
+
+// Sync Sources
+export const getSyncSources = () => api.get<SyncSource[]>('/sync-sources')
+export const createSyncSource = (s: SyncSource) => api.post<SyncSource>('/sync-sources', s)
+export const updateSyncSource = (id: number, s: SyncSource) => api.put<SyncSource>(`/sync-sources/${id}`, s)
+export const deleteSyncSource = (id: number) => api.delete(`/sync-sources/${id}`)
+export const triggerSync = (id: number) => api.post(`/sync-sources/${id}/sync`)
+export const getSyncLogs = (id: number) => api.get<SyncLog[]>(`/sync-sources/${id}/logs`)
 
 // Templates
 export const getTemplates = () => api.get('/templates')

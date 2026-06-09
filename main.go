@@ -100,8 +100,11 @@ func main() {
 	// 从数据库加载历史巡检快照到内存
 	loadLatestReports()
 
+	// 创建全局定时调度器
+	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
+
 	// 设置 HTTP 路由
-	setupRoutes(collector, config)
+	setupRoutes(collector, config, globalScheduler)
 
 	// 启动全局定时调度器（从配置文件和数据库加载定时任务）
 	startGlobalScheduler(config, collector)
@@ -197,7 +200,7 @@ func main() {
 var globalScheduler *cron.Cron
 
 // setupRoutes 设置 HTTP 路由
-func setupRoutes(collector *metrics.Collector, config *config.Config) {
+func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler *cron.Cron) {
 	// 设置首页路由
 	http.HandleFunc("/api/promai/", indexHandler)
 	http.HandleFunc("/api/promai/index", indexHandler)
@@ -249,18 +252,13 @@ func setupRoutes(collector *metrics.Collector, config *config.Config) {
 	}
 
 	// 注册管理 API 路由
-	adminAPI := NewAdminAPI(collector, config)
+	adminAPI := NewAdminAPI(collector, config, scheduler)
 	adminAPI.RegisterHandlers(http.DefaultServeMux)
 
 }
 
 // startGlobalScheduler 启动全局定时调度器
 func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
-	if globalScheduler != nil {
-		globalScheduler.Stop()
-	}
-	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
-
 	// 从数据库加载定时任务
 	var dbJobs []database.CronJob
 	database.DB.Where("enabled = ?", true).Find(&dbJobs)

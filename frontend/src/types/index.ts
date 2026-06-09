@@ -95,6 +95,40 @@ export interface InspectRecord {
   completed_at: string | null
 }
 
+export interface SyncSource {
+  id?: number
+  name: string
+  url: string
+  method?: string
+  headers?: string
+  body?: string
+  auth_type?: string
+  auth_username?: string
+  auth_password?: string
+  auth_token?: string
+  data_path?: string
+  name_field: string
+  url_field?: string
+  username_field?: string
+  password_field?: string
+  cron_expr?: string
+  enabled?: boolean
+  created_at?: string
+  updated_at?: string
+}
+
+export interface SyncLog {
+  id: number
+  sync_source_id: number
+  status: string
+  message: string
+  total_items: number
+  created_items: number
+  updated_items: number
+  error_items: number
+  created_at: string
+}
+
 export interface InspectRequest {
   datasource_id?: number
   datasource_url?: string

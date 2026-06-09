@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -190,14 +191,16 @@ func loadLatestReports() {
 }
 
 type AdminAPI struct {
-	collector  *metrics.Collector
-	config     *config.Config
-	authUser   string
-	authPass   string
-	jwtSecret  string
+	collector    *metrics.Collector
+	config       *config.Config
+	authUser     string
+	authPass     string
+	jwtSecret    string
+	scheduler    *cron.Cron
+	syncCronJobs map[uint]cron.EntryID
 }
 
-func NewAdminAPI(collector *metrics.Collector, cfg *config.Config) *AdminAPI {
+func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, scheduler *cron.Cron) *AdminAPI {
 	authUser := cfg.Auth.Username
 	authPass := cfg.Auth.Password
 	jwtSecret := cfg.Auth.JWTSecret
@@ -223,11 +226,13 @@ func NewAdminAPI(collector *metrics.Collector, cfg *config.Config) *AdminAPI {
 	}
 
 	return &AdminAPI{
-		collector: collector,
-		config:    cfg,
-		authUser:  authUser,
-		authPass:  authPass,
-		jwtSecret: jwtSecret,
+		collector:    collector,
+		config:       cfg,
+		authUser:     authUser,
+		authPass:     authPass,
+		jwtSecret:    jwtSecret,
+		scheduler:    scheduler,
+		syncCronJobs: make(map[uint]cron.EntryID),
 	}
 }
 
@@ -265,6 +270,8 @@ func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/dashboard/health", auth(a.handleDashboardHealth))
 	mux.HandleFunc("/api/v1/dashboard/health/trend", auth(a.handleDashboardHealthTrend))
 	mux.HandleFunc("/api/v1/datasources/apply-template", auth(a.handleApplyTemplate))
+	mux.HandleFunc("/api/v1/sync-sources", auth(a.handleSyncSources))
+	mux.HandleFunc("/api/v1/sync-sources/", auth(a.handleSyncSourceByID))
 
 	log.Printf("[AdminAPI] 管理接口已注册")
 }
@@ -1987,6 +1994,378 @@ func countWarning(data *report.ReportData) int {
 		}
 	}
 	return count
+}
+
+// ---- Sync Source Handlers ----
+
+func (a *AdminAPI) handleSyncSources(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "GET":
+		var list []database.SyncSource
+		database.DB.Order("created_at desc").Find(&list)
+		for i := range list {
+			list[i].AuthPassword = ""
+			list[i].AuthToken = ""
+		}
+		writeJSON(w, list)
+	case "POST":
+		var s database.SyncSource
+		if err := json.NewDecoder(r.Body).Decode(&s); err != nil {
+			writeError(w, 400, "请求体格式错误")
+			return
+		}
+		if s.Name == "" || s.URL == "" || s.NameField == "" {
+			writeError(w, 400, "名称、URL、名称字段不能为空")
+			return
+		}
+		if s.Method == "" {
+			s.Method = "GET"
+		}
+		if s.AuthType == "" {
+			s.AuthType = "none"
+		}
+		database.DB.Create(&s)
+		a.scheduleSyncSource(&s)
+		s.AuthPassword = ""
+		s.AuthToken = ""
+		writeJSON(w, s)
+	default:
+		writeError(w, 405, "不支持的请求方法")
+	}
+}
+
+func (a *AdminAPI) handleSyncSourceByID(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/sync-sources/")
+	// Check for sub-routes
+	if strings.HasSuffix(path, "/sync") {
+		idStr := strings.TrimSuffix(path, "/sync")
+		id, err := strconv.ParseUint(strings.Trim(idStr, "/"), 10, 64)
+		if err != nil {
+			writeError(w, 400, "无效的ID")
+			return
+		}
+		a.handleSyncSourceTrigger(w, r, uint(id))
+		return
+	}
+	if strings.HasSuffix(path, "/logs") {
+		idStr := strings.TrimSuffix(path, "/logs")
+		id, err := strconv.ParseUint(strings.Trim(idStr, "/"), 10, 64)
+		if err != nil {
+			writeError(w, 400, "无效的ID")
+			return
+		}
+		a.handleSyncSourceLogs(w, r, uint(id))
+		return
+	}
+	id, err := strconv.ParseUint(strings.Trim(path, "/"), 10, 64)
+	if err != nil {
+		writeError(w, 400, "无效的ID")
+		return
+	}
+	switch r.Method {
+	case "GET":
+		var s database.SyncSource
+		if database.DB.First(&s, id).Error != nil {
+			writeError(w, 404, "同步源不存在")
+			return
+		}
+		s.AuthPassword = ""
+		s.AuthToken = ""
+		writeJSON(w, s)
+	case "PUT":
+		var s database.SyncSource
+		if database.DB.First(&s, id).Error != nil {
+			writeError(w, 404, "同步源不存在")
+			return
+		}
+		var upd database.SyncSource
+		if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
+			writeError(w, 400, "请求体格式错误")
+			return
+		}
+		upd.ID = s.ID
+		upd.CreatedAt = s.CreatedAt
+		if upd.PasswordField == "" {
+			upd.PasswordField = s.PasswordField
+		}
+		if upd.AuthPassword == "" {
+			upd.AuthPassword = s.AuthPassword
+		}
+		if upd.AuthToken == "" {
+			upd.AuthToken = s.AuthToken
+		}
+		database.DB.Save(&upd)
+		a.rescheduleSyncSource(&s, &upd)
+		upd.AuthPassword = ""
+		upd.AuthToken = ""
+		writeJSON(w, upd)
+	case "DELETE":
+		var s database.SyncSource
+		if database.DB.First(&s, id).Error != nil {
+			writeError(w, 404, "同步源不存在")
+			return
+		}
+		a.removeSyncCron(s.ID)
+		database.DB.Delete(&s)
+		w.WriteHeader(204)
+	default:
+		writeError(w, 405, "不支持的请求方法")
+	}
+}
+
+func (a *AdminAPI) handleSyncSourceTrigger(w http.ResponseWriter, r *http.Request, id uint) {
+	if r.Method != "POST" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var s database.SyncSource
+	if database.DB.First(&s, id).Error != nil {
+		writeError(w, 404, "同步源不存在")
+		return
+	}
+	go a.executeSync(&s)
+	writeJSON(w, map[string]string{"message": "同步任务已启动"})
+}
+
+func (a *AdminAPI) handleSyncSourceLogs(w http.ResponseWriter, r *http.Request, id uint) {
+	if r.Method != "GET" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var logs []database.SyncLog
+	database.DB.Where("sync_source_id = ?", id).Order("created_at desc").Limit(50).Find(&logs)
+	writeJSON(w, logs)
+}
+
+func (a *AdminAPI) executeSync(s *database.SyncSource) {
+	log.Printf("[Sync] 开始同步: %s", s.Name)
+	start := time.Now()
+
+	// Build request
+	req, err := http.NewRequest(s.Method, s.URL, nil)
+	if err != nil {
+		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("创建请求失败: %v", err), 0, 0, 0, 0)
+		return
+	}
+
+	// Custom headers
+	if s.Headers != "" {
+		var headers map[string]string
+		if err := json.Unmarshal([]byte(s.Headers), &headers); err == nil {
+			for k, v := range headers {
+				req.Header.Set(k, v)
+			}
+		}
+	}
+
+	// Request body
+	if s.Body != "" && (s.Method == "POST" || s.Method == "PUT" || s.Method == "PATCH") {
+		req.Body = io.NopCloser(strings.NewReader(s.Body))
+		req.ContentLength = int64(len(s.Body))
+	}
+
+	// Auth
+	switch s.AuthType {
+	case "basic":
+		req.SetBasicAuth(s.AuthUsername, s.AuthPassword)
+	case "bearer":
+		req.Header.Set("Authorization", "Bearer "+s.AuthToken)
+	}
+
+	// Set default headers
+	if req.Header.Get("Content-Type") == "" && s.Body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if req.Header.Get("Accept") == "" {
+		req.Header.Set("Accept", "application/json")
+	}
+
+	// Execute
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("请求失败: %v", err), 0, 0, 0, 0)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("读取响应失败: %v", err), 0, 0, 0, 0)
+		return
+	}
+
+	if resp.StatusCode >= 400 {
+		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("请求返回错误状态 %d: %s", resp.StatusCode, string(body)), 0, 0, 0, 0)
+		return
+	}
+
+	// Parse JSON
+	var data interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("JSON解析失败: %v", err), 0, 0, 0, 0)
+		return
+	}
+
+	// Extract data array
+	items := a.extractJSONPath(data, s.DataPath)
+	itemsArr, ok := items.([]interface{})
+	if !ok {
+		// Try treating the whole response as an array
+		if arr, ok2 := data.([]interface{}); ok2 {
+			itemsArr = arr
+		} else {
+			a.recordSyncLog(s.ID, "failed", "响应数据不是数组，请检查 data_path 配置", 0, 0, 0, 0)
+			return
+		}
+	}
+
+	total := len(itemsArr)
+	created := 0
+	updated := 0
+	errCount := 0
+	errMsgs := []string{}
+
+	for _, item := range itemsArr {
+		obj, ok := item.(map[string]interface{})
+		if !ok {
+			errCount++
+			continue
+		}
+		name := fmt.Sprintf("%v", obj[s.NameField])
+		if name == "" || name == "<nil>" {
+			errCount++
+			errMsgs = append(errMsgs, fmt.Sprintf("缺少名称字段 '%s'", s.NameField))
+			continue
+		}
+		url := ""
+		if s.URLField != "" {
+			url = fmt.Sprintf("%v", obj[s.URLField])
+		}
+		username := ""
+		if s.UsernameField != "" {
+			username = fmt.Sprintf("%v", obj[s.UsernameField])
+		}
+		password := ""
+		if s.PasswordField != "" {
+			password = fmt.Sprintf("%v", obj[s.PasswordField])
+		}
+
+		// Find or create datasource
+		var existing database.DataSource
+		result := database.DB.Where("name = ?", name).First(&existing)
+		if result.Error == nil {
+			existing.URL = url
+			existing.Username = username
+			if password != "" {
+				existing.Password = password
+			}
+			database.DB.Save(&existing)
+			updated++
+		} else {
+			ds := database.DataSource{
+				Name:     name,
+				URL:      url,
+				Username: username,
+				Password: password,
+			}
+			database.DB.Create(&ds)
+			created++
+		}
+	}
+
+	status := "success"
+	if created+updated == 0 {
+		status = "failed"
+	} else if errCount > 0 {
+		status = "partial"
+	}
+
+	msg := fmt.Sprintf("同步完成: 总 %d 项, 新增 %d, 更新 %d, 失败 %d", total, created, updated, errCount)
+	if len(errMsgs) > 0 {
+		msg += "; " + strings.Join(errMsgs, "; ")
+	}
+	elapsed := time.Since(start)
+	log.Printf("[Sync] %s (%v)", msg, elapsed)
+	a.recordSyncLog(s.ID, status, msg, total, created, updated, errCount)
+}
+
+func (a *AdminAPI) extractJSONPath(data interface{}, path string) interface{} {
+	if path == "" {
+		return data
+	}
+	parts := strings.Split(path, ".")
+	current := data
+	for _, part := range parts {
+		obj, ok := current.(map[string]interface{})
+		if !ok {
+			return nil
+		}
+		current = obj[part]
+		if current == nil {
+			return nil
+		}
+	}
+	return current
+}
+
+func (a *AdminAPI) recordSyncLog(syncSourceID uint, status, message string, total, created, updated, errCount int) {
+	log := database.SyncLog{
+		SyncSourceID: syncSourceID,
+		Status:       status,
+		Message:      message,
+		TotalItems:   total,
+		CreatedItems: created,
+		UpdatedItems: updated,
+		ErrorItems:   errCount,
+	}
+	database.DB.Create(&log)
+
+	// Update sync source updated_at
+	database.DB.Model(&database.SyncSource{}).Where("id = ?", syncSourceID).Update("updated_at", time.Now())
+}
+
+func (a *AdminAPI) scheduleSyncSource(s *database.SyncSource) {
+	if s.CronExpr == "" || !s.Enabled {
+		return
+	}
+	if a.scheduler == nil {
+		return
+	}
+	id, ok := a.syncCronJobs[s.ID]
+	if ok {
+		a.scheduler.Remove(id)
+	}
+	sourceID := s.ID
+	entryID, err := a.scheduler.AddFunc(s.CronExpr, func() {
+		var src database.SyncSource
+		if database.DB.First(&src, sourceID).Error != nil {
+			return
+		}
+		a.executeSync(&src)
+	})
+	if err != nil {
+		log.Printf("[Sync] 调度同步源 %s 失败: %v", s.Name, err)
+		return
+	}
+	a.syncCronJobs[s.ID] = entryID
+	log.Printf("[Sync] 已调度同步源: %s (%s)", s.Name, s.CronExpr)
+}
+
+func (a *AdminAPI) rescheduleSyncSource(old, new *database.SyncSource) {
+	if old.CronExpr != new.CronExpr || old.Enabled != new.Enabled {
+		a.removeSyncCron(old.ID)
+		a.scheduleSyncSource(new)
+	}
+}
+
+func (a *AdminAPI) removeSyncCron(id uint) {
+	if entryID, ok := a.syncCronJobs[id]; ok {
+		if a.scheduler != nil {
+			a.scheduler.Remove(entryID)
+		}
+		delete(a.syncCronJobs, id)
+	}
 }
 
 func getReportStatus(data *report.ReportData) string {
