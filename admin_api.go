@@ -390,10 +390,36 @@ func maskPassword(ds []database.DataSource) {
 func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+		if page < 1 {
+			page = 1
+		}
+		if pageSize < 1 || pageSize > 200 {
+			pageSize = 50
+		}
+
+		query := database.DB.Model(&database.DataSource{})
+		if kw := r.URL.Query().Get("keyword"); kw != "" {
+			query = query.Where("name LIKE ? OR url LIKE ?", "%"+kw+"%", "%"+kw+"%")
+		}
+		if en := r.URL.Query().Get("enabled"); en != "" {
+			query = query.Where("enabled = ?", en == "true")
+		}
+
+		var total int64
+		query.Count(&total)
+
 		var ds []database.DataSource
-		database.DB.Order("is_default desc, name asc").Find(&ds)
+		query.Order("is_default desc, enabled desc, name asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&ds)
 		maskPassword(ds)
-		writeJSON(w, ds)
+
+		writeJSON(w, map[string]interface{}{
+			"items": ds,
+			"total": total,
+			"page":  page,
+			"page_size": pageSize,
+		})
 	case "POST":
 		var d database.DataSource
 		if err := json.NewDecoder(r.Body).Decode(&d); err != nil {
@@ -404,10 +430,37 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "名称和URL不能为空")
 			return
 		}
+		d.Enabled = true
 		database.DB.Create(&d)
 		w.WriteHeader(201)
 		d.Password = ""
 		writeJSON(w, d)
+	case "PATCH":
+		var req struct {
+			IDs     []uint `json:"ids"`
+			Enabled *bool  `json:"enabled,omitempty"`
+			Action  string `json:"action"` // "delete" or "toggle"
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, 400, "请求体格式错误")
+			return
+		}
+		if len(req.IDs) == 0 {
+			writeError(w, 400, "请选择数据源")
+			return
+		}
+		switch req.Action {
+		case "delete":
+			database.DB.Delete(&database.DataSource{}, req.IDs)
+		case "toggle":
+			if req.Enabled != nil {
+				database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("enabled", *req.Enabled)
+			}
+		default:
+			writeError(w, 400, "不支持的操作")
+			return
+		}
+		writeJSON(w, map[string]interface{}{"success": true})
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
@@ -443,19 +496,20 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 			writeError(w, 404, "数据源不存在")
 			return
 		}
-		var upd database.DataSource
+		var upd map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
 			writeError(w, 400, "请求体格式错误")
 			return
 		}
-		upd.ID = d.ID
-		upd.CreatedAt = d.CreatedAt
-		if upd.Password == "" {
-			upd.Password = d.Password
+		delete(upd, "id")
+		delete(upd, "created_at")
+		if pw, ok := upd["password"].(string); ok && pw == "" {
+			delete(upd, "password")
 		}
-		database.DB.Save(&upd)
-		upd.Password = ""
-		writeJSON(w, upd)
+		database.DB.Model(&d).Updates(upd)
+		database.DB.First(&d, id)
+		d.Password = ""
+		writeJSON(w, d)
 	case "DELETE":
 		database.DB.Delete(&database.DataSource{}, id)
 		w.WriteHeader(204)

@@ -125,7 +125,7 @@ onMounted(async () => {
     const [ds, cron, notif, reps] = await Promise.all([
       getDataSources(), getCronJobs(), getNotifications(), getReports(),
     ])
-    stats.value[0].value = ds.data.length
+    stats.value[0].value = ds.data.total
     stats.value[1].value = cron.data.length
     stats.value[2].value = notif.data.length
     stats.value[3].value = reps.data.length

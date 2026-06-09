@@ -13,6 +13,7 @@ type DataSource struct {
 	Username       string    `gorm:"size:100" json:"username"`
 	Password       string    `gorm:"size:100" json:"password"`
 	IsDefault      bool      `gorm:"default:false" json:"is_default"`
+	Enabled        bool      `gorm:"default:true" json:"enabled"`
 	TemplateID     *uint     `json:"template_id"`
 	NotifyChannels string    `gorm:"type:text" json:"notify_channels"`
 	CreatedAt      time.Time `json:"created_at"`

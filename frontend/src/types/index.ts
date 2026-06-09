@@ -5,6 +5,7 @@ export interface DataSource {
   username?: string
   password?: string
   is_default?: boolean
+  enabled?: boolean
   template_id?: number | null
   notify_channels?: string
   created_at?: string

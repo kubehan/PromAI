@@ -139,7 +139,7 @@ async function fetchData() {
   loading.value = true
   try {
     const [jr, dr, nr] = await Promise.all([getCronJobs(), getDataSources(), getNotifications()])
-    jobs.value = jr.data; datasources.value = dr.data; notifications.value = nr.data
+    jobs.value = jr.data; datasources.value = dr.data.items; notifications.value = nr.data
   } finally { loading.value = false }
 }
 

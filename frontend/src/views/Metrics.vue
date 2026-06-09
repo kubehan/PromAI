@@ -295,7 +295,7 @@ async function fetchData() {
       getDataSources()
     ])
     metricTypes.value = mtRes.data
-    datasources.value = dsRes.data
+    datasources.value = dsRes.data.items
 
     const flat: FlatMetric[] = []
     for (const mt of metricTypes.value) {

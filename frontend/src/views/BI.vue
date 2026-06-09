@@ -742,7 +742,7 @@ watch(selectedDS, fetchData)
 onMounted(async () => {
   try {
     const ds = await getDataSources()
-    allDatasources.value = ds.data
+    allDatasources.value = ds.data.items
   } catch { /* ignore */ }
   await fetchData()
   await fetchTrend()

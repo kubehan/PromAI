@@ -38,11 +38,14 @@ export const login = (username: string, password: string) => api.post('/auth/log
 export const getMe = () => api.get('/auth/me')
 
 // Data Sources
-export const getDataSources = () => api.get<DataSource[]>('/datasources')
+export const getDataSources = (params?: { page?: number; page_size?: number; keyword?: string; enabled?: string }) =>
+  api.get<{ items: DataSource[]; total: number; page: number; page_size: number }>('/datasources', { params })
 export const getDataSource = (id: number) => api.get<DataSource>(`/datasources/${id}`)
 export const createDataSource = (d: DataSource) => api.post<DataSource>('/datasources', d)
-export const updateDataSource = (id: number, d: DataSource) => api.put<DataSource>(`/datasources/${id}`, d)
+export const updateDataSource = (id: number, d: Partial<DataSource>) => api.put<DataSource>(`/datasources/${id}`, d)
 export const deleteDataSource = (id: number) => api.delete(`/datasources/${id}`)
+export const batchDeleteDataSources = (ids: number[]) => api.patch('/datasources', { ids, action: 'delete' })
+export const batchToggleDataSources = (ids: number[], enabled: boolean) => api.patch('/datasources', { ids, action: 'toggle', enabled })
 export const importDatasources = (yaml: string) => api.post('/datasources/import', { yaml_content: yaml })
 export const applyTemplate = (datasourceId: number) => api.post('/datasources/apply-template', { datasource_id: datasourceId })
 export const testDataSource = (id: number) => api.post(`/datasources/${id}/test`)

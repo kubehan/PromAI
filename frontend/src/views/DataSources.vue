@@ -20,46 +20,85 @@
           </el-button>
         </div>
       </div>
-      <el-table :data="datasources" v-loading="loading" stripe>
-        <el-table-column type="index" label="#" width="56" />
+
+      <!-- Search & Filter -->
+      <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+        <el-input
+          v-model="searchKeyword"
+          placeholder="搜索名称 / URL..."
+          clearable
+          style="width: 280px;"
+          @clear="fetchData"
+          @keyup.enter="fetchData"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <el-select v-model="filterEnabled" placeholder="状态" clearable style="width: 120px;" @change="fetchData">
+          <el-option label="仅启用" value="true" />
+          <el-option label="仅禁用" value="false" />
+        </el-select>
+        <span style="font-size: 13px; color: var(--text-tertiary);">共 {{ total }} 个</span>
+      </div>
+
+      <!-- Batch Actions -->
+      <div v-if="selectedIds.length > 0" style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: rgba(0,212,255,0.05); border-radius: 8px;">
+        <span style="font-size: 13px; color: var(--text-secondary);">已选 {{ selectedIds.length }} 项</span>
+        <el-button size="small" @click="selectedIds = []">取消选择</el-button>
+        <el-button size="small" type="primary" @click="batchToggle(true)"><el-icon><Check /></el-icon> 批量启用</el-button>
+        <el-button size="small" @click="batchToggle(false)"><el-icon><Close /></el-icon> 批量禁用</el-button>
+        <el-button size="small" type="danger" @click="batchDelete"><el-icon><Delete /></el-icon> 批量删除</el-button>
+      </div>
+
+      <el-table :data="datasources" v-loading="loading" stripe @selection-change="(rows: any[]) => selectedIds = rows.map((r: any) => r.id)">
+        <el-table-column type="selection" width="44" />
         <el-table-column prop="name" label="名称" min-width="180">
           <template #default="{ row }">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-weight: 600; color: var(--text-primary);">{{ row.name }}</span>
+              <span :style="{ fontWeight: 600, color: row.enabled === false ? 'var(--text-tertiary)' : 'var(--text-primary)', textDecoration: row.enabled === false ? 'line-through' : 'none' }">{{ row.name }}</span>
               <el-tag v-if="row.is_default" size="small" effect="dark" style="background: rgba(0,212,255,0.15); color: var(--cyan); border: none;">默认</el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="url" label="URL" min-width="320">
+        <el-table-column prop="url" label="URL" min-width="300">
           <template #default="{ row }">
             <code style="font-size: 12px; color: var(--text-tertiary);">{{ row.url }}</code>
           </template>
         </el-table-column>
-        <el-table-column prop="username" label="用户名" width="120">
+        <el-table-column label="状态" width="80" align="center">
+          <template #default="{ row }">
+            <el-switch
+              :model-value="row.enabled !== false"
+              size="small"
+              @click.stop
+              @change="toggleEnabled(row)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="username" label="用户名" width="100">
           <template #default="{ row }">
             <span v-if="row.username" style="color: var(--text-secondary);">{{ row.username }}</span>
             <span v-else style="color: var(--text-tertiary);">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="巡检模板" width="160">
+        <el-table-column label="巡检模板" width="150">
           <template #default="{ row }">
             <span v-if="row.template_id" style="color: var(--text-secondary); font-size: 13px;">{{ templateName(row.template_id) }}</span>
             <span v-else style="color: var(--text-tertiary); font-size: 13px;">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="通知渠道" width="180">
+        <el-table-column label="通知渠道" width="170">
           <template #default="{ row }">
             <span v-if="row.notify_channels" style="color: var(--text-secondary); font-size: 13px;">{{ channelNames(row.notify_channels) }}</span>
             <span v-else style="color: var(--text-tertiary); font-size: 13px;">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="创建时间" width="170">
+        <el-table-column label="创建时间" width="160">
           <template #default="{ row }">{{ dayjs(row.created_at).format('MM-DD HH:mm') }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="360" fixed="right">
+        <el-table-column label="操作" width="340" fixed="right">
           <template #default="{ row }">
             <el-button size="small" text @click="openEdit(row)" style="color: var(--cyan);">编辑</el-button>
-            <el-button size="small" text @click="testConnectivity(row)" style="color: var(--emerald);">测试连接</el-button>
+            <el-button size="small" text @click="testConnectivity(row)" style="color: var(--emerald);">测试</el-button>
             <el-button size="small" text @click="inspectDS(row)" style="color: var(--orange);">巡检</el-button>
             <el-dropdown trigger="click" @command="(cmd: string) => handleMore(row, cmd)">
               <el-button size="small" text style="color: var(--text-tertiary);">
@@ -75,6 +114,19 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- Pagination -->
+      <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :page-sizes="[20, 50, 100, 200]"
+          :total="total"
+          layout="total, sizes, prev, pager, next"
+          background
+          @change="fetchData"
+        />
+      </div>
     </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑数据源' : '新增数据源'" width="520" :close-on-click-modal="false">
@@ -121,7 +173,7 @@
   username: admin
   password: xxx
 - name: 测试环境
- url: http://prometheus-test:9090
+  url: http://prometheus-test:9090
           </pre>
         </template>
       </el-alert>
@@ -293,7 +345,7 @@ import { ref, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs } from '../api'
+import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs, batchDeleteDataSources, batchToggleDataSources } from '../api'
 import type { DataSource, SyncSource } from '../types'
 
 const loading = ref(false)
@@ -313,6 +365,14 @@ const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
   url: [{ required: true, message: '请输入 URL', trigger: 'blur' }],
 }
+
+// Pagination, search, filter
+const page = ref(1)
+const pageSize = ref(50)
+const total = ref(0)
+const searchKeyword = ref('')
+const filterEnabled = ref('')
+const selectedIds = ref<number[]>([])
 
 // Sync source state
 const syncDialogVisible = ref(false)
@@ -419,10 +479,15 @@ watch(syncDialogVisible, (v) => {
 async function fetchData() {
   loading.value = true
   try {
-    const [dsRes, tmplRes, notifRes] = await Promise.all([getDataSources(), getTemplates(), getNotifications()])
-    datasources.value = dsRes.data
+    const params: any = { page: page.value, page_size: pageSize.value }
+    if (searchKeyword.value) params.keyword = searchKeyword.value
+    if (filterEnabled.value) params.enabled = filterEnabled.value
+    const [dsRes, tmplRes, notifRes] = await Promise.all([getDataSources(params), getTemplates(), getNotifications()])
+    datasources.value = dsRes.data.items
+    total.value = dsRes.data.total
     templates.value = tmplRes.data
     notifChannels.value = notifRes.data
+    selectedIds.value = []
   } finally { loading.value = false }
 }
 
@@ -547,6 +612,31 @@ async function handleImport() {
     await fetchData()
   } catch (e: any) { ElMessage.error(e.message) }
   finally { importing.value = false }
+}
+
+async function toggleEnabled(row: DataSource) {
+  try {
+    await updateDataSource(row.id!, { enabled: !(row.enabled !== false) })
+    ElMessage.success(row.enabled === false ? '已启用' : '已禁用')
+    await fetchData()
+  } catch (e: any) { ElMessage.error(e.message) }
+}
+
+async function batchToggle(enabled: boolean) {
+  try {
+    await batchToggleDataSources(selectedIds.value, enabled)
+    ElMessage.success(enabled ? '批量启用成功' : '批量禁用成功')
+    await fetchData()
+  } catch (e: any) { ElMessage.error(e.message) }
+}
+
+async function batchDelete() {
+  try {
+    await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个数据源？`, '批量删除', { type: 'warning' })
+    await batchDeleteDataSources(selectedIds.value)
+    ElMessage.success('批量删除成功')
+    await fetchData()
+  } catch { /* ignore */ }
 }
 
 onMounted(fetchData)
