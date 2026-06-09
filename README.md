@@ -4,104 +4,7 @@
 
 ## 项目简介
 
-这是一个基于 Prometheus 的监控报告自动生成工具，可以自动收集、分析指标数据并生成可视化的 HTML 报告。该工具旨在简化监控数据的收集和展示过程，帮助运维人员快速了解系统状态。
-
-## 报告样式
-
-### 获取报告
-
-http://localhost:8091/api/promai/getreport
-
-[报告样式](reports/inspection_report_20241214_131709.html)
-![report](images/资源概览.png)
-
-<!-- ![report](images/image.png) -->
-
-![report](images/image2.png)
-
-## 服务健康看板
-
-### 获取服务健康看板
-
-http://localhost:8091/api/promai/status 
-
-
-![status](images/status.png)
-
-![机器人报告](image/wechat_article_preview/1764515543801.png)
-
-
-
-## 功能特点
-
-- 支持多种指标类型的监控（基础资源、Kubernetes、应用服务等）
-- 自动计算指标状态和告警级别（正常、警告、严重）
-- 生成包含数据表格和图表的 HTML 报告
-- 支持自定义指标阈值和标签别名
-- 灵活的配置文件系统
-- 支持多维度数据分析和展示
-- 自动计算关键统计指标（最大值、最小值、平均值等）
-- 美观的可视化界面，支持响应式布局
-- **新增：支持多数据源配置，可通过datasource参数动态切换Prometheus集群**
-
-## 系统要求
-
-- Go 1.22 或更高版本
-- 可访问的 Prometheus 服务器
-- 现代浏览器（支持 HTML5 和 JavaScript）
-- 至少 512MB 可用内存
-- 50MB 可用磁盘空间
-
-## 配置说明
-
-配置文件采用 YAML 格式，主要包含以下几个部分：
-
-### Prometheus 配置
-
-在 `config/config.yaml` 中配置 Prometheus 服务器地址和监控指标。
-
-```yaml
-prometheus_url: "http://prometheus.k8s.kubehan.cn"
-
-metric_types:
-  - type: "基础资源使用情况"
-    metrics:
-      - name: "CPU使用率"
-        description: "节点CPU使用率统计"
-        query: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)"
-        trend_query: "100 - (avg by(instance) (irate(node_cpu_seconds_total{mode='idle'}[5m])) * 100)[6h:5m]"
-        threshold: 80
-        unit: "%"
-        labels:
-          instance: "节点"
-      # 其他指标...
-```
-
-### 指标说明
-
-每个指标可以配置以下内容：
-
-- `name`: 指标名称
-- `description`: 指标描述
-- `query`: 用于表格显示的即时查询
-- `trend_query`: 用于图表显示的趋势查询
-- `threshold`: 指标阈值
-- `unit`: 指标单位
-- `labels`: 标签别名
-- `threshold_type`: 阈值比较方式: "greater", "greater_equal", "less", "less_equal", "equal", "not_equal"
-
-  `greater`: 当值大于阈值时告警 (例如：CPU使用率 > 80% 告警)
-
-  `greater_equal`: 当值大于等于阈值时告警 (例如：CPU使用率 >= 80% 告警)
-
-  `less`: 当值小于阈值时告警 (例如：可用节点数 < 3 告警)
-
-  `less_equal`: 当值小于等于阈值时告警 (例如：可用节点数 <= 3 告警)
-
-  `equal`: 值必须等于阈值才正常 (例如：版本号必须匹配)
-
-  `not_equal`: 值不等于阈值才正常 (例如：版本号不匹配时告警)
-- `threshold_status`: 阈值状态: "normal", "critical" 根据阈值类型不同，告警状态也不同
+基于 Prometheus 的监控巡检工具，支持自动采集指标、生成可视化 HTML 报告，并提供 **Web 管理后台**（SQLite 持久化）进行数据源、指标、模板、定时任务、通知渠道的全生命周期管理。
 
 ## 快速开始
 
@@ -113,224 +16,87 @@ metric_types:
    git clone https://github.com/kubehan/PromAI.git
    cd PromAI
    ```
+
 2. 安装依赖：
 
    ```bash
    go mod download
+   cd frontend && npm install && cd ..
    ```
-3. 修改配置文件：
+
+3. 修改配置文件 `config/config.yaml`，设置 Prometheus 地址
+
+4. 构建前端 + 后端：
 
    ```bash
-   cp config/config.yaml config/config.yaml
-   # 编辑 config.yaml 设置 Prometheus 服务器地址和监控指标
+   cd frontend && npm run build && cd ..
+   go build -o promai .
    ```
-4. 构建并运行：
+
+5. 运行：
 
    ```bash
-   go build -o PromAI main.go
-   ./PromAI -config config/config.yaml
+   ./promai
    ```
-5. 查看报告：
-   生成的报告将保存在 `reports` 目录下。
 
-### Docker 部署
+   首次运行自动从 `config/config.yaml` 导入种子数据到 SQLite。
 
-```bash
-docker run -d --name PromAI -p 8091:8091 kubehan/promai:latest
-```
+### 访问地址
 
-### Kubernetes 部署
+| 用途 | 地址 |
+|------|------|
+| 管理后台（SPA） | http://localhost:8091/api/promai/admin |
+| 健康大屏（BI） | http://localhost:8091/api/promai/admin/#/bi |
+| 触发巡检报告 | http://localhost:8091/api/promai/getreport |
+| 历史报告 | http://localhost:8091/api/promai/reports/ |
 
-```bash
-kubectl create namespace promai
-kubectl create configmap config --from-file=config/config.yaml -n promai
-kubectl apply -f deploy/deployment.yaml
-```
+## 管理后台功能
 
-## 使用示例
+| 页面 | 功能 |
+|------|------|
+| **控制台** | 系统概览，数据源/报告/模板/通知数量统计 |
+| **健康大屏** | ECharts 图表展示各数据源健康评分、指标分布、告警统计 |
+| **数据源管理** | 添加/编辑/删除 Prometheus 数据源，绑定巡检模板 |
+| **指标配置** | 管理指标类型和 PromQL 配置，按数据源筛选，PromQL 验证 |
+| **巡检模板** | 创建巡检模板，绑定指标，支持指标级别覆盖（不影响全局） |
+| **通知渠道** | 配置钉钉、企业微信、飞书、邮件等通知方式 |
+| **定时任务** | Cron 表达式定时巡检，选择通知渠道自动告警推送 |
+| **触发巡检** | 手动触发巡检，支持选择数据源、指标、模板 |
+| **报告管理** | 查看/删除历史巡检报告 |
+| **系统设置** | 项目名称、调度 Cron、报告清理策略等 |
 
-在配置文件中添加所需的监控指标后，运行程序将生成 HTML 报告。报告中将包含各个指标的当前状态、历史趋势图表以及详细的表格数据。
+## 配置说明（config/config.yaml）
 
-### 基本使用
-
-1. 修改配置文件中的Prometheus地址为自己的地址
-2. 修改配置文件中的指标
-3. 运行程序 默认运行在8091端口，通过访问http://localhost:8091/getreport 查看报告
-
-```bash
-go build -o PromAI main.go
-./PromAI -config config/config.yaml -port :8091
-```
-
-### 多数据源使用
-
-支持通过URL参数 `datasource`动态切换不同的Prometheus集群：
-
-1. 在配置文件中配置多个数据源：
+仅用于首次启动时的种子数据导入，后续所有配置通过管理后台 UI 操作，持久化在 SQLite。
 
 ```yaml
+prometheus_url: "http://prometheus.k8s.kubehan.cn"
+port: 8091
+project_name: "PromAI"
+cron_schedule: "00 08,17 * * *"
+
 data_sources:
   - name: "cluster1"
     url: "http://prometheus.cluster1.example.com"
-  - name: "cluster2" 
-    url: "http://prometheus.cluster2.example.com"
-  - name: "test-cluster"
-    url: "http://prometheus.test.example.com"
 ```
 
-2. 使用datasource参数访问特定集群的报告：
+## 多数据源
 
-```bash
-# 获取cluster1的报告
-http://localhost:8091/api/promai/getreport?datasource=cluster1
+通过管理后台「数据源管理」页面添加，每个数据源可独立绑定不同的巡检模板。
 
-# 获取cluster2的报告
-http://localhost:8091/api/promai/getreport?datasource=cluster2
-
-# 查看cluster1的状态页面
-http://localhost:8091/api/promai/status?datasource=cluster1
-
-# 不带datasource参数时使用默认的prometheus_url
-http://localhost:8091/api/promai/getreport
-
-#自定义数据源
-http://localhost:8091/api/promai/getreport?datasource=http://prometheus.test.example.com
-```
-
-# Prometheus Automated Inspection 已实现功能
-
-✅ **已实现的核心功能**
+## 已实现的核心功能
 
 - ✅ 多数据源支持
-- ✅ 自定义仪表板
+- ✅ SQLite 持久化（GORM）
+- ✅ 巡检模板系统（模板指标覆盖）
 - ✅ 智能告警（警告、严重两级告警）
-- ✅ API 接口 (/getreport, /status, /health)
-- ✅ 用户角色和权限管理
-- ✅ 数据导出功能（HTML报告）
-- ✅ 响应式设计（移动端支持）
-- ✅ 实时状态监控看板
-- ✅ 灵活的阈值配置系统
-- ✅ 完整的指标统计分析
-
-# 项目特色
-
-## 🎯 智能告警系统
-
-支持多种阈值比较方式，适应不同监控场景需求：
-
-- 数值范围监控（CPU、内存使用率）
-- 计数监控（可用节点数、连接数）
-- 精确匹配监控（版本号、状态检查）
-
-## 📊 可视化报告
-
-自动生成包含统计信息、趋势图表和详细数据的HTML报告：
-
-- 概览统计卡片
-- 资源使用情况图表
-- 按状态筛选的数据表格
-- 响应式设计，支持各种设备
-
-## 🔄 实时状态监控
-
-提供服务健康状态看板，实时显示：
-
-- 各类别巡检结果统计
-- 异常指标详情
-- 总体健康度评估
-
-## 🔧 灵活配置系统
-
-支持YAML配置文件，可自定义：
-
-- Prometheus数据源
-- 监控指标类型
-- 阈值和告警规则
-- 标签别名显示
-
-## 贡献
-
-欢迎任何形式的贡献！请提交问题、建议或拉取请求。
-
-## 贡献者
-
-<!-- readme: collaborators,contributors -start -->
-<table>
-<tr>
-    <td align="center">
-        <a href="https://github.com/kubehan">
-            <img src="https://avatars.githubusercontent.com/u/69997301?v=4" width="100;" alt="kubehan"/>
-            <br />
-            <sub><b>Kubehan</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/ghostelement">
-            <img src="https://avatars.githubusercontent.com/u/77783267?v=4" width="100;" alt="ghostelement"/>
-            <br />
-            <sub><b>Ghostelement</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/cloud-chengjia">
-            <img src="https://avatars.githubusercontent.com/u/95220692?v=4" width="100;" alt="cloud-chengjia"/>
-            <br />
-            <sub><b>Cloud-chengjia</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/junlintianxiazhifulinzhongguo">
-            <img src="https://avatars.githubusercontent.com/u/18591729?v=4" width="100;" alt="junlintianxiazhifulinzhongguo"/>
-            <br />
-            <sub><b>Junlintianxiazhifulinzhongguo</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/zhuhao22">
-            <img src="https://avatars.githubusercontent.com/u/110542139?v=4" width="100;" alt="zhuhao22"/>
-            <br />
-            <sub><b>Zhuhao22</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/KingsBa">
-            <img src="https://avatars.githubusercontent.com/u/247204263?v=4" width="100;" alt="KingsBa"/>
-            <br />
-            <sub><b>KingsBa</b></sub>
-        </a>
-    </td></tr>
-<tr>
-    <td align="center">
-        <a href="https://github.com/liushiju">
-            <img src="https://avatars.githubusercontent.com/u/34912508?v=4" width="100;" alt="liushiju"/>
-            <br />
-            <sub><b>Shiju Liu</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/wevsmy">
-            <img src="https://avatars.githubusercontent.com/u/26675374?v=4" width="100;" alt="wevsmy"/>
-            <br />
-            <sub><b>Wilson_wu</b></sub>
-        </a>
-    </td>
-    <td align="center">
-        <a href="https://github.com/liaofan-0710">
-            <img src="https://avatars.githubusercontent.com/u/59794905?v=4" width="100;" alt="liaofan-0710"/>
-            <br />
-            <sub><b>了凡</b></sub>
-        </a>
-    </td></tr>
-</table>
-<!-- readme: collaborators,contributors -end -->
-
-## 联系我们
-
-微信扫码添加我为好友，备注“PromAI”，即可加入PromAI交流群。
-微信号：Kubehan
-
-微信公众号：云原生知识栈
-![1764516172438](image/README/1764516172438.png)
+- ✅ 管理后台 SPA（Vue 3 + Element Plus）
+- ✅ 健康大屏（ECharts）
+- ✅ 定时巡检（Cron 表达式）
+- ✅ 多渠道通知（钉钉、企微、飞书、邮件）
+- ✅ 数据导出（HTML 报告）
+- ✅ PromQL 在线验证
+- ✅ 响应式设计
 
 ## 许可证
 
