@@ -257,6 +257,13 @@ func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler 
 
 // startGlobalScheduler 启动全局定时调度器
 func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
+	// 清除旧任务，防止泄漏
+	globalScheduler.Stop()
+	for globalScheduler.Entries() != nil {
+		globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
+		break
+	}
+
 	// 从数据库加载定时任务
 	var dbJobs []database.CronJob
 	database.DB.Where("enabled = ?", true).Find(&dbJobs)
@@ -1057,75 +1064,116 @@ func adminHandler(w http.ResponseWriter, r *http.Request) {
 
 // doInspection 执行巡检并保存报告记录
 func doInspection(cfg *config.Config, collector *metrics.Collector, job database.CronJob) {
-	activeCollector := collector
-	activeCfg := cfg
+	// Resolve datasource list
+	dsIDs := resolveJobDatasourceIDs(job)
+	if len(dsIDs) == 0 {
+		// Use default (collector from config)
+		data, err := collector.CollectMetrics()
+		if err != nil {
+			log.Printf("[Cron] 收集指标失败: %v", err)
+			database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": "failed"})
+			return
+		}
+		data.Datasource = cfg.PrometheusURL
+		setLatestReport(data.Datasource, reportDataToHealth(data))
+		reportFilePath, err := report.GenerateReport(*data)
+		if err != nil {
+			log.Printf("[Cron] 生成报告失败: %v", err)
+			return
+		}
+		saveReportRecord(data, reportFilePath)
+		sendNotifications(cfg, reportFilePath, data)
+		sendJobNotifications(job, reportFilePath, data)
+		database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": "success"})
+		log.Printf("[Cron] 定时任务 %s 完成: %s", job.Name, reportFilePath)
+		return
+	}
 
-	if job.DatasourceID != nil {
-		var ds database.DataSource
-		if database.DB.First(&ds, *job.DatasourceID).Error == nil {
+	var anySuccess bool
+	for _, dsID := range dsIDs {
+		func(dsID uint) {
+			var ds database.DataSource
+			if database.DB.First(&ds, dsID).Error != nil {
+				log.Printf("[Cron] 数据源 %d 不存在，跳过", dsID)
+				return
+			}
 			client, err := prometheus.NewClient(ds.URL, ds.Username, ds.Password)
-			if err == nil {
-				// Apply template filtering if the datasource has a template
-				if ds.TemplateID != nil {
-					var links []database.InspectionTemplateMetric
-					database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
-					if len(links) > 0 {
-						cfgIDs := make([]uint, len(links))
-						for i, l := range links {
-							cfgIDs[i] = l.MetricConfigID
-						}
-						var tmplConfigs []database.MetricConfig
-						database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
-						for i := range tmplConfigs {
-							var override database.TemplateMetricOverride
-							if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
-								override.Apply(&tmplConfigs[i])
-							}
-						}
-						if len(tmplConfigs) > 0 {
-							activeCfg = buildFilteredConfig(cfg, tmplConfigs)
+			if err != nil {
+				log.Printf("[Cron] 连接数据源 %s 失败: %v", ds.Name, err)
+				return
+			}
+			activeCfg := cfg
+			if ds.TemplateID != nil {
+				var links []database.InspectionTemplateMetric
+				database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
+				if len(links) > 0 {
+					cfgIDs := make([]uint, len(links))
+					for i, l := range links {
+						cfgIDs[i] = l.MetricConfigID
+					}
+					var tmplConfigs []database.MetricConfig
+					database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
+					for i := range tmplConfigs {
+						var override database.TemplateMetricOverride
+						if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
+							override.Apply(&tmplConfigs[i])
 						}
 					}
+					if len(tmplConfigs) > 0 {
+						activeCfg = buildFilteredConfig(cfg, tmplConfigs)
+					}
 				}
-				activeCollector = metrics.NewCollectorWithURL(client.API, activeCfg, ds.URL)
 			}
-		}
+			dsCollector := metrics.NewCollectorWithURL(client.API, activeCfg, ds.URL)
+
+			data, err := dsCollector.CollectMetrics()
+			if err != nil {
+				log.Printf("[Cron] 数据源 %s 收集指标失败: %v", ds.Name, err)
+				return
+			}
+			data.Datasource = ds.URL
+			setLatestReport(data.Datasource, reportDataToHealth(data))
+
+			reportFilePath, err := report.GenerateReport(*data)
+			if err != nil {
+				log.Printf("[Cron] 数据源 %s 生成报告失败: %v", ds.Name, err)
+				return
+			}
+			saveReportRecord(data, reportFilePath)
+			sendNotifications(cfg, reportFilePath, data)
+			sendJobNotifications(job, reportFilePath, data)
+			anySuccess = true
+			log.Printf("[Cron] 数据源 %s 巡检完成: %s", ds.Name, reportFilePath)
+		}(dsID)
 	}
 
-	data, err := activeCollector.CollectMetrics()
-	if err != nil {
-		log.Printf("[Cron] 收集指标失败: %v", err)
-		now := time.Now()
-		database.DB.Model(&job).Updates(map[string]interface{}{
-			"last_run_at": now, "last_status": "failed",
-		})
-		return
+	status := "success"
+	if !anySuccess {
+		status = "failed"
+	}
+	database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": status})
+}
+
+func resolveJobDatasourceIDs(job database.CronJob) []uint {
+	if job.AllDatasources {
+		var dsList []database.DataSource
+		database.DB.Where("enabled = ?", true).Find(&dsList)
+		ids := make([]uint, len(dsList))
+		for i, ds := range dsList {
+			ids[i] = ds.ID
+		}
+		return ids
+	}
+	if job.DatasourceIDs != "" {
+		var ids []uint
+		if err := json.Unmarshal([]byte(job.DatasourceIDs), &ids); err == nil && len(ids) > 0 {
+			return ids
+		}
 	}
 	if job.DatasourceID != nil {
-		var ds database.DataSource
-		if database.DB.First(&ds, *job.DatasourceID).Error == nil {
-			data.Datasource = ds.URL
-		}
-	} else {
-		data.Datasource = cfg.PrometheusURL
+		return []uint{*job.DatasourceID}
 	}
-	setLatestReport(data.Datasource, reportDataToHealth(data))
-
-	reportFilePath, err := report.GenerateReport(*data)
-	if err != nil {
-		log.Printf("[Cron] 生成报告失败: %v", err)
-		return
-	}
-
-	saveReportRecord(data, reportFilePath)
-	sendNotifications(cfg, reportFilePath, data)
-	sendJobNotifications(job, reportFilePath, data)
-
-	now := time.Now()
-	database.DB.Model(&job).Updates(map[string]interface{}{
-		"last_run_at": now, "last_status": "success",
-	})
-	log.Printf("[Cron] 定时任务 %s 完成: %s", job.Name, reportFilePath)
+	return nil
 }
 
 // saveReportRecord 保存报告记录到数据库

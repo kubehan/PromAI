@@ -52,6 +52,8 @@ export interface CronJob {
   name: string
   schedule: string
   datasource_id?: number | null
+  datasource_ids?: string
+  all_datasources?: boolean
   enabled?: boolean
   notify_channels?: string
   last_run_at?: string | null

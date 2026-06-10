@@ -22,9 +22,9 @@
             <el-tag size="small" style="background: rgba(0,212,255,0.1); color: var(--cyan); border: none; font-family: monospace;">{{ row.schedule }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="数据源" width="180">
+        <el-table-column label="数据源" width="260">
           <template #default="{ row }">
-            <span style="color: var(--text-secondary);">{{ dsName(row.datasource_id) }}</span>
+            <span style="color: var(--text-secondary); font-size: 13px;">{{ dsNames(row) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="通知渠道" min-width="160">
@@ -71,9 +71,12 @@
           </el-input>
         </el-form-item>
         <el-form-item label="数据源">
-          <el-select v-model="form.datasource_id" placeholder="默认数据源" clearable filterable style="width: 100%">
-            <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
-          </el-select>
+          <div style="width: 100%;">
+            <el-checkbox v-model="form.all_datasources" style="margin-bottom: 6px;" @change="onAllDSChange">全部数据源</el-checkbox>
+            <el-select v-model="selectedDSIds" placeholder="选择数据源" multiple clearable filterable style="width: 100%;" :disabled="form.all_datasources">
+              <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
+            </el-select>
+          </div>
         </el-form-item>
         <el-form-item label="通知渠道">
           <el-select v-model="notifChannelIds" placeholder="选择通知渠道" multiple clearable filterable style="width: 100%">
@@ -111,16 +114,25 @@ const dialogVisible = ref(false)
 const editingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const notifChannelIds = ref<number[]>([])
-const form = ref<CronJob>({ name: '', schedule: '', datasource_id: null, enabled: true })
+const selectedDSIds = ref<number[]>([])
+const form = ref<CronJob>({ name: '', schedule: '', datasource_id: null, all_datasources: false, enabled: true })
 const rules = {
   name: [{ required: true, message: '请输入任务名称', trigger: 'blur' }],
   schedule: [{ required: true, message: '请输入调度表达式', trigger: 'blur' }],
 }
 
-function dsName(id: number | null | undefined) {
-  if (!id) return '默认数据源'
-  const d = datasources.value.find(x => x.id === id)
-  return d ? d.name : `ID: ${id}`
+function dsNames(row: CronJob) {
+  if (row.all_datasources) return '全部数据源'
+  if (row.datasource_ids) {
+    let ids: number[] = []
+    try { ids = JSON.parse(row.datasource_ids) } catch { ids = [] }
+    return ids.map(id => datasources.value.find(d => d.id === id)?.name).filter(Boolean).join(', ') || '默认数据源'
+  }
+  if (row.datasource_id) {
+    const d = datasources.value.find(x => x.id === row.datasource_id)
+    return d ? d.name : `ID: ${row.datasource_id}`
+  }
+  return '默认数据源'
 }
 
 function notifNames(channels: string | undefined | null) {
@@ -129,6 +141,16 @@ function notifNames(channels: string | undefined | null) {
   try { ids = JSON.parse(channels) } catch { ids = [] }
   return ids.map(id => notifications.value.find(n => n.id === id)?.name).filter(Boolean).join(', ')
 }
+
+function onAllDSChange(val: boolean) {
+  if (val) selectedDSIds.value = []
+}
+
+// Sync form.datasource_ids with selectedDSIds
+watch(selectedDSIds, (ids) => {
+  form.value.datasource_ids = ids.length > 0 ? JSON.stringify(ids) : ''
+  form.value.datasource_id = null
+})
 
 // Sync form.notify_channels with notifChannelIds
 watch(notifChannelIds, (ids) => {
@@ -145,15 +167,16 @@ async function fetchData() {
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', schedule: '', datasource_id: null, enabled: true }
+  form.value = { name: '', schedule: '', datasource_id: null, all_datasources: false, enabled: true }
   notifChannelIds.value = []
+  selectedDSIds.value = []
   dialogVisible.value = true
 }
 function openEdit(row: CronJob) {
   editingId.value = row.id!
-  form.value = { ...row }
-  try { notifChannelIds.value = row.notify_channels ? JSON.parse(row.notify_channels) : [] }
-  catch { notifChannelIds.value = [] }
+  form.value = { ...row, all_datasources: row.all_datasources ?? false }
+  try { notifChannelIds.value = row.notify_channels ? JSON.parse(row.notify_channels) : [] } catch { notifChannelIds.value = [] }
+  try { selectedDSIds.value = row.datasource_ids ? JSON.parse(row.datasource_ids) : [] } catch { selectedDSIds.value = [] }
   dialogVisible.value = true
 }
 

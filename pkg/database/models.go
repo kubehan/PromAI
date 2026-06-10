@@ -60,7 +60,9 @@ type CronJob struct {
 	ID              uint       `gorm:"primaryKey" json:"id"`
 	Name            string     `gorm:"size:200;not null" json:"name"`
 	Schedule        string     `gorm:"size:100;not null" json:"schedule"`
-	DatasourceID    *uint      `json:"datasource_id"`
+	DatasourceID    *uint      `json:"datasource_id"`               // 旧版单数据源（向后兼容）
+	DatasourceIDs   string     `gorm:"type:text" json:"datasource_ids"`     // 多数据源 JSON 数组
+	AllDatasources  bool       `json:"all_datasources"`                      // 全部数据源
 	Enabled         bool       `gorm:"default:true" json:"enabled"`
 	NotifyChannels  string     `gorm:"type:text" json:"notify_channels"`
 	LastRunAt       *time.Time `json:"last_run_at"`
