@@ -9,7 +9,7 @@
       <div class="section-header">
         <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 指标列表</h3>
         <div class="action-bar">
-          <el-select v-model="filterDS" placeholder="全部数据源" clearable style="width: 160px;" @change="fetchData">
+          <el-select v-model="filterDS" placeholder="全部数据源" clearable filterable style="width: 160px;" @change="fetchData">
             <el-option label="全局指标" :value="0" />
             <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
           </el-select>
@@ -80,14 +80,14 @@
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="指标类型" prop="metric_type_id">
-              <el-select v-model="configForm.metric_type_id" style="width: 100%;" :disabled="!!editingConfigId">
+              <el-select v-model="configForm.metric_type_id" style="width: 100%;" :disabled="!!editingConfigId" filterable>
                 <el-option v-for="mt in metricTypes" :key="mt.id" :label="mt.type_name" :value="mt.id" />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="数据源">
-              <el-select v-model="configForm.datasource_id" placeholder="全局指标" clearable style="width: 100%;">
+              <el-select v-model="configForm.datasource_id" placeholder="全局指标" clearable filterable style="width: 100%;">
                 <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
               </el-select>
             </el-form-item>

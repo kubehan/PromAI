@@ -6,7 +6,7 @@
         <p>全景巡检健康状态 BI 看板</p>
       </div>
       <div style="display: flex; gap: 12px; align-items: center;">
-        <el-select v-model="selectedDS" placeholder="全部数据源" style="width: 200px;" @change="fetchData">
+        <el-select v-model="searchKeyword" placeholder="全部数据源" filterable clearable style="width: 200px;" @change="fetchData">
           <el-option label="全部数据源" value="" />
           <el-option v-for="ds in allDatasources" :key="ds.id" :label="ds.name" :value="ds.id" />
         </el-select>
@@ -329,6 +329,7 @@ import type { DataSource } from '../types'
 
 const loading = ref(false)
 const allDatasources = ref<DataSource[]>([])
+const searchKeyword = ref<number | string>('')
 const selectedDS = ref<number | string>('')
 const healthData = ref<any[]>([])
 const overallHealth = ref(100)

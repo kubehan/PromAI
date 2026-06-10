@@ -22,10 +22,10 @@
         </div>
         <el-form ref="formRef" :model="form" :rules="rules" @keyup.enter="handleLogin">
           <el-form-item prop="username">
-            <el-input v-model="form.username" placeholder="用户名" size="large" :prefix-icon="User" />
+            <el-input v-model="form.username" placeholder="用户名: admin" size="large" :prefix-icon="User" />
           </el-form-item>
           <el-form-item prop="password">
-            <el-input v-model="form.password" type="password" placeholder="密码" size="large" show-password :prefix-icon="Lock" />
+            <el-input v-model="form.password" type="password" placeholder="密码: promai2024" size="large" show-password :prefix-icon="Lock" />
           </el-form-item>
           <el-form-item>
             <el-button type="primary" size="large" :loading="loading" style="width: 100%;" @click="handleLogin">登 录</el-button>

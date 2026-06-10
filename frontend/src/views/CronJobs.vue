@@ -71,12 +71,12 @@
           </el-input>
         </el-form-item>
         <el-form-item label="数据源">
-          <el-select v-model="form.datasource_id" placeholder="默认数据源" clearable style="width: 100%">
+          <el-select v-model="form.datasource_id" placeholder="默认数据源" clearable filterable style="width: 100%">
             <el-option v-for="ds in datasources" :key="ds.id" :label="ds.name" :value="ds.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="通知渠道">
-          <el-select v-model="notifChannelIds" placeholder="选择通知渠道" multiple clearable style="width: 100%">
+          <el-select v-model="notifChannelIds" placeholder="选择通知渠道" multiple clearable filterable style="width: 100%">
             <el-option v-for="nc in notifications" :key="nc.id" :label="nc.name" :value="nc.id" />
           </el-select>
         </el-form-item>

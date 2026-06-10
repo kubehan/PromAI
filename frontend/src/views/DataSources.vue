@@ -59,7 +59,7 @@
         <template v-if="batchMode === 'template'">
           <el-form label-width="100px">
             <el-form-item label="巡检模板">
-              <el-select v-model="batchTemplateId" placeholder="不绑定模板" clearable style="width: 100%;">
+              <el-select v-model="batchTemplateId" placeholder="不绑定模板" clearable filterable style="width: 100%;">
                 <el-option v-for="t in templates" :key="t.id" :label="t.name + ' (' + t.metric_count + ' 指标)'" :value="t.id" />
               </el-select>
             </el-form-item>
@@ -68,7 +68,7 @@
         <template v-if="batchMode === 'notify'">
           <el-form label-width="100px">
             <el-form-item label="通知渠道">
-              <el-select v-model="batchNotifyChannels" multiple placeholder="不发送通知" clearable style="width: 100%;">
+              <el-select v-model="batchNotifyChannels" multiple placeholder="不发送通知" clearable filterable style="width: 100%;">
                 <el-option v-for="ch in notifChannels" :key="ch.id" :label="ch.name + ' (' + ch.channel_type + ')'" :value="ch.id" />
               </el-select>
             </el-form-item>
@@ -187,13 +187,13 @@
           <el-input v-model="form.password" type="password" placeholder="可选" show-password />
         </el-form-item>
         <el-form-item label="巡检模板">
-          <el-select v-model="form.template_id" placeholder="不绑定模板（使用指标列表中的配置）" clearable style="width: 100%;">
+          <el-select v-model="form.template_id" placeholder="不绑定模板（使用指标列表中的配置）" clearable filterable style="width: 100%;">
             <el-option v-for="t in templates" :key="t.id" :label="t.name + ' (' + t.metric_count + ' 指标)'" :value="t.id" />
           </el-select>
           <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">绑定的模板在巡检时优先使用，未绑定时使用「导入全局指标」生成的配置</div>
         </el-form-item>
         <el-form-item label="通知渠道">
-          <el-select v-model="selectedChannels" multiple placeholder="不发送通知" clearable style="width: 100%;">
+          <el-select v-model="selectedChannels" multiple placeholder="不发送通知" clearable filterable style="width: 100%;">
             <el-option v-for="ch in notifChannels" :key="ch.id" :label="ch.name + ' (' + ch.channel_type + ')'" :value="ch.id" />
           </el-select>
           <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">点击「巡检」时将自动推送报告到选中的通知渠道</div>
