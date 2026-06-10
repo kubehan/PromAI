@@ -107,7 +107,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import dayjs from 'dayjs'
-import { getAllDataSources, getCronJobs, getNotifications, getReports } from '../api'
+import { getAllDataSources, getCronJobs, getAllNotifications, getReports } from '../api'
 import type { ReportRecord } from '../types'
 
 const loading = ref(false)
@@ -123,13 +123,13 @@ onMounted(async () => {
   loading.value = true
   try {
     const [ds, cron, notif, reps] = await Promise.all([
-      getAllDataSources(), getCronJobs(), getNotifications(), getReports(),
+      getAllDataSources(), getCronJobs(), getAllNotifications(), getReports(),
     ])
     stats.value[0].value = ds.data.length
     stats.value[1].value = cron.data.length
     stats.value[2].value = notif.data.length
-    stats.value[3].value = reps.data.length
-    recentReports.value = reps.data.slice(0, 5)
+    stats.value[3].value = reps.data.total
+    recentReports.value = reps.data.items.slice(0, 5)
   } catch { /* ignore */ } finally {
     loading.value = false
   }

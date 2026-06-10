@@ -59,7 +59,9 @@ export const applyTemplate = (datasourceId: number) => api.post('/datasources/ap
 export const testDataSource = (id: number) => api.post(`/datasources/${id}/test`)
 
 // Notifications
-export const getNotifications = () => api.get<NotificationChannel[]>('/notifications')
+export const getNotifications = (params?: { page?: number; page_size?: number; keyword?: string; channel_type?: string }) =>
+  api.get<{ items: NotificationChannel[]; total: number; page: number; page_size: number }>('/notifications', { params })
+export const getAllNotifications = () => api.get<NotificationChannel[]>('/notifications/all')
 export const getNotification = (id: number) => api.get<NotificationChannel>(`/notifications/${id}`)
 export const createNotification = (n: NotificationChannel) => api.post<NotificationChannel>('/notifications', n)
 export const updateNotification = (id: number, n: NotificationChannel) => api.put<NotificationChannel>(`/notifications/${id}`, n)
@@ -74,7 +76,8 @@ export const updateCronJob = (id: number, j: CronJob) => api.put<CronJob>(`/cron
 export const deleteCronJob = (id: number) => api.delete(`/cronjobs/${id}`)
 
 // Reports
-export const getReports = () => api.get<ReportRecord[]>('/report-records')
+export const getReports = (params?: { page?: number; page_size?: number; keyword?: string; status?: string }) =>
+  api.get<{ items: ReportRecord[]; total: number; page: number; page_size: number }>('/report-records', { params })
 export const deleteReport = (id: number) => api.delete(`/report-records/${id}`)
 
 // Metrics
@@ -94,7 +97,8 @@ export const updateSettings = (s: Record<string, string>) => api.put('/settings'
 // Inspect
 export const triggerInspect = (req: InspectRequest) => api.post('/inspect', req)
 export const getInspectTask = (taskId: string) => api.get(`/inspect/task/${taskId}`)
-export const getInspectRecords = () => api.get<InspectRecord[]>('/inspect/records')
+export const getInspectRecords = (params?: { page?: number; page_size?: number; keyword?: string; status?: string }) =>
+  api.get<{ items: InspectRecord[]; total: number; page: number; page_size: number }>('/inspect/records', { params })
 
 // Dashboard
 export const getDashboardStats = () => api.get<DashboardStats>('/dashboard/stats')
@@ -113,7 +117,9 @@ export const triggerSync = (id: number) => api.post(`/sync-sources/${id}/sync`)
 export const getSyncLogs = (id: number) => api.get<SyncLog[]>(`/sync-sources/${id}/logs`)
 
 // Templates
-export const getTemplates = () => api.get('/templates')
+export const getTemplates = (params?: { page?: number; page_size?: number; keyword?: string }) =>
+  api.get<{ items: any[]; total: number; page: number; page_size: number }>('/templates', { params })
+export const getAllTemplates = () => api.get<any[]>('/templates/all')
 export const getTemplate = (id: number) => api.get(`/templates/${id}`)
 export const createTemplate = (name: string, description?: string) => api.post('/templates', { name, description })
 export const updateTemplate = (id: number, t: any) => api.put(`/templates/${id}`, t)

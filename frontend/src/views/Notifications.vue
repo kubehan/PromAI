@@ -8,7 +8,17 @@
     <div class="section-card">
       <div class="section-header">
         <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 渠道列表</h3>
-        <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon> 新增渠道</el-button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <el-input v-model="keyword" placeholder="搜索名称" clearable style="width: 200px;" @keyup.enter="fetchData" @clear="fetchData" />
+          <el-select v-model="typeFilter" placeholder="类型" clearable style="width: 140px;" @change="fetchData">
+            <el-option label="企业微信机器人" value="wechat_work" />
+            <el-option label="企业微信应用" value="wechat_app" />
+            <el-option label="钉钉机器人" value="dingtalk" />
+            <el-option label="飞书机器人" value="feishu" />
+            <el-option label="邮件" value="email" />
+          </el-select>
+          <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon> 新增渠道</el-button>
+        </div>
       </div>
       <el-table :data="channels" v-loading="loading" stripe>
         <el-table-column type="index" label="#" width="56" />
@@ -40,6 +50,15 @@
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="total > pageSize" style="display: flex; justify-content: center; margin-top: 16px;">
+        <el-pagination
+          v-model:current-page="page"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="fetchData"
+        />
+      </div>
     </div>
 
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑通知渠道' : '新增通知渠道'" width="620" :close-on-click-modal="false">
@@ -60,7 +79,6 @@
           <el-switch v-model="form.enabled" />
         </el-form-item>
 
-        <!-- 企业微信机器人 -->
         <template v-if="form.channel_type === 'wechat_work'">
           <el-form-item label="Webhook 地址" prop="config.webhook">
             <el-input v-model="cfg.webhook" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." />
@@ -70,7 +88,6 @@
           </el-form-item>
         </template>
 
-        <!-- 企业微信应用 -->
         <template v-if="form.channel_type === 'wechat_app'">
           <el-form-item label="企业 ID (CorpID)" prop="config.corpid">
             <el-input v-model="cfg.corpid" placeholder="ww..." />
@@ -89,7 +106,6 @@
           </el-form-item>
         </template>
 
-        <!-- 钉钉机器人 -->
         <template v-if="form.channel_type === 'dingtalk'">
           <el-form-item label="Webhook 地址" prop="config.webhook">
             <el-input v-model="cfg.webhook" placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." />
@@ -99,7 +115,6 @@
           </el-form-item>
         </template>
 
-        <!-- 飞书机器人 -->
         <template v-if="form.channel_type === 'feishu'">
           <el-form-item label="Webhook 地址" prop="config.webhook">
             <el-input v-model="cfg.webhook" placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..." />
@@ -112,7 +127,6 @@
           </el-form-item>
         </template>
 
-        <!-- 邮件 -->
         <template v-if="form.channel_type === 'email'">
           <el-form-item label="SMTP 服务器" prop="config.smtp_host">
             <el-input v-model="cfg.smtp_host" placeholder="smtp.example.com" />
@@ -120,18 +134,21 @@
           <el-form-item label="SMTP 端口" prop="config.smtp_port">
             <el-input v-model.number="cfg.smtp_port" placeholder="465" type="number" />
           </el-form-item>
-          <el-form-item label="用户名" prop="config.username">
-            <el-input v-model="cfg.username" placeholder="user@example.com" />
+          <el-form-item label="加密方式">
+            <el-select v-model="cfg.encryption" style="width: 100%;">
+              <el-option label="SSL/TLS (端口 465)" value="ssl" />
+              <el-option label="STARTTLS (端口 587)" value="starttls" />
+              <el-option label="无" value="none" />
+            </el-select>
           </el-form-item>
-          <el-form-item label="密码" prop="config.password">
-            <el-input v-model="cfg.password" placeholder="SMTP 密码/授权码" type="password" show-password />
+          <el-form-item label="发件人邮箱" prop="config.from_email">
+            <el-input v-model="cfg.from_email" placeholder="alert@example.com" />
           </el-form-item>
-          <el-form-item label="发件地址" prop="config.from">
-            <el-input v-model="cfg.from" placeholder="user@example.com" />
+          <el-form-item label="发件人密码" prop="config.password">
+            <el-input v-model="cfg.password" placeholder="SMTP 密码或授权码" type="password" show-password />
           </el-form-item>
-          <el-form-item label="收件地址" prop="config.to">
-            <el-input v-model="cfg.to" placeholder="user1@example.com, user2@example.com" />
-            <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">多个邮箱用逗号分隔</div>
+          <el-form-item label="收件人" prop="config.to_emails">
+            <el-input v-model="cfg.to_emails" placeholder="多个邮箱用逗号分隔" type="textarea" :rows="2" />
           </el-form-item>
         </template>
       </el-form>
@@ -146,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
+import { ref, onMounted, reactive, watch } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
@@ -154,102 +171,66 @@ import { getNotifications, createNotification, updateNotification, deleteNotific
 import type { NotificationChannel } from '../types'
 
 const loading = ref(false)
-const saving = ref(false)
 const channels = ref<NotificationChannel[]>([])
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+const keyword = ref('')
+const typeFilter = ref('')
+
 const dialogVisible = ref(false)
+const saving = ref(false)
 const editingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
-
-const form = ref<NotificationChannel>({ channel_type: 'wechat_work', name: '', enabled: true, config_json: '{}' })
-
-const cfg = reactive<Record<string, any>>({
-  webhook: '', secret: '', proxy_url: '',
-  corpid: '', agentid: 0, touser: '',
-  smtp_host: '', smtp_port: 465, username: '', password: '', from: '', to: '',
-  verify_sign: false,
-})
-
-const rules = {
-  channel_type: [{ required: true, message: '请选择渠道类型', trigger: 'change' }],
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-}
+const form = reactive({ channel_type: '', name: '', enabled: true })
+const cfg = reactive<any>({})
+const rules = { name: [{ required: true, message: '请输入渠道名称', trigger: 'blur' }] }
 
 function channelLabel(t: string) {
-  const m: Record<string,string> = { wechat_work: '企业微信', wechat_app: '企业微信应用', dingtalk: '钉钉', feishu: '飞书', email: '邮件' }
-  return m[t] || t
+  const map: Record<string, string> = { wechat_work: '企业微信机器人', wechat_app: '企业微信应用', dingtalk: '钉钉', feishu: '飞书', email: '邮件' }
+  return map[t] || t
 }
 function channelBg(t: string) {
-  const m: Record<string,string> = { wechat_work: 'rgba(16,185,129,0.1)', wechat_app: 'rgba(16,185,129,0.1)', dingtalk: 'rgba(0,212,255,0.1)', feishu: 'rgba(124,58,237,0.1)', email: 'rgba(99,102,241,0.1)' }
-  return m[t] || 'rgba(99,102,241,0.1)'
+  const map: Record<string, string> = { wechat_work: 'rgba(81,179,80,0.12)', wechat_app: 'rgba(81,179,80,0.12)', dingtalk: 'rgba(0,150,255,0.12)', feishu: 'rgba(83,119,241,0.12)', email: 'rgba(128,128,128,0.12)' }
+  return map[t] || 'rgba(128,128,128,0.12)'
 }
 function channelColor(t: string) {
-  const m: Record<string,string> = { wechat_work: '#10b981', wechat_app: '#10b981', dingtalk: '#00d4ff', feishu: '#7c3aed', email: '#818cf8' }
-  return m[t] || '#818cf8'
-}
-
-function defaultConfig(t: string): Record<string, any> {
-  switch (t) {
-    case 'wechat_work': return { webhook: '', proxy_url: '' }
-    case 'wechat_app': return { corpid: '', agentid: 0, secret: '', touser: '@all', proxy_url: '' }
-    case 'dingtalk': return { webhook: '', secret: '' }
-    case 'feishu': return { webhook: '', secret: '', verify_sign: false }
-    case 'email': return { smtp_host: '', smtp_port: 465, username: '', password: '', from: '', to: '' }
-    default: return {}
-  }
-}
-
-function loadConfig(json: string, t: string) {
-  let parsed: Record<string, any> = {}
-  try { parsed = JSON.parse(json) } catch { /* ignore */ }
-  const lowerMap: Record<string, any> = {}
-  for (const k of Object.keys(parsed)) lowerMap[k.toLowerCase()] = parsed[k]
-
-  const defs = defaultConfig(t)
-  for (const key of Object.keys(defs)) {
-    let val: any = lowerMap[key.toLowerCase()] !== undefined ? lowerMap[key.toLowerCase()] : defs[key]
-    if (key === 'to' && Array.isArray(val)) {
-      const arr: string[] = val
-      val = arr.join(', ')
-    }
-
-    (cfg as any)[key] = val
-  }
-}
-
-function syncConfigToJson() {
-  const defs = defaultConfig(form.value.channel_type)
-  const obj: Record<string, any> = {}
-  for (const key of Object.keys(defs)) {
-    let val = (cfg as any)[key]
-    if (key === 'to' && typeof val === 'string') {
-      val = val.split(',').map((s: string) => s.trim()).filter(Boolean)
-    }
-    obj[key] = val
-  }
-  form.value.config_json = JSON.stringify(obj)
-}
-
-function onTypeChange() {
-  loadConfig('{}', form.value.channel_type)
+  const map: Record<string, string> = { wechat_work: '#51b350', wechat_app: '#51b350', dingtalk: '#0096ff', feishu: '#5377f1', email: '#888' }
+  return map[t] || '#888'
 }
 
 async function fetchData() {
   loading.value = true
-  try { const res = await getNotifications(); channels.value = res.data } finally { loading.value = false }
+  try {
+    const params: any = { page: page.value, page_size: pageSize.value }
+    if (keyword.value) params.keyword = keyword.value
+    if (typeFilter.value) params.channel_type = typeFilter.value
+    const res = await getNotifications(params)
+    channels.value = res.data.items
+    total.value = res.data.total
+  } catch (e: any) { ElMessage.error(e.message) }
+  finally { loading.value = false }
 }
 
 function openCreate() {
   editingId.value = null
-  form.value = { channel_type: 'wechat_work', name: '', enabled: true, config_json: '{}' }
-  loadConfig('{}', 'wechat_work')
+  form.channel_type = ''; form.name = ''; form.enabled = true
+  Object.keys(cfg).forEach(k => delete cfg[k])
   dialogVisible.value = true
 }
 
 function openEdit(row: NotificationChannel) {
-  editingId.value = row.id!
-  form.value = { ...row }
-  loadConfig(row.config_json || '{}', row.channel_type)
+  editingId.value = row.id ?? null
+  form.channel_type = row.channel_type; form.name = row.name; form.enabled = row.enabled ?? false
+  Object.keys(cfg).forEach(k => delete cfg[k])
+  if (row.config_json) {
+    try { Object.assign(cfg, JSON.parse(row.config_json)) } catch { /* ignore */ }
+  }
   dialogVisible.value = true
+}
+
+function onTypeChange() {
+  Object.keys(cfg).forEach(k => delete cfg[k])
 }
 
 async function handleSave() {
@@ -257,11 +238,31 @@ async function handleSave() {
   if (!valid) return
   saving.value = true
   try {
-    syncConfigToJson()
-    if (editingId.value) { await updateNotification(editingId.value, form.value); ElMessage.success('更新成功') }
-    else { await createNotification(form.value); ElMessage.success('创建成功') }
-    dialogVisible.value = false; await fetchData()
-  } catch (e: any) { ElMessage.error(e.message) } finally { saving.value = false }
+    const payload = { ...form, config_json: JSON.stringify(cfg) }
+    if (editingId.value) {
+      await updateNotification(editingId.value, payload)
+      ElMessage.success('更新成功')
+    } else {
+      await createNotification(payload)
+      ElMessage.success('创建成功')
+    }
+    dialogVisible.value = false
+    await fetchData()
+  } catch (e: any) { ElMessage.error(e.message) }
+  finally { saving.value = false }
+}
+
+async function toggleEnabled(row: NotificationChannel) {
+  try {
+    await updateNotification(row.id!, { enabled: row.enabled } as any)
+  } catch { ElMessage.error('更新失败') }
+}
+
+async function handleTest(row: NotificationChannel) {
+  try {
+    await testNotification(row.id!)
+    ElMessage.success('测试消息已发送，请检查通知渠道')
+  } catch (e: any) { ElMessage.error(e.message) }
 }
 
 async function handleDelete(row: NotificationChannel) {
@@ -271,15 +272,7 @@ async function handleDelete(row: NotificationChannel) {
   } catch { /* ignore */ }
 }
 
-async function handleTest(row: NotificationChannel) {
-  try { await testNotification(row.id!); ElMessage.success('测试通知已发送，请检查渠道') }
-  catch (e: any) { ElMessage.error(e.message) }
-}
-
-async function toggleEnabled(row: NotificationChannel) {
-  try { await updateNotification(row.id!, row); ElMessage.success(row.enabled ? '已启用' : '已禁用') }
-  catch { row.enabled = !row.enabled }
-}
+watch(dialogVisible, v => { if (!v) editingId.value = null })
 
 onMounted(fetchData)
 </script>

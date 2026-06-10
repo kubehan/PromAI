@@ -8,7 +8,15 @@
     <div class="section-card">
       <div class="section-header">
         <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 历史报告</h3>
-        <el-button plain @click="fetchData" :loading="loading"><el-icon><Refresh /></el-icon> 刷新</el-button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <el-input v-model="keyword" placeholder="搜索标题/数据源" clearable style="width: 200px;" @keyup.enter="fetchData" @clear="fetchData" />
+          <el-select v-model="statusFilter" placeholder="状态" clearable style="width: 110px;" @change="fetchData">
+            <el-option label="正常" value="success" />
+            <el-option label="告警" value="warning" />
+            <el-option label="高危" value="danger" />
+          </el-select>
+          <el-button plain @click="fetchData" :loading="loading"><el-icon><Refresh /></el-icon> 刷新</el-button>
+        </div>
       </div>
       <el-table :data="reports" v-loading="loading" stripe>
         <el-table-column type="index" label="#" width="56" />
@@ -51,6 +59,15 @@
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="total > pageSize" style="display: flex; justify-content: center; margin-top: 16px;">
+        <el-pagination
+          v-model:current-page="page"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="fetchData"
+        />
+      </div>
       <el-empty v-if="!loading && reports.length === 0" description="暂无报告" :image-size="60" />
     </div>
   </div>
@@ -65,11 +82,22 @@ import type { ReportRecord } from '../types'
 
 const loading = ref(false)
 const reports = ref<ReportRecord[]>([])
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+const keyword = ref('')
+const statusFilter = ref('')
 
 async function fetchData() {
   loading.value = true
-  try { const res = await getReports(); reports.value = res.data }
-  catch (e: any) { ElMessage.error(e.message) }
+  try {
+    const params: any = { page: page.value, page_size: pageSize.value }
+    if (keyword.value) params.keyword = keyword.value
+    if (statusFilter.value) params.status = statusFilter.value
+    const res = await getReports(params)
+    reports.value = res.data.items
+    total.value = res.data.total
+  } catch (e: any) { ElMessage.error(e.message) }
   finally { loading.value = false }
 }
 

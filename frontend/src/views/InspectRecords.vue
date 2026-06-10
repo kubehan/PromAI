@@ -8,6 +8,14 @@
     <div class="section-card">
       <div class="section-header">
         <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 任务列表</h3>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <el-input v-model="keyword" placeholder="搜索目标/消息" clearable style="width: 200px;" @keyup.enter="fetchRecords" @clear="fetchRecords" />
+          <el-select v-model="statusFilter" placeholder="状态" clearable style="width: 110px;" @change="fetchRecords">
+            <el-option label="运行中" value="running" />
+            <el-option label="已完成" value="completed" />
+            <el-option label="失败" value="failed" />
+          </el-select>
+        </div>
       </div>
       <el-table :data="records" v-loading="loading" stripe>
         <el-table-column prop="task_id" label="任务 ID" width="200" />
@@ -35,6 +43,15 @@
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="total > pageSize" style="display: flex; justify-content: center; margin-top: 16px;">
+        <el-pagination
+          v-model:current-page="page"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="fetchRecords"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -59,12 +76,21 @@ interface InspectRecord {
 
 const loading = ref(false)
 const records = ref<InspectRecord[]>([])
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+const keyword = ref('')
+const statusFilter = ref('')
 
 async function fetchRecords() {
   loading.value = true
   try {
-    const res = await getInspectRecords()
-    records.value = res.data
+    const params: any = { page: page.value, page_size: pageSize.value }
+    if (keyword.value) params.keyword = keyword.value
+    if (statusFilter.value) params.status = statusFilter.value
+    const res = await getInspectRecords(params)
+    records.value = res.data.items
+    total.value = res.data.total
   } catch (e: any) {
     ElMessage.error(e.message)
   } finally {

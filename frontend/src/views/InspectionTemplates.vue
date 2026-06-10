@@ -8,7 +8,10 @@
     <div class="section-card">
       <div class="section-header">
         <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 模板列表</h3>
-        <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon> 新建模板</el-button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <el-input v-model="keyword" placeholder="搜索模板名称" clearable style="width: 200px;" @keyup.enter="fetchData" @clear="fetchData" />
+          <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon> 新建模板</el-button>
+        </div>
       </div>
       <el-table :data="templates" v-loading="loading" stripe>
         <el-table-column type="index" label="#" width="56" />
@@ -48,6 +51,15 @@
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="total > pageSize" style="display: flex; justify-content: center; margin-top: 16px;">
+        <el-pagination
+          v-model:current-page="page"
+          :page-size="pageSize"
+          :total="total"
+          layout="prev, pager, next"
+          @current-change="fetchData"
+        />
+      </div>
       <el-empty v-if="!loading && templates.length === 0" description="暂无巡检模板" :image-size="60" />
     </div>
 
@@ -238,6 +250,10 @@ const saving = ref(false)
 const metricsLoading = ref(false)
 const savingMetrics = ref(false)
 const templates = ref<any[]>([])
+const page = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+const keyword = ref('')
 const metricTypes = ref<MetricType[]>([])
 const selectedConfigIds = ref<number[]>([])
 const editingTemplate = ref<any>(null)
@@ -258,8 +274,11 @@ const detailMetrics = ref<any[]>([])
 async function fetchData() {
   loading.value = true
   try {
-    const res = await getTemplates()
-    templates.value = res.data
+    const params: any = { page: page.value, page_size: pageSize.value }
+    if (keyword.value) params.keyword = keyword.value
+    const res = await getTemplates(params)
+    templates.value = res.data.items
+    total.value = res.data.total
   } finally { loading.value = false }
 }
 

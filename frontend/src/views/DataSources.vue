@@ -388,7 +388,7 @@ import { ref, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs, batchDeleteDataSources, batchToggleDataSources, batchSetTemplate, batchSetNotify, batchApplyTemplate, batchInspect, batchSetCreds } from '../api'
+import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getAllTemplates, getAllNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs, batchDeleteDataSources, batchToggleDataSources, batchSetTemplate, batchSetNotify, batchApplyTemplate, batchInspect, batchSetCreds } from '../api'
 import type { DataSource, SyncSource } from '../types'
 
 const loading = ref(false)
@@ -532,7 +532,7 @@ async function fetchData() {
     const params: any = { page: page.value, page_size: pageSize.value }
     if (searchKeyword.value) params.keyword = searchKeyword.value
     if (filterEnabled.value) params.enabled = filterEnabled.value
-    const [dsRes, tmplRes, notifRes] = await Promise.all([getDataSources(params), getTemplates(), getNotifications()])
+    const [dsRes, tmplRes, notifRes] = await Promise.all([getDataSources(params), getAllTemplates(), getAllNotifications()])
     datasources.value = dsRes.data.items
     total.value = dsRes.data.total
     templates.value = tmplRes.data

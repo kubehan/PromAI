@@ -249,6 +249,7 @@ func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/promai/datasources/all", auth(a.handleAllDataSources))
 	mux.HandleFunc("/api/promai/datasources/", auth(a.handleDataSourceByID))
 	mux.HandleFunc("/api/promai/notifications", auth(a.handleNotifications))
+	mux.HandleFunc("/api/promai/notifications/all", auth(a.handleAllNotifications))
 	mux.HandleFunc("/api/promai/notifications/", auth(a.handleNotificationByID))
 	mux.HandleFunc("/api/promai/cronjobs", auth(a.handleCronJobs))
 	mux.HandleFunc("/api/promai/cronjobs/", auth(a.handleCronJobByID))
@@ -260,6 +261,7 @@ func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/promai/metrics/configs/", auth(a.handleMetricConfigByID))
 	mux.HandleFunc("/api/promai/metrics/validate", auth(a.handleValidatePromQL))
 	mux.HandleFunc("/api/promai/templates", auth(a.handleTemplates))
+	mux.HandleFunc("/api/promai/templates/all", auth(a.handleAllTemplates))
 	mux.HandleFunc("/api/promai/templates/", auth(a.handleTemplateByID))
 	mux.HandleFunc("/api/promai/settings", auth(a.handleSettings))
 	mux.HandleFunc("/api/promai/inspect", auth(a.handleInspect))
@@ -653,9 +655,35 @@ func (a *AdminAPI) handleApplyTemplate(w http.ResponseWriter, r *http.Request) {
 func (a *AdminAPI) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+		if page < 1 {
+			page = 1
+		}
+		if pageSize < 1 || pageSize > 200 {
+			pageSize = 20
+		}
+
+		query := database.DB.Model(&database.NotificationChannel{})
+		if kw := r.URL.Query().Get("keyword"); kw != "" {
+			query = query.Where("name LIKE ?", "%"+kw+"%")
+		}
+		if ct := r.URL.Query().Get("channel_type"); ct != "" {
+			query = query.Where("channel_type = ?", ct)
+		}
+
+		var total int64
+		query.Count(&total)
+
 		var nc []database.NotificationChannel
-		database.DB.Order("channel_type asc").Find(&nc)
-		writeJSON(w, nc)
+		query.Order("channel_type asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&nc)
+
+		writeJSON(w, map[string]interface{}{
+			"items":     nc,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		})
 	case "POST":
 		var n database.NotificationChannel
 		if err := json.NewDecoder(r.Body).Decode(&n); err != nil {
@@ -713,6 +741,16 @@ func (a *AdminAPI) handleNotificationByID(w http.ResponseWriter, r *http.Request
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
+}
+
+func (a *AdminAPI) handleAllNotifications(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var nc []database.NotificationChannel
+	database.DB.Order("channel_type asc").Find(&nc)
+	writeJSON(w, nc)
 }
 
 func (a *AdminAPI) handleCronJobs(w http.ResponseWriter, r *http.Request) {
@@ -786,9 +824,35 @@ func (a *AdminAPI) handleCronJobByID(w http.ResponseWriter, r *http.Request) {
 func (a *AdminAPI) handleReports(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+		if page < 1 {
+			page = 1
+		}
+		if pageSize < 1 || pageSize > 200 {
+			pageSize = 20
+		}
+
+		query := database.DB.Model(&database.ReportRecord{})
+		if kw := r.URL.Query().Get("keyword"); kw != "" {
+			query = query.Where("title LIKE ? OR datasource_name LIKE ?", "%"+kw+"%", "%"+kw+"%")
+		}
+		if st := r.URL.Query().Get("status"); st != "" {
+			query = query.Where("status = ?", st)
+		}
+
+		var total int64
+		query.Count(&total)
+
 		var reports []database.ReportRecord
-		database.DB.Order("created_at desc").Find(&reports)
-		writeJSON(w, reports)
+		query.Order("created_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&reports)
+
+		writeJSON(w, map[string]interface{}{
+			"items":     reports,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		})
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
@@ -1362,9 +1426,34 @@ func (a *AdminAPI) handleInspectRecords(w http.ResponseWriter, r *http.Request) 
 		writeError(w, 405, "不支持的请求方法")
 		return
 	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
+
+	query := database.DB.Model(&database.InspectRecord{})
+	if kw := r.URL.Query().Get("keyword"); kw != "" {
+		query = query.Where("datasource_name LIKE ? OR message LIKE ?", "%"+kw+"%", "%"+kw+"%")
+	}
+	if st := r.URL.Query().Get("status"); st != "" {
+		query = query.Where("status = ?", st)
+	}
+
+	var total int64
+	query.Count(&total)
+
 	var records []database.InspectRecord
-	database.DB.Order("created_at desc").Limit(100).Find(&records)
-	writeJSON(w, records)
+	query.Order("created_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&records)
+	writeJSON(w, map[string]interface{}{
+		"items":     records,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
 }
 
 // buildFilteredConfig builds a config.Config from a filtered set of MetricConfig rows
@@ -1437,9 +1526,26 @@ func (a *AdminAPI) handleBindMetrics(w http.ResponseWriter, r *http.Request) {
 func (a *AdminAPI) handleTemplates(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
+		page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+		pageSize, _ := strconv.Atoi(r.URL.Query().Get("page_size"))
+		if page < 1 {
+			page = 1
+		}
+		if pageSize < 1 || pageSize > 200 {
+			pageSize = 20
+		}
+
+		query := database.DB.Model(&database.InspectionTemplate{})
+		if kw := r.URL.Query().Get("keyword"); kw != "" {
+			query = query.Where("name LIKE ?", "%"+kw+"%")
+		}
+
+		var total int64
+		query.Count(&total)
+
 		var templates []database.InspectionTemplate
-		database.DB.Order("created_at desc").Find(&templates)
-		// Attach metric config counts
+		query.Order("created_at desc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&templates)
+
 		type result struct {
 			database.InspectionTemplate
 			MetricCount int `json:"metric_count"`
@@ -1450,7 +1556,12 @@ func (a *AdminAPI) handleTemplates(w http.ResponseWriter, r *http.Request) {
 			database.DB.Model(&database.InspectionTemplateMetric{}).Where("template_id = ?", t.ID).Count(&count)
 			results = append(results, result{InspectionTemplate: t, MetricCount: int(count)})
 		}
-		writeJSON(w, results)
+		writeJSON(w, map[string]interface{}{
+			"items":     results,
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
+		})
 	case "POST":
 		var req struct {
 			Name        string `json:"name"`
@@ -1467,6 +1578,26 @@ func (a *AdminAPI) handleTemplates(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
+}
+
+func (a *AdminAPI) handleAllTemplates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var templates []database.InspectionTemplate
+	database.DB.Order("created_at desc").Find(&templates)
+	type result struct {
+		database.InspectionTemplate
+		MetricCount int `json:"metric_count"`
+	}
+	var results []result
+	for _, t := range templates {
+		var count int64
+		database.DB.Model(&database.InspectionTemplateMetric{}).Where("template_id = ?", t.ID).Count(&count)
+		results = append(results, result{InspectionTemplate: t, MetricCount: int(count)})
+	}
+	writeJSON(w, results)
 }
 
 func (a *AdminAPI) handleTemplateByID(w http.ResponseWriter, r *http.Request) {
