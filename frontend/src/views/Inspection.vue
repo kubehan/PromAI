@@ -113,7 +113,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getDataSources, getMetricTypes, triggerInspect, getInspectTask } from '../api'
+import { getAllDataSources, getMetricTypes, triggerInspect, getInspectTask } from '../api'
 import type { DataSource, MetricType } from '../types'
 
 const route = useRoute()
@@ -213,8 +213,8 @@ async function handleInspect() {
 
 onMounted(async () => {
   try {
-    const dsRes = await getDataSources()
-    datasources.value = dsRes.data.items
+    const dsRes = await getAllDataSources()
+    datasources.value = dsRes.data
     // 从路由参数预填数据源
     if (route.query.datasource_id) {
       const dsId = Number(route.query.datasource_id)

@@ -99,7 +99,7 @@ import { ref, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getCronJobs, createCronJob, updateCronJob, deleteCronJob, getDataSources, getNotifications } from '../api'
+import { getCronJobs, createCronJob, updateCronJob, deleteCronJob, getAllDataSources, getNotifications } from '../api'
 import type { CronJob, DataSource, NotificationChannel } from '../types'
 
 const loading = ref(false)
@@ -138,8 +138,8 @@ watch(notifChannelIds, (ids) => {
 async function fetchData() {
   loading.value = true
   try {
-    const [jr, dr, nr] = await Promise.all([getCronJobs(), getDataSources(), getNotifications()])
-    jobs.value = jr.data; datasources.value = dr.data.items; notifications.value = nr.data
+    const [jr, dr, nr] = await Promise.all([getCronJobs(), getAllDataSources(), getNotifications()])
+    jobs.value = jr.data; datasources.value = dr.data; notifications.value = nr.data
   } finally { loading.value = false }
 }
 

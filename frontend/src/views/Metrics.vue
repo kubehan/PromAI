@@ -224,7 +224,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getMetricTypes, createMetricConfig, updateMetricConfig, deleteMetricConfig, getDataSources, validatePromQL, createMetricType, updateMetricType, deleteMetricType } from '../api'
+import { getMetricTypes, createMetricConfig, updateMetricConfig, deleteMetricConfig, getAllDataSources, validatePromQL, createMetricType, updateMetricType, deleteMetricType } from '../api'
 import type { MetricType, MetricConfig, DataSource } from '../types'
 
 interface FlatMetric extends MetricConfig {
@@ -292,10 +292,10 @@ async function fetchData() {
     const dsFilter = filterDS.value !== '' ? Number(filterDS.value) : null
     const [mtRes, dsRes] = await Promise.all([
       dsFilter !== null ? getMetricTypes(dsFilter) : getMetricTypes(),
-      getDataSources()
+      getAllDataSources()
     ])
     metricTypes.value = mtRes.data
-    datasources.value = dsRes.data.items
+    datasources.value = dsRes.data
 
     const flat: FlatMetric[] = []
     for (const mt of metricTypes.value) {

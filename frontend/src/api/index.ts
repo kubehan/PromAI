@@ -40,6 +40,9 @@ export const getMe = () => api.get('/auth/me')
 // Data Sources
 export const getDataSources = (params?: { page?: number; page_size?: number; keyword?: string; enabled?: string }) =>
   api.get<{ items: DataSource[]; total: number; page: number; page_size: number }>('/datasources', { params })
+
+export const getAllDataSources = () =>
+  api.get<DataSource[]>('/datasources/all')
 export const getDataSource = (id: number) => api.get<DataSource>(`/datasources/${id}`)
 export const createDataSource = (d: DataSource) => api.post<DataSource>('/datasources', d)
 export const updateDataSource = (id: number, d: Partial<DataSource>) => api.put<DataSource>(`/datasources/${id}`, d)

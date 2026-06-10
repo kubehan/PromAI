@@ -324,7 +324,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { GridLayout, GridItem } from 'vue3-grid-layout'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
-import { getDataSources, getDashboardHealth, getDashboardHealthTrend } from '../api'
+import { getAllDataSources, getDashboardHealth, getDashboardHealthTrend } from '../api'
 import type { DataSource } from '../types'
 
 const loading = ref(false)
@@ -742,8 +742,8 @@ watch(selectedDS, fetchData)
 
 onMounted(async () => {
   try {
-    const ds = await getDataSources()
-    allDatasources.value = ds.data.items
+    const ds = await getAllDataSources()
+    allDatasources.value = ds.data
   } catch { /* ignore */ }
   await fetchData()
   await fetchTrend()

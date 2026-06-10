@@ -246,6 +246,7 @@ func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
 	// Protected routes
 	mux.HandleFunc("/api/promai/auth/me", auth(a.handleMe))
 	mux.HandleFunc("/api/promai/datasources", auth(a.handleDataSources))
+	mux.HandleFunc("/api/promai/datasources/all", auth(a.handleAllDataSources))
 	mux.HandleFunc("/api/promai/datasources/", auth(a.handleDataSourceByID))
 	mux.HandleFunc("/api/promai/notifications", auth(a.handleNotifications))
 	mux.HandleFunc("/api/promai/notifications/", auth(a.handleNotificationByID))
@@ -502,6 +503,19 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
+}
+
+func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var ds []database.DataSource
+	database.DB.Model(&database.DataSource{}).
+		Order("is_default desc, enabled desc, name asc").
+		Find(&ds)
+	maskPassword(ds)
+	writeJSON(w, ds)
 }
 
 func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) {
