@@ -3,7 +3,6 @@ node_modules
 .gitignore
 frontend/dist
 frontend/node_modules
-templates/*.html
 !.gitkeep
 reports
 data
