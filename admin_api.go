@@ -441,7 +441,9 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			Enabled        *bool  `json:"enabled,omitempty"`
 			TemplateID     *uint  `json:"template_id,omitempty"`
 			NotifyChannels string `json:"notify_channels"`
-			Action         string `json:"action"` // delete, toggle, set-template, set-notify, apply-template
+			Username       string `json:"username"`
+			Password       string `json:"password"`
+			Action         string `json:"action"` // delete, toggle, set-template, set-notify, apply-template, inspect, set-creds
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, 400, "请求体格式错误")
@@ -473,6 +475,25 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("template_id", globalTmpl.ID)
+		case "inspect":
+			var dss []database.DataSource
+			database.DB.Find(&dss, "id IN ?", req.IDs)
+			for i := range dss {
+				go a.runSingleInspect(dss[i])
+			}
+			writeJSON(w, map[string]interface{}{"success": true, "message": fmt.Sprintf("已启动 %d 个巡检任务", len(dss))})
+			return
+		case "set-creds":
+			updates := map[string]interface{}{}
+			if req.Username != "" {
+				updates["username"] = req.Username
+			}
+			if req.Password != "" {
+				updates["password"] = req.Password
+			}
+			if len(updates) > 0 {
+				database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Updates(updates)
+			}
 		default:
 			writeError(w, 400, "不支持的操作")
 			return
@@ -1266,6 +1287,37 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 		})
 		inspectTasksMu.Unlock()
 	}
+}
+
+func (a *AdminAPI) runSingleInspect(ds database.DataSource) {
+	taskID := newTaskID()
+	task := &InspectTask{
+		ID:        taskID,
+		Status:    "running",
+		Message:   "巡检任务已创建，正在执行...",
+		CreatedAt: time.Now(),
+	}
+	inspectTasksMu.Lock()
+	inspectTasks[taskID] = task
+	inspectTasksMu.Unlock()
+
+	database.DB.Create(&database.InspectRecord{
+		TaskID:         taskID,
+		Status:         "running",
+		DatasourceID:   &ds.ID,
+		DatasourceName: ds.Name,
+		Message:        "巡检任务已创建，正在执行...",
+		StartedAt:      time.Now(),
+	})
+
+	req := struct {
+		DatasourceID    uint   `json:"datasource_id"`
+		DatasourceURL   string `json:"datasource_url"`
+		WechatBotKey    string `json:"wechat_bot_key"`
+		ToUser          string `json:"touser"`
+		MetricConfigIDs []uint `json:"metric_config_ids"`
+	}{DatasourceID: ds.ID}
+	a.runInspect(task, ds.URL, ds.Username, ds.Password, req)
 }
 
 func (a *AdminAPI) handleInspectTask(w http.ResponseWriter, r *http.Request) {

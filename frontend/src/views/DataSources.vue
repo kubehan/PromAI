@@ -48,6 +48,8 @@
         <el-button size="small" @click="batchToggle(false)"><el-icon><Close /></el-icon> 禁用</el-button>
         <el-button size="small" @click="openBatchDialog('template')"><el-icon><CopyDocument /></el-icon> 绑定模板</el-button>
         <el-button size="small" @click="openBatchDialog('notify')"><el-icon><Message /></el-icon> 通知渠道</el-button>
+        <el-button size="small" @click="openBatchDialog('creds')"><el-icon><Lock /></el-icon> 用户密码</el-button>
+        <el-button size="small" @click="batchInspectAction"><el-icon><Monitor /></el-icon> 巡检</el-button>
         <el-button size="small" @click="batchApplyGlobalTemplate"><el-icon><Download /></el-icon> 导入全局指标</el-button>
         <el-button size="small" type="danger" @click="batchDelete"><el-icon><Delete /></el-icon> 删除</el-button>
       </div>
@@ -72,10 +74,20 @@
             </el-form-item>
           </el-form>
         </template>
+        <template v-if="batchMode === 'creds'">
+          <el-form label-width="100px">
+            <el-form-item label="用户名">
+              <el-input v-model="batchUsername" placeholder="留空则不修改" />
+            </el-form-item>
+            <el-form-item label="密码">
+              <el-input v-model="batchPassword" type="password" placeholder="留空则不修改" show-password />
+            </el-form-item>
+          </el-form>
+        </template>
         <template #footer>
           <div class="dialog-footer">
             <el-button @click="batchDialogVisible = false" style="color: var(--text-secondary);">取消</el-button>
-            <el-button type="primary" :loading="batchSaving" @click="handleBatchSave">{{ batchMode === 'template' ? '绑定' : '设置' }}</el-button>
+            <el-button type="primary" :loading="batchSaving" @click="handleBatchSave">{{ batchSaveLabel }}</el-button>
           </div>
         </template>
       </el-dialog>
@@ -130,7 +142,7 @@
           <template #default="{ row }">
             <el-button size="small" text @click="openEdit(row)" style="color: var(--cyan);">编辑</el-button>
             <el-button size="small" text @click="testConnectivity(row)" style="color: var(--emerald);">测试</el-button>
-            <el-button size="small" text @click="inspectDS(row)" style="color: var(--orange);">巡检</el-button>
+            <el-button size="small" text @click="inspectDS(row)" style="color: var(--red);">巡检</el-button>
             <el-dropdown trigger="click" @command="(cmd: string) => handleMore(row, cmd)">
               <el-button size="small" text style="color: var(--text-tertiary);">
                 更多<el-icon><ArrowDown /></el-icon>
@@ -376,7 +388,7 @@ import { ref, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs, batchDeleteDataSources, batchToggleDataSources, batchSetTemplate, batchSetNotify, batchApplyTemplate } from '../api'
+import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs, batchDeleteDataSources, batchToggleDataSources, batchSetTemplate, batchSetNotify, batchApplyTemplate, batchInspect, batchSetCreds } from '../api'
 import type { DataSource, SyncSource } from '../types'
 
 const loading = ref(false)
@@ -405,9 +417,11 @@ const searchKeyword = ref('')
 const filterEnabled = ref('')
 const selectedIds = ref<number[]>([])
 const batchDialogVisible = ref(false)
-const batchMode = ref<'template' | 'notify'>('template')
+const batchMode = ref<'template' | 'notify' | 'creds'>('template')
 const batchTemplateId = ref<number | null>(null)
 const batchNotifyChannels = ref<number[]>([])
+const batchUsername = ref('')
+const batchPassword = ref('')
 const batchSaving = ref(false)
 
 // Sync source state
@@ -676,11 +690,20 @@ async function batchDelete() {
 }
 
 const batchDialogTitle = ref('')
-function openBatchDialog(mode: 'template' | 'notify') {
+const batchSaveLabel = ref('')
+function openBatchDialog(mode: 'template' | 'notify' | 'creds') {
   batchMode.value = mode
   batchTemplateId.value = null
   batchNotifyChannels.value = []
-  batchDialogTitle.value = mode === 'template' ? `批量绑定模板（${selectedIds.value.length} 项）` : `批量设置通知渠道（${selectedIds.value.length} 项）`
+  batchUsername.value = ''
+  batchPassword.value = ''
+  const titles: Record<string, string> = {
+    template: `批量绑定模板（${selectedIds.value.length} 项）`,
+    notify: `批量设置通知渠道（${selectedIds.value.length} 项）`,
+    creds: `批量设置用户名密码（${selectedIds.value.length} 项）`,
+  }
+  batchDialogTitle.value = titles[mode]
+  batchSaveLabel.value = mode === 'template' ? '绑定' : mode === 'creds' ? '保存' : '设置'
   batchDialogVisible.value = true
 }
 
@@ -690,10 +713,13 @@ async function handleBatchSave() {
     if (batchMode.value === 'template') {
       await batchSetTemplate(selectedIds.value, batchTemplateId.value)
       ElMessage.success(`已${batchTemplateId.value ? '绑定' : '解绑'}模板`)
-    } else {
+    } else if (batchMode.value === 'notify') {
       const notifyStr = batchNotifyChannels.value.length ? JSON.stringify(batchNotifyChannels.value) : ''
       await batchSetNotify(selectedIds.value, notifyStr)
       ElMessage.success('通知渠道已更新')
+    } else {
+      await batchSetCreds(selectedIds.value, batchUsername.value, batchPassword.value)
+      ElMessage.success('用户名密码已更新')
     }
     batchDialogVisible.value = false
     await fetchData()
@@ -708,6 +734,14 @@ async function batchApplyGlobalTemplate() {
     ElMessage.success('全局指标已导入')
     await fetchData()
   } catch { /* ignore */ }
+}
+
+async function batchInspectAction() {
+  try {
+    await ElMessageBox.confirm(`确定为选中的 ${selectedIds.value.length} 个数据源启动巡检？`, '批量巡检', { type: 'info' })
+    const res = await batchInspect(selectedIds.value)
+    ElMessage.success(res.data.message || '巡检已启动')
+  } catch (e: any) { ElMessage.error(e.message) }
 }
 
 onMounted(fetchData)

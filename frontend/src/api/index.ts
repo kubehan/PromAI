@@ -49,6 +49,8 @@ export const batchToggleDataSources = (ids: number[], enabled: boolean) => api.p
 export const batchSetTemplate = (ids: number[], templateId: number | null) => api.patch('/datasources', { ids, action: 'set-template', template_id: templateId })
 export const batchSetNotify = (ids: number[], notifyChannels: string) => api.patch('/datasources', { ids, action: 'set-notify', notify_channels: notifyChannels })
 export const batchApplyTemplate = (ids: number[]) => api.patch('/datasources', { ids, action: 'apply-template' })
+export const batchInspect = (ids: number[]) => api.patch('/datasources', { ids, action: 'inspect' })
+export const batchSetCreds = (ids: number[], username: string, password: string) => api.patch('/datasources', { ids, action: 'set-creds', username, password })
 export const importDatasources = (yaml: string) => api.post('/datasources/import', { yaml_content: yaml })
 export const applyTemplate = (datasourceId: number) => api.post('/datasources/apply-template', { datasource_id: datasourceId })
 export const testDataSource = (id: number) => api.post(`/datasources/${id}/test`)
