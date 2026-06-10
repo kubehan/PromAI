@@ -238,40 +238,40 @@ func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, scheduler *cr
 
 func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
 	// Public auth routes (no auth required)
-	mux.HandleFunc("/api/v1/auth/login", a.handleLogin)
+	mux.HandleFunc("/api/promai/auth/login", a.handleLogin)
 
 	// Auth middleware helper
 	auth := a.authMiddleware
 
 	// Protected routes
-	mux.HandleFunc("/api/v1/auth/me", auth(a.handleMe))
-	mux.HandleFunc("/api/v1/datasources", auth(a.handleDataSources))
-	mux.HandleFunc("/api/v1/datasources/", auth(a.handleDataSourceByID))
-	mux.HandleFunc("/api/v1/notifications", auth(a.handleNotifications))
-	mux.HandleFunc("/api/v1/notifications/", auth(a.handleNotificationByID))
-	mux.HandleFunc("/api/v1/cronjobs", auth(a.handleCronJobs))
-	mux.HandleFunc("/api/v1/cronjobs/", auth(a.handleCronJobByID))
-	mux.HandleFunc("/api/v1/reports", auth(a.handleReports))
-	mux.HandleFunc("/api/v1/reports/", auth(a.handleReportByID))
-	mux.HandleFunc("/api/v1/metrics/types", auth(a.handleMetricTypes))
-	mux.HandleFunc("/api/v1/metrics/types/", auth(a.handleMetricTypeByID))
-	mux.HandleFunc("/api/v1/metrics/configs", auth(a.handleMetricConfigs))
-	mux.HandleFunc("/api/v1/metrics/configs/", auth(a.handleMetricConfigByID))
-	mux.HandleFunc("/api/v1/metrics/validate", auth(a.handleValidatePromQL))
-	mux.HandleFunc("/api/v1/templates", auth(a.handleTemplates))
-	mux.HandleFunc("/api/v1/templates/", auth(a.handleTemplateByID))
-	mux.HandleFunc("/api/v1/settings", auth(a.handleSettings))
-	mux.HandleFunc("/api/v1/inspect", auth(a.handleInspect))
-	mux.HandleFunc("/api/v1/inspect/records", auth(a.handleInspectRecords))
-	mux.HandleFunc("/api/v1/inspect/task/", auth(a.handleInspectTask))
-	mux.HandleFunc("/api/v1/datasources/import", auth(a.handleImportDatasource))
-	mux.HandleFunc("/api/v1/notifications/test", auth(a.handleTestNotification))
-	mux.HandleFunc("/api/v1/dashboard/stats", auth(a.handleDashboardStats))
-	mux.HandleFunc("/api/v1/dashboard/health", auth(a.handleDashboardHealth))
-	mux.HandleFunc("/api/v1/dashboard/health/trend", auth(a.handleDashboardHealthTrend))
-	mux.HandleFunc("/api/v1/datasources/apply-template", auth(a.handleApplyTemplate))
-	mux.HandleFunc("/api/v1/sync-sources", auth(a.handleSyncSources))
-	mux.HandleFunc("/api/v1/sync-sources/", auth(a.handleSyncSourceByID))
+	mux.HandleFunc("/api/promai/auth/me", auth(a.handleMe))
+	mux.HandleFunc("/api/promai/datasources", auth(a.handleDataSources))
+	mux.HandleFunc("/api/promai/datasources/", auth(a.handleDataSourceByID))
+	mux.HandleFunc("/api/promai/notifications", auth(a.handleNotifications))
+	mux.HandleFunc("/api/promai/notifications/", auth(a.handleNotificationByID))
+	mux.HandleFunc("/api/promai/cronjobs", auth(a.handleCronJobs))
+	mux.HandleFunc("/api/promai/cronjobs/", auth(a.handleCronJobByID))
+	mux.HandleFunc("/api/promai/report-records", auth(a.handleReports))
+	mux.HandleFunc("/api/promai/report-records/", auth(a.handleReportByID))
+	mux.HandleFunc("/api/promai/metrics/types", auth(a.handleMetricTypes))
+	mux.HandleFunc("/api/promai/metrics/types/", auth(a.handleMetricTypeByID))
+	mux.HandleFunc("/api/promai/metrics/configs", auth(a.handleMetricConfigs))
+	mux.HandleFunc("/api/promai/metrics/configs/", auth(a.handleMetricConfigByID))
+	mux.HandleFunc("/api/promai/metrics/validate", auth(a.handleValidatePromQL))
+	mux.HandleFunc("/api/promai/templates", auth(a.handleTemplates))
+	mux.HandleFunc("/api/promai/templates/", auth(a.handleTemplateByID))
+	mux.HandleFunc("/api/promai/settings", auth(a.handleSettings))
+	mux.HandleFunc("/api/promai/inspect", auth(a.handleInspect))
+	mux.HandleFunc("/api/promai/inspect/records", auth(a.handleInspectRecords))
+	mux.HandleFunc("/api/promai/inspect/task/", auth(a.handleInspectTask))
+	mux.HandleFunc("/api/promai/datasources/import", auth(a.handleImportDatasource))
+	mux.HandleFunc("/api/promai/notifications/test", auth(a.handleTestNotification))
+	mux.HandleFunc("/api/promai/dashboard/stats", auth(a.handleDashboardStats))
+	mux.HandleFunc("/api/promai/dashboard/health", auth(a.handleDashboardHealth))
+	mux.HandleFunc("/api/promai/dashboard/health/trend", auth(a.handleDashboardHealthTrend))
+	mux.HandleFunc("/api/promai/datasources/apply-template", auth(a.handleApplyTemplate))
+	mux.HandleFunc("/api/promai/sync-sources", auth(a.handleSyncSources))
+	mux.HandleFunc("/api/promai/sync-sources/", auth(a.handleSyncSourceByID))
 
 	log.Printf("[AdminAPI] 管理接口已注册")
 }
@@ -1577,7 +1577,7 @@ func (a *AdminAPI) handleTemplateMetricOverride(w http.ResponseWriter, r *http.R
 		writeError(w, 405, "不支持的请求方法")
 		return
 	}
-	// Path: /api/v1/templates/{templateId}/metrics/{configId}/override
+	// Path: /api/promai/templates/{templateId}/metrics/{configId}/override
 	parts := strings.Split(strings.TrimSuffix(strings.TrimSuffix(r.URL.Path, "/override"), "/"), "/")
 	if len(parts) < 7 {
 		writeError(w, 400, "路径格式错误")
@@ -2158,7 +2158,7 @@ func (a *AdminAPI) handleSyncSources(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *AdminAPI) handleSyncSourceByID(w http.ResponseWriter, r *http.Request) {
-	path := strings.TrimPrefix(r.URL.Path, "/api/v1/sync-sources/")
+	path := strings.TrimPrefix(r.URL.Path, "/api/promai/sync-sources/")
 	// Check for sub-routes
 	if strings.HasSuffix(path, "/sync") {
 		idStr := strings.TrimSuffix(path, "/sync")

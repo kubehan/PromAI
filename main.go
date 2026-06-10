@@ -230,16 +230,16 @@ func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler 
 	http.HandleFunc("/api/promai/tasks", tasksHandler)
 	http.HandleFunc("/api/promai/tasks/", taskDetailHandler)
 
-	// 设置管理后台页面 - 优先使用前端构建产物
+	// 将首页替换为后台登录页面（前端 SPA）
 	if _, err := os.Stat("frontend/dist"); err == nil {
 		distDir := "frontend/dist"
-		http.Handle("/api/promai/admin/assets/", http.StripPrefix("/api/promai/admin/", http.FileServer(http.Dir(distDir))))
-		http.Handle("/api/promai/admin/favicon.svg", http.StripPrefix("/api/promai/admin/", http.FileServer(http.Dir(distDir))))
-		http.HandleFunc("/api/promai/admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Handle("/promai/assets/", http.StripPrefix("/promai/", http.FileServer(http.Dir(distDir))))
+		http.Handle("/promai/favicon.svg", http.StripPrefix("/promai/", http.FileServer(http.Dir(distDir))))
+		http.HandleFunc("/promai", func(w http.ResponseWriter, r *http.Request) {
 			http.ServeFile(w, r, distDir+"/index.html")
 		})
-		http.HandleFunc("/api/promai/admin/", func(w http.ResponseWriter, r *http.Request) {
-			path := distDir + r.URL.Path[len("/api/promai/admin/"):]
+		http.HandleFunc("/promai/", func(w http.ResponseWriter, r *http.Request) {
+			path := distDir + r.URL.Path[len("/promai/"):]
 			if _, err := os.Stat(path); err == nil {
 				http.ServeFile(w, r, path)
 			} else {
@@ -247,8 +247,6 @@ func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler 
 			}
 		})
 		log.Printf("  前端构建产物已加载 (frontend/dist)")
-	} else {
-		http.HandleFunc("/api/promai/admin", adminHandler)
 	}
 
 	// 注册管理 API 路由
@@ -702,18 +700,7 @@ func makeStatusHandler(client metrics.PrometheusAPI, config *config.Config) http
 
 // indexHandler 首页处理器
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("templates/index.html")
-	if err != nil {
-		http.Error(w, "Failed to parse template", http.StatusInternalServerError)
-		log.Printf("Error parsing index template: %v", err)
-		return
-	}
-
-	if err := tmpl.Execute(w, nil); err != nil {
-		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-		log.Printf("Error rendering index template: %v", err)
-		return
-	}
+	http.Redirect(w, r, "/promai/", http.StatusFound)
 }
 
 // progressHandler 进度页面处理器

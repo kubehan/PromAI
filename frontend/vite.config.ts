@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/api/promai/admin/',
+  base: '/promai/',
   server: {
     port: 5173,
     proxy: {

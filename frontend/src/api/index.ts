@@ -8,7 +8,7 @@ import type {
 } from '../types'
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/api/promai',
   timeout: 30000,
 })
 
@@ -71,8 +71,8 @@ export const updateCronJob = (id: number, j: CronJob) => api.put<CronJob>(`/cron
 export const deleteCronJob = (id: number) => api.delete(`/cronjobs/${id}`)
 
 // Reports
-export const getReports = () => api.get<ReportRecord[]>('/reports')
-export const deleteReport = (id: number) => api.delete(`/reports/${id}`)
+export const getReports = () => api.get<ReportRecord[]>('/report-records')
+export const deleteReport = (id: number) => api.delete(`/report-records/${id}`)
 
 // Metrics
 export const getMetricTypes = (datasourceId?: number) => api.get<MetricType[]>('/metrics/types', { params: datasourceId ? { datasource_id: datasourceId } : {} })
