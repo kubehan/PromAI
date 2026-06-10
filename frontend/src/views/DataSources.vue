@@ -44,10 +44,41 @@
       <div v-if="selectedIds.length > 0" style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: rgba(0,212,255,0.05); border-radius: 8px;">
         <span style="font-size: 13px; color: var(--text-secondary);">已选 {{ selectedIds.length }} 项</span>
         <el-button size="small" @click="selectedIds = []">取消选择</el-button>
-        <el-button size="small" type="primary" @click="batchToggle(true)"><el-icon><Check /></el-icon> 批量启用</el-button>
-        <el-button size="small" @click="batchToggle(false)"><el-icon><Close /></el-icon> 批量禁用</el-button>
-        <el-button size="small" type="danger" @click="batchDelete"><el-icon><Delete /></el-icon> 批量删除</el-button>
+        <el-button size="small" type="primary" @click="batchToggle(true)"><el-icon><Check /></el-icon> 启用</el-button>
+        <el-button size="small" @click="batchToggle(false)"><el-icon><Close /></el-icon> 禁用</el-button>
+        <el-button size="small" @click="openBatchDialog('template')"><el-icon><CopyDocument /></el-icon> 绑定模板</el-button>
+        <el-button size="small" @click="openBatchDialog('notify')"><el-icon><Message /></el-icon> 通知渠道</el-button>
+        <el-button size="small" @click="batchApplyGlobalTemplate"><el-icon><Download /></el-icon> 导入全局指标</el-button>
+        <el-button size="small" type="danger" @click="batchDelete"><el-icon><Delete /></el-icon> 删除</el-button>
       </div>
+
+      <!-- Batch Dialog -->
+      <el-dialog v-model="batchDialogVisible" :title="batchDialogTitle" width="480" :close-on-click-modal="false">
+        <template v-if="batchMode === 'template'">
+          <el-form label-width="100px">
+            <el-form-item label="巡检模板">
+              <el-select v-model="batchTemplateId" placeholder="不绑定模板" clearable style="width: 100%;">
+                <el-option v-for="t in templates" :key="t.id" :label="t.name + ' (' + t.metric_count + ' 指标)'" :value="t.id" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+        </template>
+        <template v-if="batchMode === 'notify'">
+          <el-form label-width="100px">
+            <el-form-item label="通知渠道">
+              <el-select v-model="batchNotifyChannels" multiple placeholder="不发送通知" clearable style="width: 100%;">
+                <el-option v-for="ch in notifChannels" :key="ch.id" :label="ch.name + ' (' + ch.channel_type + ')'" :value="ch.id" />
+              </el-select>
+            </el-form-item>
+          </el-form>
+        </template>
+        <template #footer>
+          <div class="dialog-footer">
+            <el-button @click="batchDialogVisible = false" style="color: var(--text-secondary);">取消</el-button>
+            <el-button type="primary" :loading="batchSaving" @click="handleBatchSave">{{ batchMode === 'template' ? '绑定' : '设置' }}</el-button>
+          </div>
+        </template>
+      </el-dialog>
 
       <el-table :data="datasources" v-loading="loading" stripe @selection-change="(rows: any[]) => selectedIds = rows.map((r: any) => r.id)">
         <el-table-column type="selection" width="44" />
@@ -345,7 +376,7 @@ import { ref, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs, batchDeleteDataSources, batchToggleDataSources } from '../api'
+import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getTemplates, getNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs, batchDeleteDataSources, batchToggleDataSources, batchSetTemplate, batchSetNotify, batchApplyTemplate } from '../api'
 import type { DataSource, SyncSource } from '../types'
 
 const loading = ref(false)
@@ -373,6 +404,11 @@ const total = ref(0)
 const searchKeyword = ref('')
 const filterEnabled = ref('')
 const selectedIds = ref<number[]>([])
+const batchDialogVisible = ref(false)
+const batchMode = ref<'template' | 'notify'>('template')
+const batchTemplateId = ref<number | null>(null)
+const batchNotifyChannels = ref<number[]>([])
+const batchSaving = ref(false)
 
 // Sync source state
 const syncDialogVisible = ref(false)
@@ -635,6 +671,41 @@ async function batchDelete() {
     await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个数据源？`, '批量删除', { type: 'warning' })
     await batchDeleteDataSources(selectedIds.value)
     ElMessage.success('批量删除成功')
+    await fetchData()
+  } catch { /* ignore */ }
+}
+
+const batchDialogTitle = ref('')
+function openBatchDialog(mode: 'template' | 'notify') {
+  batchMode.value = mode
+  batchTemplateId.value = null
+  batchNotifyChannels.value = []
+  batchDialogTitle.value = mode === 'template' ? `批量绑定模板（${selectedIds.value.length} 项）` : `批量设置通知渠道（${selectedIds.value.length} 项）`
+  batchDialogVisible.value = true
+}
+
+async function handleBatchSave() {
+  batchSaving.value = true
+  try {
+    if (batchMode.value === 'template') {
+      await batchSetTemplate(selectedIds.value, batchTemplateId.value)
+      ElMessage.success(`已${batchTemplateId.value ? '绑定' : '解绑'}模板`)
+    } else {
+      const notifyStr = batchNotifyChannels.value.length ? JSON.stringify(batchNotifyChannels.value) : ''
+      await batchSetNotify(selectedIds.value, notifyStr)
+      ElMessage.success('通知渠道已更新')
+    }
+    batchDialogVisible.value = false
+    await fetchData()
+  } catch (e: any) { ElMessage.error(e.message) }
+  finally { batchSaving.value = false }
+}
+
+async function batchApplyGlobalTemplate() {
+  try {
+    await ElMessageBox.confirm(`确定为选中的 ${selectedIds.value.length} 个数据源导入全局指标？`, '导入全局指标', { type: 'info' })
+    await batchApplyTemplate(selectedIds.value)
+    ElMessage.success('全局指标已导入')
     await fetchData()
   } catch { /* ignore */ }
 }

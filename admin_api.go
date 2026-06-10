@@ -437,9 +437,11 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, d)
 	case "PATCH":
 		var req struct {
-			IDs     []uint `json:"ids"`
-			Enabled *bool  `json:"enabled,omitempty"`
-			Action  string `json:"action"` // "delete" or "toggle"
+			IDs            []uint `json:"ids"`
+			Enabled        *bool  `json:"enabled,omitempty"`
+			TemplateID     *uint  `json:"template_id,omitempty"`
+			NotifyChannels string `json:"notify_channels"`
+			Action         string `json:"action"` // delete, toggle, set-template, set-notify, apply-template
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, 400, "请求体格式错误")
@@ -456,6 +458,21 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			if req.Enabled != nil {
 				database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("enabled", *req.Enabled)
 			}
+		case "set-template":
+			if req.TemplateID != nil {
+				database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("template_id", *req.TemplateID)
+			} else {
+				database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("template_id", nil)
+			}
+		case "set-notify":
+			database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("notify_channels", req.NotifyChannels)
+		case "apply-template":
+			var globalTmpl database.InspectionTemplate
+			if err := database.DB.Where("name = ?", "全局模板").First(&globalTmpl).Error; err != nil {
+				writeError(w, 500, "全局模板不存在")
+				return
+			}
+			database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("template_id", globalTmpl.ID)
 		default:
 			writeError(w, 400, "不支持的操作")
 			return
