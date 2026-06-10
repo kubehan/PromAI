@@ -455,3 +455,63 @@ body {
   .page-container { padding: 16px; }
   .stat-card .stat-value { font-size: 22px; }
 }
+
+/* Pagination dark theme */
+.el-pagination {
+  --el-pagination-button-color: var(--text-secondary) !important;
+  --el-pagination-button-bg-color: transparent !important;
+  --el-pagination-hover-color: var(--cyan) !important;
+  --el-pagination-font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.el-pagination button {
+  border-radius: 8px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+}
+
+.el-pagination .el-pager li {
+  border-radius: 8px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  background: transparent !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500 !important;
+}
+
+.el-pagination .el-pager li:hover {
+  color: var(--cyan) !important;
+  background: rgba(0, 212, 255, 0.08) !important;
+}
+
+.el-pagination .el-pager li.is-active {
+  color: var(--text-inverse) !important;
+  background: var(--cyan) !important;
+  font-weight: 700 !important;
+}
+
+.el-pagination .el-pagination__total,
+.el-pagination .el-pagination__sizes {
+  color: var(--text-tertiary) !important;
+}
+
+.el-pagination .el-select .el-input__wrapper {
+  background: rgba(0, 0, 0, 0.3) !important;
+  border-radius: 8px !important;
+}
+
+.el-pagination.is-background .el-pager li {
+  background: rgba(56, 189, 248, 0.06) !important;
+  border: 1px solid transparent !important;
+}
+
+.el-pagination.is-background .el-pager li:hover {
+  border-color: rgba(0, 212, 255, 0.3) !important;
+}
+
+.el-pagination.is-background .el-pager li.is-active {
+  background: var(--cyan) !important;
+  border-color: var(--cyan) !important;
+  color: var(--text-inverse) !important;
+}

@@ -43,13 +43,15 @@
           </template>
         </el-table-column>
       </el-table>
-      <div v-if="total > pageSize" style="display: flex; justify-content: center; margin-top: 16px;">
+      <div v-if="total > pageSize" style="display: flex; justify-content: flex-end; margin-top: 16px; padding: 0 24px 16px;">
         <el-pagination
           v-model:current-page="page"
-          :page-size="pageSize"
+          v-model:page-size="pageSize"
+          :page-sizes="[10, 20, 50, 100]"
           :total="total"
-          layout="prev, pager, next"
-          @current-change="fetchRecords"
+          layout="total, sizes, prev, pager, next"
+          background
+          @change="fetchRecords"
         />
       </div>
     </div>
