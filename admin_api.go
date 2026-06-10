@@ -1248,6 +1248,15 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 			return
 		}
 
+		// 检查连通性，不可用则立即终止
+		hcCtx, hcCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := client.HealthCheck(hcCtx); err != nil {
+			hcCancel()
+			runErr = fmt.Errorf("数据源 %s 不可用: %v", promURL, err)
+			return
+		}
+		hcCancel()
+
 		activeConfig := a.config
 		if len(req.MetricConfigIDs) > 0 {
 			var selectedConfigs []database.MetricConfig
@@ -1845,6 +1854,15 @@ func (a *AdminAPI) handleTemplateInspect(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// 检查连通性，不可用则立即终止
+	hcCtx, hcCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := client.HealthCheck(hcCtx); err != nil {
+		hcCancel()
+		writeError(w, 503, fmt.Sprintf("数据源 %s 不可用: %v", promURL, err))
+		return
+	}
+	hcCancel()
+
 	activeConfig := buildFilteredConfig(a.config, selectedConfigs)
 	dataCollector := metrics.NewCollectorWithURL(client.API, activeConfig, promURL)
 	data, err := dataCollector.CollectMetrics()
@@ -2157,14 +2175,70 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 		overallHealth = float64(totalAll-alertAll) / float64(totalAll) * 100
 	}
 
+	// Health score distribution
+	buckets := []int{0, 0, 0, 0, 0}
+	for _, r := range results {
+		switch {
+		case r.HealthScore >= 90:
+			buckets[4]++
+		case r.HealthScore >= 80:
+			buckets[3]++
+		case r.HealthScore >= 70:
+			buckets[2]++
+		case r.HealthScore >= 60:
+			buckets[1]++
+		default:
+			buckets[0]++
+		}
+	}
+	totalDS := len(results)
+	healthDistribution := []map[string]interface{}{
+		{"range": "0-60", "count": buckets[0], "pct": safePct(buckets[0], totalDS)},
+		{"range": "60-70", "count": buckets[1], "pct": safePct(buckets[1], totalDS)},
+		{"range": "70-80", "count": buckets[2], "pct": safePct(buckets[2], totalDS)},
+		{"range": "80-90", "count": buckets[3], "pct": safePct(buckets[3], totalDS)},
+		{"range": "90-100", "count": buckets[4], "pct": safePct(buckets[4], totalDS)},
+	}
+
+	// Type-level alert aggregation across all datasources
+	typeAlertMap := make(map[string]*TypeSummaryItem)
+	typeAlertOrder := make([]string, 0)
+	for _, r := range results {
+		for _, s := range r.TypeSummaries {
+			if s.Alerts == 0 {
+				continue
+			}
+			if _, ok := typeAlertMap[s.TypeName]; !ok {
+				typeAlertMap[s.TypeName] = &TypeSummaryItem{TypeName: s.TypeName}
+				typeAlertOrder = append(typeAlertOrder, s.TypeName)
+			}
+			ta := typeAlertMap[s.TypeName]
+			ta.TotalMetrics += s.TotalMetrics
+			ta.CriticalCount += s.CriticalCount
+			ta.WarningCount += s.WarningCount
+			ta.Alerts += s.Alerts
+			ta.NormalCount += s.NormalCount
+		}
+	}
+	typeAlerts := make([]TypeSummaryItem, 0, len(typeAlertOrder))
+	for _, tn := range typeAlertOrder {
+		typeAlerts = append(typeAlerts, *typeAlertMap[tn])
+	}
+	sort.Slice(typeAlerts, func(i, j int) bool {
+		return typeAlerts[i].Alerts > typeAlerts[j].Alerts
+	})
+
 	writeJSON(w, map[string]interface{}{
-		"datasources":     results,
-		"overall_health":  overallHealth,
-		"total_metrics":   totalAll,
-		"total_alerts":    alertAll,
-		"critical_total":  criticalAll,
-		"warning_total":   warningAll,
-		"normal_total":    totalAll - alertAll,
+		"datasources":         results,
+		"overall_health":      overallHealth,
+		"total_metrics":       totalAll,
+		"total_alerts":        alertAll,
+		"critical_total":      criticalAll,
+		"warning_total":       warningAll,
+		"normal_total":        totalAll - alertAll,
+		"health_distribution": healthDistribution,
+		"type_alerts":         typeAlerts,
+		"total_datasources":   totalDS,
 	})
 }
 
@@ -2673,4 +2747,11 @@ func getReportStatus(data *report.ReportData) string {
 		return "warning"
 	}
 	return "success"
+}
+
+func safePct(n, total int) float64 {
+	if total == 0 {
+		return 0
+	}
+	return float64(n) / float64(total) * 100
 }

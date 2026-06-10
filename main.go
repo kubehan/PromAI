@@ -10,9 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"PromAI/pkg/config"
@@ -198,6 +201,7 @@ func main() {
 
 // 全局定时调度器，由 admin API 动态管理
 var globalScheduler *cron.Cron
+var cronTaskCounter int64
 
 // setupRoutes 设置 HTTP 路由
 func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler *cron.Cron) {
@@ -1062,96 +1066,201 @@ func adminHandler(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, "templates/admin.html")
 }
 
-// doInspection 执行巡检并保存报告记录
+// doInspection 执行巡检并保存报告记录（并发执行所有数据源）
 func doInspection(cfg *config.Config, collector *metrics.Collector, job database.CronJob) {
-	// Resolve datasource list
 	dsIDs := resolveJobDatasourceIDs(job)
 	if len(dsIDs) == 0 {
-		// Use default (collector from config)
-		data, err := collector.CollectMetrics()
-		if err != nil {
-			log.Printf("[Cron] 收集指标失败: %v", err)
-			database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": "failed"})
-			return
-		}
-		data.Datasource = cfg.PrometheusURL
-		setLatestReport(data.Datasource, reportDataToHealth(data))
-		reportFilePath, err := report.GenerateReport(*data)
-		if err != nil {
-			log.Printf("[Cron] 生成报告失败: %v", err)
-			return
-		}
-		saveReportRecord(data, reportFilePath)
-		sendNotifications(cfg, reportFilePath, data)
-		sendJobNotifications(job, reportFilePath, data)
-		database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": "success"})
-		log.Printf("[Cron] 定时任务 %s 完成: %s", job.Name, reportFilePath)
+		doSingleInspection(cfg, collector, job, nil)
 		return
 	}
 
+	var mu sync.Mutex
 	var anySuccess bool
+	var wg sync.WaitGroup
 	for _, dsID := range dsIDs {
-		func(dsID uint) {
-			var ds database.DataSource
-			if database.DB.First(&ds, dsID).Error != nil {
-				log.Printf("[Cron] 数据源 %d 不存在，跳过", dsID)
-				return
+		wg.Add(1)
+		id := dsID
+		go func() {
+			defer wg.Done()
+			if doSingleInspection(cfg, collector, job, &id) {
+				mu.Lock()
+				anySuccess = true
+				mu.Unlock()
 			}
-			client, err := prometheus.NewClient(ds.URL, ds.Username, ds.Password)
-			if err != nil {
-				log.Printf("[Cron] 连接数据源 %s 失败: %v", ds.Name, err)
-				return
-			}
-			activeCfg := cfg
-			if ds.TemplateID != nil {
-				var links []database.InspectionTemplateMetric
-				database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
-				if len(links) > 0 {
-					cfgIDs := make([]uint, len(links))
-					for i, l := range links {
-						cfgIDs[i] = l.MetricConfigID
-					}
-					var tmplConfigs []database.MetricConfig
-					database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
-					for i := range tmplConfigs {
-						var override database.TemplateMetricOverride
-						if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
-							override.Apply(&tmplConfigs[i])
-						}
-					}
-					if len(tmplConfigs) > 0 {
-						activeCfg = buildFilteredConfig(cfg, tmplConfigs)
-					}
-				}
-			}
-			dsCollector := metrics.NewCollectorWithURL(client.API, activeCfg, ds.URL)
-
-			data, err := dsCollector.CollectMetrics()
-			if err != nil {
-				log.Printf("[Cron] 数据源 %s 收集指标失败: %v", ds.Name, err)
-				return
-			}
-			data.Datasource = ds.URL
-			setLatestReport(data.Datasource, reportDataToHealth(data))
-
-			reportFilePath, err := report.GenerateReport(*data)
-			if err != nil {
-				log.Printf("[Cron] 数据源 %s 生成报告失败: %v", ds.Name, err)
-				return
-			}
-			saveReportRecord(data, reportFilePath)
-			sendNotifications(cfg, reportFilePath, data)
-			sendJobNotifications(job, reportFilePath, data)
-			anySuccess = true
-			log.Printf("[Cron] 数据源 %s 巡检完成: %s", ds.Name, reportFilePath)
-		}(dsID)
+		}()
 	}
+	wg.Wait()
 
 	status := "success"
 	if !anySuccess {
 		status = "failed"
 	}
 	database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": status})
+}
+
+// doSingleInspection 对单个数据源执行巡检，创建 InspectRecord 并保存报告
+func doSingleInspection(cfg *config.Config, collector *metrics.Collector, job database.CronJob, dsIDPtr *uint) bool {
+	taskID := fmt.Sprintf("cron_%d_%d_%d", job.ID, time.Now().Unix(), atomic.AddInt64(&cronTaskCounter, 1))
+
+	if dsIDPtr != nil {
+		dsID := *dsIDPtr
+		var ds database.DataSource
+		if database.DB.First(&ds, dsID).Error != nil {
+			log.Printf("[Cron] 数据源 %d 不存在", dsID)
+			database.DB.Create(&database.InspectRecord{
+				TaskID: taskID, Status: "failed",
+				DatasourceID: &dsID, DatasourceName: fmt.Sprintf("数据源 %d", dsID),
+				Message: "数据源不存在", Error: "数据源不存在",
+				StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+			})
+			return false
+		}
+
+		client, err := prometheus.NewClient(ds.URL, ds.Username, ds.Password)
+		if err != nil {
+			log.Printf("[Cron] 创建数据源 %s 客户端失败: %v", ds.Name, err)
+			database.DB.Create(&database.InspectRecord{
+				TaskID: taskID, Status: "failed", DatasourceID: &dsID,
+				DatasourceName: ds.Name, Message: "创建客户端失败", Error: err.Error(),
+				StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+			})
+			return false
+		}
+
+		// 先检查连通性，不可用则立即终止
+		hcCtx, hcCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := client.HealthCheck(hcCtx); err != nil {
+			hcCancel()
+			log.Printf("[Cron] 数据源 %s 不可用: %v，跳过巡检", ds.Name, err)
+			database.DB.Create(&database.InspectRecord{
+				TaskID: taskID, Status: "failed", DatasourceID: &dsID,
+				DatasourceName: ds.Name, Message: "数据源不可用", Error: err.Error(),
+				StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+			})
+			return false
+		}
+		hcCancel()
+
+		activeCfg := cfg
+		if ds.TemplateID != nil {
+			var links []database.InspectionTemplateMetric
+			database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
+			if len(links) > 0 {
+				cfgIDs := make([]uint, len(links))
+				for i, l := range links {
+					cfgIDs[i] = l.MetricConfigID
+				}
+				var tmplConfigs []database.MetricConfig
+				database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
+				for i := range tmplConfigs {
+					var override database.TemplateMetricOverride
+					if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
+						override.Apply(&tmplConfigs[i])
+					}
+				}
+				if len(tmplConfigs) > 0 {
+					activeCfg = buildFilteredConfig(cfg, tmplConfigs)
+				}
+			}
+		}
+
+		database.DB.Create(&database.InspectRecord{
+			TaskID: taskID, Status: "running", DatasourceID: &dsID,
+			DatasourceName: ds.Name, Message: "正在执行巡检...",
+			StartedAt: time.Now(),
+		})
+
+		dsCollector := metrics.NewCollectorWithURL(client.API, activeCfg, ds.URL)
+		data, err := dsCollector.CollectMetrics()
+		if err != nil {
+			log.Printf("[Cron] 数据源 %s 收集指标失败: %v", ds.Name, err)
+			database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+				"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+			})
+			return false
+		}
+		data.Datasource = ds.URL
+		setLatestReport(data.Datasource, reportDataToHealth(data))
+
+		reportFilePath, err := report.GenerateReport(*data)
+		if err != nil {
+			log.Printf("[Cron] 数据源 %s 生成报告失败: %v", ds.Name, err)
+			database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+				"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+			})
+			return false
+		}
+		saveReportRecord(data, reportFilePath)
+		sendNotifications(cfg, reportFilePath, data)
+		sendJobNotifications(job, reportFilePath, data)
+		reportURL := "/api/promai/reports/" + filepath.Base(reportFilePath)
+		database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+			"status": "completed", "message": "巡检完成", "report_url": reportURL, "completed_at": time.Now(),
+		})
+		log.Printf("[Cron] 数据源 %s 巡检完成: %s", ds.Name, reportFilePath)
+		return true
+	}
+
+	// No datasource specified — use default collector
+	// 先检查默认数据源连通性
+	hcCtx, hcCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	client, err := prometheus.NewClient(cfg.PrometheusURL, cfg.PrometheusUsername, cfg.PrometheusPassword)
+	if err != nil {
+		hcCancel()
+		log.Printf("[Cron] 创建默认数据源客户端失败: %v", err)
+		database.DB.Create(&database.InspectRecord{
+			TaskID: taskID, Status: "failed",
+			DatasourceName: cfg.PrometheusURL, Message: "创建客户端失败", Error: err.Error(),
+			StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+		})
+		return false
+	}
+	if err := client.HealthCheck(hcCtx); err != nil {
+		hcCancel()
+		log.Printf("[Cron] 默认数据源 %s 不可用: %v，跳过巡检", cfg.PrometheusURL, err)
+		database.DB.Create(&database.InspectRecord{
+			TaskID: taskID, Status: "failed",
+			DatasourceName: cfg.PrometheusURL, Message: "数据源不可用", Error: err.Error(),
+			StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+		})
+		return false
+	}
+	hcCancel()
+
+	database.DB.Create(&database.InspectRecord{
+		TaskID: taskID, Status: "running",
+		DatasourceName: cfg.PrometheusURL, Message: "正在执行巡检...",
+		StartedAt: time.Now(),
+	})
+	data, err := collector.CollectMetrics()
+	if err != nil {
+		log.Printf("[Cron] 收集指标失败: %v", err)
+		database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+			"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+		})
+		database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": "failed"})
+		return false
+	}
+	data.Datasource = cfg.PrometheusURL
+	setLatestReport(data.Datasource, reportDataToHealth(data))
+	reportFilePath, err := report.GenerateReport(*data)
+	if err != nil {
+		log.Printf("[Cron] 生成报告失败: %v", err)
+		database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+			"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+		})
+		return false
+	}
+	saveReportRecord(data, reportFilePath)
+	sendNotifications(cfg, reportFilePath, data)
+	sendJobNotifications(job, reportFilePath, data)
+	reportURL := "/api/promai/reports/" + filepath.Base(reportFilePath)
+	database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+		"status": "completed", "message": "巡检完成", "report_url": reportURL, "completed_at": time.Now(),
+	})
+	database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": "success"})
+	log.Printf("[Cron] 定时任务 %s 完成: %s", job.Name, reportFilePath)
+	return true
 }
 
 func resolveJobDatasourceIDs(job database.CronJob) []uint {
