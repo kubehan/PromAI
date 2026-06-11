@@ -6,6 +6,16 @@
 
 基于 Prometheus 的监控巡检工具，支持自动采集指标、生成可视化 HTML 报告，并提供 **Web 管理后台**（SQLite 持久化）进行数据源、指标、模板、定时任务、通知渠道的全生命周期管理。
 
+## 效果展示
+![xx](images/image%20copy%202.png)
+![xx](images/image%20copy%203.png)
+![xx](images/image%20copy%204.png)
+![xx](images/image%20copy%205.png)
+![xx](images/image%20copy%206.png)
+![xx](images/image%20copy%207.png)
+![xx](images/image%20copy.png)
+![xx](images/image.png)
+![xx](images/image2.png)
 ## 快速开始
 
 ### 源码编译
@@ -29,7 +39,8 @@
 4. 构建前端 + 后端：
 
    ```bash
-   cd frontend && npm run build && cd ..
+   cd frontend && npm run build 
+   cd ..
    go build -o promai .
    ```
 
@@ -45,10 +56,10 @@
 
 | 用途 | 地址 |
 |------|------|
-| 管理后台（SPA） | http://localhost:8091/api/promai/admin |
-| 健康大屏（BI） | http://localhost:8091/api/promai/admin/#/bi |
-| 触发巡检报告 | http://localhost:8091/api/promai/getreport |
-| 历史报告 | http://localhost:8091/api/promai/reports/ |
+| 首页 | http://localhost:8091/promai |
+| 健康大屏（BI） | http://localhost:8091/promai/bi |
+| 巡检报告 | http://localhost:8091/promai/reports |
+| 触发巡检 | http://localhost:8091/promai/inspection/ |
 
 ## 管理后台功能
 
@@ -71,7 +82,6 @@
 
 ```yaml
 prometheus_url: "http://prometheus.k8s.kubehan.cn"
-port: 8091
 project_name: "PromAI"
 cron_schedule: "00 08,17 * * *"
 

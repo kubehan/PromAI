@@ -45,25 +45,23 @@ PromAI 是一个基于 Prometheus 的智能监控报告生成与巡检系统。�
 
    ```bash
    go mod download
-   go build -o PromAI main.go
+   go build -o promai .
    ```
 3. **运行**
 
    ```bash
-   # 确保配置文件存在
-   cp config/config.yaml.example config/config.yaml # 如果有示例文件
-   # 或者直接使用现有的 config/config.yaml
+   # 直接使用现有的 config/config.yaml，按需修改配置
 
    # 环境变量配置 EXTERNAL_PORT 指定反向代理端口
 
-   ./PromAI -config config/config.yaml -port :8091
+   ./promai -config config/config.yaml -port :8091
    ```
 
 ### Docker 部署
 
 ```bash
 docker run -d \
-  --name PromAI \
+  --name promai \
   -p 8091:8091 \
   -v $(pwd)/config/config.yaml:/app/config/config.yaml \
   -v $(pwd)/reports:/app/reports \
@@ -89,9 +87,17 @@ kubectl apply -f deploy/deployment.yaml
 ```yaml
 # 默认 Prometheus 地址
 prometheus_url: "http://prometheus-k8s.monitoring.svc.cluster.local:9090"
+prometheus_username: ""       # 可选
+prometheus_password: ""       # 可选
 
 # 项目名称，显示在报告中
 project_name: "巡检报告"
+
+# 管理后台认证（首次启动时同步到 SQLite）
+auth:
+  username: "admin"
+  password: "admin123"
+  jwt_secret: "your-secret-key"
 
 # 定时巡检任务 (Cron 表达式)
 # 示例：每天 08:00 和 17:00 执行
@@ -118,7 +124,7 @@ data_sources:
 
 ### 通知配置
 
-支持钉钉、邮件和企业微信通知。
+支持钉钉、邮件、企业微信（机器人+应用）和飞书通知。
 
 ```yaml
 notifications:
@@ -132,12 +138,30 @@ notifications:
     enabled: true
     webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_KEY"
     report_url: "http://your-promai-host:8091"
+
+  wechat_app:
+    enabled: false
+    corpid: "wwaf792cfe24e35c78"
+    agentid: 1000009
+    secret: "YOUR_APP_SECRET"
+    touser: "@all"
+    proxy_url: ""
+    report_url: "http://your-promai-host:8091"
+
+  feishu:
+    enabled: false
+    webhook: "https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_TOKEN"
+    secret: ""
+    report_url: "http://your-promai-host:8091"
+    timeout: 5
+    verify_sign: false
+
   email:
     enabled: false
-    smtp_host: "smtp.exmail.qq.com"  # 我这里用的是腾讯企业邮箱，需要改成自己的
+    smtp_host: "smtp.exmail.qq.com"
     smtp_port: 465
-    username: "demo@demo.cn"  # 填写自己的邮箱账号
-    password: "xxxxxxxxxxxxxxxxxxxx"  # 这里填写的是授权码
+    username: "demo@demo.cn"
+    password: "xxxxxxxxxxxxxxxxxxxx"  # 授权码
     from: "demo@demo.cn"
     to:
       - "demo@demo.cn"
@@ -158,13 +182,14 @@ metric_types:
         # 阈值配置
         threshold: 80
         threshold_type: "greater" # greater(>), less(<), equal(==), not_equal(!=)
+        threshold_status: "critical" # 触发阈值时的告警级别：critical / warning / normal
         unit: "%"
         labels:
           instance: "节点IP"
 ```
 
-** 特别注意 **
-资源使用概览部分必须按照现有配置文件中的进行定义，否则无法正常显示,因为代理里面定义了如下内容
+**特别注意**
+资源使用概览部分必须按照现有配置文件中的进行定义，否则无法正常显示，因为报告模板里面定义了如下内容
 
 ```html
     const cpuData = getHostMetricValues('CPU性能状态监控');
@@ -173,7 +198,7 @@ metric_types:
     const diskData = getDiskMetricValues('/home');
 ```
 
-因此必须要在配置文件包含以下内容才能出来图表
+因此必须在配置文件中包含以下内容才能正常显示图表
 
 ```yaml
     metrics:
@@ -238,7 +263,7 @@ PromAI 内置 Cron 调度器。根据 `config.yaml` 中的 `cron_schedule` 配�
 A: 修改 `config/config.yaml`，在 `metric_types` 中添加新的 `metrics` 项。你需要提供有效的 PromQL 查询语句和合理的阈值。
 
 **Q: 报告中的资源使用概览图表没有数据？**
-A: 请检查 `config.yaml` 中指标的 `metrics` 是否配置正确，以及 Prometheus 中是否有对应的历史数据。-name需要配置为
+A: 请检查 `config.yaml` 中指标的 `metrics` 是否配置正确，以及 Prometheus 中是否有对应的历史数据。`name` 需要配置为
 
 ```yaml
     metrics:

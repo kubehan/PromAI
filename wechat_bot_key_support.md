@@ -40,11 +40,11 @@ http://localhost:8091/api/promai/getreport?datasource=bruneihealth&taskid=test-1
    - 输入企业微信机器人key（可选）
 4. 点击"开始巡检"
 
-### 方式三：状态页面
+### 方式三：触发巡检时传入
 
 ```bash
-# 状态页面支持企业微信机器人参数
-http://localhost:8091/api/promai/status?wechat_bot_key=你的机器人key
+# 触发巡检时传入企业微信机器人参数
+http://localhost:8091/api/promai/getreport?wechat_bot_key=你的机器人key
 ```
 
 ## 参数说明
