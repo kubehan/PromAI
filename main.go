@@ -10,12 +10,16 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"PromAI/pkg/config"
+	"PromAI/pkg/database"
 	"PromAI/pkg/metrics"
 	"PromAI/pkg/notify"
 	"PromAI/pkg/prometheus"
@@ -43,6 +47,8 @@ func loadConfig(path string) (*config.Config, error) {
 	if envPrometheusURL := os.Getenv("PROMETHEUS_URL"); envPrometheusURL != "" {
 		log.Printf("使用环境变量中的 Prometheus URL: %s", envPrometheusURL)
 		config.PrometheusURL = envPrometheusURL
+		config.PrometheusUsername = os.Getenv("PROMETHEUS_USERNAME")
+		config.PrometheusPassword = os.Getenv("PROMETHEUS_PASSWORD")
 	} else {
 		log.Printf("使用配置文件中的 Prometheus URL: %s", config.PrometheusURL)
 	}
@@ -56,7 +62,7 @@ func setup(configPath string) (*prometheus.Client, *config.Config, error) {
 		return nil, nil, fmt.Errorf("loading config: %w", err)
 	}
 
-	client, err := prometheus.NewClient(config.PrometheusURL)
+	client, err := prometheus.NewClient(config.PrometheusURL, config.PrometheusUsername, config.PrometheusPassword)
 	if err != nil {
 		return nil, nil, fmt.Errorf("initializing Prometheus client: %w", err)
 	}
@@ -81,46 +87,37 @@ func main() {
 	// 设置全局端口
 	utils.SetGlobalPort(strings.TrimPrefix(*port, ":"))
 
-	// 设置 HTTP 路由
-	setupRoutes(collector, config)
-
-	// 如果配置了定时任务，启动定时执行
-	if config.CronSchedule != "" {
-		c := cron.New()
-		_, err := c.AddFunc(config.CronSchedule, func() {
-			log.Printf("开始执行定时巡检任务...")
-			data, err := collector.CollectMetrics()
-			if err != nil {
-				log.Printf("Error collecting metrics: %v", err)
-				return
-			}
-
-			reportFilePath, err := report.GenerateReport(*data)
-			if err != nil {
-				log.Printf("Error generating report: %v", err)
-				return
-			}
-
-			// 发送通知
-			sendNotifications(config, reportFilePath, data)
-			log.Printf("定时巡检任务完成，报告已生成: %s", reportFilePath)
-		})
-
-		if err != nil {
-			log.Printf("Failed to schedule cron job: %v", err)
-		} else {
-			c.Start()
-			log.Printf("定时任务已启动，执行周期: %s", config.CronSchedule)
-		}
+	// 初始化 SQLite 数据库
+	dbPath := "promai.db"
+	if envDB := os.Getenv("PROMAI_DB_PATH"); envDB != "" {
+		dbPath = envDB
 	}
+	if err := database.InitDB(dbPath); err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
+	}
+	// 从配置文件导入初始数据到数据库
+	if err := database.SeedFromConfig(config); err != nil {
+		log.Printf("Warning: failed to seed database: %v", err)
+	}
+
+	// 从数据库加载历史巡检快照到内存
+	loadLatestReports()
+
+	// 创建全局定时调度器
+	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
+
+	// 设置 HTTP 路由
+	setupRoutes(collector, config, globalScheduler)
+
+	// 启动全局定时调度器（从配置文件和数据库加载定时任务）
+	startGlobalScheduler(config, collector)
 
 	// 配置报告清理
 	if config.ReportCleanup.Enabled {
 		cleanupSchedule := config.ReportCleanup.CronSchedule
 		if cleanupSchedule == "" {
-			cleanupSchedule = "0 2 * * *" // 默认每天凌晨2点清理
+			cleanupSchedule = "0 2 * * *"
 		}
-
 		if cleanupSchedule != "" {
 			c := cron.New()
 			_, err := c.AddFunc(cleanupSchedule, func() {
@@ -130,7 +127,6 @@ func main() {
 				}
 				log.Printf("报告清理成功")
 			})
-
 			if err != nil {
 				log.Printf("设置清理定时任务失败: %v", err)
 			} else {
@@ -148,6 +144,7 @@ func main() {
 	log.Printf("")
 	log.Printf("访问地址:")
 	log.Printf("  首页: http://localhost%s/api/promai", *port)
+	log.Printf("  管理后台: http://localhost%s/api/promai/admin", *port)
 	log.Printf("  巡检进度: http://localhost%s/api/promai/progress", *port)
 	log.Printf("  历史报告: http://localhost%s/api/promai/reports/history", *port)
 	log.Printf("")
@@ -188,6 +185,12 @@ func main() {
 	if config.Notifications.WeChatWork.Enabled {
 		log.Printf("  企业微信: 已启用")
 	}
+	if config.Notifications.Feishu.Enabled {
+		log.Printf("  飞书通知: 已启用")
+	}
+	if config.Notifications.WeChatApp.Enabled {
+		log.Printf("  企业微信应用: 已启用")
+	}
 	log.Printf("==========================================")
 	log.Printf("服务器正在运行...")
 
@@ -196,8 +199,12 @@ func main() {
 	}
 }
 
+// 全局定时调度器，由 admin API 动态管理
+var globalScheduler *cron.Cron
+var cronTaskCounter int64
+
 // setupRoutes 设置 HTTP 路由
-func setupRoutes(collector *metrics.Collector, config *config.Config) {
+func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler *cron.Cron) {
 	// 设置首页路由
 	http.HandleFunc("/api/promai/", indexHandler)
 	http.HandleFunc("/api/promai/index", indexHandler)
@@ -227,6 +234,83 @@ func setupRoutes(collector *metrics.Collector, config *config.Config) {
 	http.HandleFunc("/api/promai/tasks", tasksHandler)
 	http.HandleFunc("/api/promai/tasks/", taskDetailHandler)
 
+	// 将首页替换为后台登录页面（前端 SPA）
+	if _, err := os.Stat("frontend/dist"); err == nil {
+		distDir := "frontend/dist"
+		http.Handle("/promai/assets/", http.StripPrefix("/promai/", http.FileServer(http.Dir(distDir))))
+		http.Handle("/promai/favicon.svg", http.StripPrefix("/promai/", http.FileServer(http.Dir(distDir))))
+		http.HandleFunc("/promai", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, distDir+"/index.html")
+		})
+		http.HandleFunc("/promai/", func(w http.ResponseWriter, r *http.Request) {
+			path := distDir + r.URL.Path[len("/promai/"):]
+			if _, err := os.Stat(path); err == nil {
+				http.ServeFile(w, r, path)
+			} else {
+				http.ServeFile(w, r, distDir+"/index.html")
+			}
+		})
+		log.Printf("  前端构建产物已加载 (frontend/dist)")
+	}
+
+	// 注册管理 API 路由
+	adminAPI := NewAdminAPI(collector, config, scheduler)
+	adminAPI.RegisterHandlers(http.DefaultServeMux)
+
+}
+
+// startGlobalScheduler 启动全局定时调度器
+func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
+	// 清除旧任务，防止泄漏
+	globalScheduler.Stop()
+	for globalScheduler.Entries() != nil {
+		globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
+		break
+	}
+
+	// 从数据库加载定时任务
+	var dbJobs []database.CronJob
+	database.DB.Where("enabled = ?", true).Find(&dbJobs)
+	for _, job := range dbJobs {
+		j := job
+		_, err := globalScheduler.AddFunc(j.Schedule, func() {
+			log.Printf("[Cron] 执行定时任务: %s", j.Name)
+			doInspection(config, collector, j)
+		})
+		if err != nil {
+			log.Printf("[Cron] 调度任务 %s 失败 (%s): %v", j.Name, j.Schedule, err)
+		} else {
+			log.Printf("[Cron] 已调度任务: %s (%s)", j.Name, j.Schedule)
+		}
+	}
+
+	// 保留原有配置文件的定时任务（兼容）
+	if config.CronSchedule != "" {
+		_, err := globalScheduler.AddFunc(config.CronSchedule, func() {
+			log.Printf("[Cron] 执行定时巡检任务(配置文件)...")
+			data, err := collector.CollectMetrics()
+			if err != nil {
+				log.Printf("[Cron] 收集指标失败: %v", err)
+				return
+			}
+			reportFilePath, err := report.GenerateReport(*data)
+			if err != nil {
+				log.Printf("[Cron] 生成报告失败: %v", err)
+				return
+			}
+			saveReportRecord(data, reportFilePath)
+			sendNotifications(config, reportFilePath, data)
+			log.Printf("[Cron] 定时巡检任务完成: %s", reportFilePath)
+		})
+		if err != nil {
+			log.Printf("[Cron] 调度配置文件任务失败: %v", err)
+		} else {
+			log.Printf("[Cron] 已调度配置文件任务: %s", config.CronSchedule)
+		}
+	}
+
+	globalScheduler.Start()
+	log.Printf("[Cron] 定时调度器已启动")
 }
 
 // executeInspectionWithProgress 带进度更新的巡检执行
@@ -259,6 +343,7 @@ func executeInspectionWithProgress(collector *metrics.Collector, config *config.
 		taskmanager.GlobalTaskManager.FailStep(taskID, "生成巡检报告", err.Error())
 		return nil, fmt.Errorf("generating report: %w", err)
 	}
+	data.ReportUrl = reportFilePath
 
 	// 完成任务
 	taskmanager.GlobalTaskManager.CompleteTask(taskID, reportFilePath)
@@ -284,6 +369,8 @@ func makeReportHandler(collector *metrics.Collector, config *config.Config) http
 		// 获取datasource参数 - 使用多种方法确保获取到正确的值
 		datasource := r.URL.Query().Get("datasource")
 		prometheusURL := ""
+		prometheusUsername := ""
+		prometheusPassword := ""
 
 		// 额外的调试信息
 		log.Printf("[DEBUG] 收到的完整查询参数RawQuery: %s", r.URL.RawQuery)
@@ -322,6 +409,8 @@ func makeReportHandler(collector *metrics.Collector, config *config.Config) http
 					log.Printf("[DEBUG] 检查数据源: %s -> %s", ds.Name, ds.URL)
 					if ds.Name == datasource {
 						prometheusURL = ds.URL
+						prometheusUsername = ds.UserName
+						prometheusPassword = ds.Password
 						log.Printf("[DEBUG] 找到匹配的数据源: %s -> %s", ds.Name, ds.URL)
 						break
 					}
@@ -356,7 +445,7 @@ func makeReportHandler(collector *metrics.Collector, config *config.Config) http
 		if datasource != "" {
 			// 创建新的Prometheus客户端
 			log.Printf("[DEBUG] 创建自定义Prometheus客户端，URL: %s", prometheusURL)
-			client, err := prometheus.NewClient(prometheusURL)
+			client, err := prometheus.NewClient(prometheusURL, prometheusUsername, prometheusPassword)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Failed to create Prometheus client for datasource '%s': %v", datasource, err), http.StatusInternalServerError)
 				return
@@ -380,12 +469,7 @@ func makeReportHandler(collector *metrics.Collector, config *config.Config) http
 			return
 		}
 
-		reportFilePath, err := report.GenerateReport(*data)
-		if err != nil {
-			http.Error(w, "Failed to generate report", http.StatusInternalServerError)
-			log.Printf("Error generating report: %v", err)
-			return
-		}
+		reportFilePath := data.ReportUrl
 
 		// 创建包含HTTP请求和报告数据的context，用于动态URL生成和分类汇总
 		ctx := context.WithValue(r.Context(), "http_request", r)
@@ -408,7 +492,63 @@ func makeReportHandler(collector *metrics.Collector, config *config.Config) http
 
 // sendNotifications 发送所有通知（兼容版本）
 func sendNotifications(config *config.Config, reportFilePath string, reportData *report.ReportData) {
-	sendNotificationsWithContext(context.Background(), config, reportFilePath, reportData)
+	// 创建包含报告数据的上下文
+	ctx := context.WithValue(context.Background(), "report_data", *reportData)
+	sendNotificationsWithContext(ctx, config, reportFilePath, reportData)
+}
+
+// sendJobNotifications sends notifications to the channels configured in a cron job
+func sendJobNotifications(job database.CronJob, reportFilePath string, reportData *report.ReportData) {
+	if job.NotifyChannels == "" {
+		return
+	}
+	var channelIDs []uint
+	if err := json.Unmarshal([]byte(job.NotifyChannels), &channelIDs); err != nil || len(channelIDs) == 0 {
+		return
+	}
+	var channels []database.NotificationChannel
+	database.DB.Where("id IN ? AND enabled = ?", channelIDs, true).Find(&channels)
+	if len(channels) == 0 {
+		return
+	}
+	alertSummary := notify.CalculateAlertSummary(*reportData)
+	for _, ch := range channels {
+		sendSingleNotification(ch, reportFilePath, reportData.Datasource, alertSummary, reportData)
+	}
+}
+
+func sendSingleNotification(ch database.NotificationChannel, reportFilePath, datasource string, summary notify.AlertSummary, reportData *report.ReportData) {
+	ctx := context.Background()
+	if reportData != nil {
+		ctx = context.WithValue(ctx, "report_data", *reportData)
+	}
+	switch ch.ChannelType {
+	case "dingtalk":
+		var cfg notify.DingtalkConfig
+		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
+			notify.SendDingtalkWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
+		}
+	case "email":
+		var cfg notify.EmailConfig
+		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
+			notify.SendEmailWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
+		}
+	case "wechat_work":
+		var cfg notify.WeChatWorkConfig
+		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
+			notify.SendWeChatWorkWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
+		}
+	case "wechat_app":
+		var cfg notify.WeChatAppConfig
+		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
+			notify.SendWeChatAppWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
+		}
+	case "feishu":
+		var cfg notify.FeishuConfig
+		if json.Unmarshal([]byte(ch.ConfigJSON), &cfg) == nil {
+			notify.SendFeishuWithContext(ctx, cfg, reportFilePath, "PromAI", datasource, summary)
+		}
+	}
 }
 
 // sendNotificationsWithContext 发送所有通知（支持动态URL）
@@ -436,6 +576,34 @@ func sendNotificationsWithContext(ctx context.Context, config *config.Config, re
 		log.Printf("发送企业微信消息")
 		if err := notify.SendWeChatWorkWithContext(ctx, config.Notifications.WeChatWork, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
 			log.Printf("发送企业微信消息失败: %v", err)
+		}
+	}
+
+	if config.Notifications.Feishu.Enabled {
+		log.Printf("发送飞书消息")
+		if err := notify.SendFeishuWithContext(ctx, config.Notifications.Feishu, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+			log.Printf("发送飞书消息失败: %v", err)
+		}
+	}
+
+	// 企业微信应用通知 - 支持动态touser参数
+	if config.Notifications.WeChatApp.Enabled {
+		log.Printf("发送企业微信应用消息")
+
+		// 创建配置副本，以便动态修改touser
+		appConfig := config.Notifications.WeChatApp
+
+		// 检查是否有动态传入的touser参数
+		if r, ok := ctx.Value("http_request").(*http.Request); ok {
+			dynamicToUser := r.URL.Query().Get("touser")
+			if dynamicToUser != "" {
+				log.Printf("[NOTIFICATION] 检测到动态touser参数: %s，将覆盖配置文件设置", dynamicToUser)
+				appConfig.ToUser = dynamicToUser
+			}
+		}
+
+		if err := notify.SendWeChatAppWithContext(ctx, appConfig, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+			log.Printf("发送企业微信应用消息失败: %v", err)
 		}
 	}
 
@@ -473,6 +641,8 @@ func makeStatusHandler(client metrics.PrometheusAPI, config *config.Config) http
 		// 获取datasource参数
 		datasource := r.URL.Query().Get("datasource")
 		prometheusURL := ""
+		prometheusUsername := ""
+		prometheusPassword := ""
 		var prometheusClient metrics.PrometheusAPI
 
 		if datasource != "" {
@@ -484,6 +654,8 @@ func makeStatusHandler(client metrics.PrometheusAPI, config *config.Config) http
 				for _, ds := range config.DataSources {
 					if ds.Name == datasource {
 						prometheusURL = ds.URL
+						prometheusUsername = ds.UserName
+						prometheusPassword = ds.Password
 						break
 					}
 				}
@@ -494,7 +666,7 @@ func makeStatusHandler(client metrics.PrometheusAPI, config *config.Config) http
 			}
 
 			// 创建新的Prometheus客户端
-			newClient, err := prometheus.NewClient(prometheusURL)
+			newClient, err := prometheus.NewClient(prometheusURL, prometheusUsername, prometheusPassword)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Failed to create Prometheus client for datasource '%s': %v", datasource, err), http.StatusInternalServerError)
 				return
@@ -539,18 +711,7 @@ func makeStatusHandler(client metrics.PrometheusAPI, config *config.Config) http
 
 // indexHandler 首页处理器
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("templates/index.html")
-	if err != nil {
-		http.Error(w, "Failed to parse template", http.StatusInternalServerError)
-		log.Printf("Error parsing index template: %v", err)
-		return
-	}
-
-	if err := tmpl.Execute(w, nil); err != nil {
-		http.Error(w, "Failed to render template", http.StatusInternalServerError)
-		log.Printf("Error rendering index template: %v", err)
-		return
-	}
+	http.Redirect(w, r, "/promai/", http.StatusFound)
 }
 
 // progressHandler 进度页面处理器
@@ -898,6 +1059,279 @@ func recentActivitiesHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(activities); err != nil {
 		log.Printf("Error encoding activities: %v", err)
 	}
+}
+
+// adminHandler 管理后台页面处理器
+func adminHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "templates/admin.html")
+}
+
+// doInspection 执行巡检并保存报告记录（并发执行所有数据源）
+func doInspection(cfg *config.Config, collector *metrics.Collector, job database.CronJob) {
+	dsIDs := resolveJobDatasourceIDs(job)
+	if len(dsIDs) == 0 {
+		doSingleInspection(cfg, collector, job, nil)
+		return
+	}
+
+	var mu sync.Mutex
+	var anySuccess bool
+	var wg sync.WaitGroup
+	for _, dsID := range dsIDs {
+		wg.Add(1)
+		id := dsID
+		go func() {
+			defer wg.Done()
+			if doSingleInspection(cfg, collector, job, &id) {
+				mu.Lock()
+				anySuccess = true
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+
+	status := "success"
+	if !anySuccess {
+		status = "failed"
+	}
+	database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": status})
+}
+
+// doSingleInspection 对单个数据源执行巡检，创建 InspectRecord 并保存报告
+func doSingleInspection(cfg *config.Config, collector *metrics.Collector, job database.CronJob, dsIDPtr *uint) bool {
+	taskID := fmt.Sprintf("cron_%d_%d_%d", job.ID, time.Now().Unix(), atomic.AddInt64(&cronTaskCounter, 1))
+
+	if dsIDPtr != nil {
+		dsID := *dsIDPtr
+		var ds database.DataSource
+		if database.DB.First(&ds, dsID).Error != nil {
+			log.Printf("[Cron] 数据源 %d 不存在", dsID)
+			database.DB.Create(&database.InspectRecord{
+				TaskID: taskID, Status: "failed",
+				DatasourceID: &dsID, DatasourceName: fmt.Sprintf("数据源 %d", dsID),
+				Message: "数据源不存在", Error: "数据源不存在",
+				StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+			})
+			return false
+		}
+
+		client, err := prometheus.NewClient(ds.URL, ds.Username, ds.Password)
+		if err != nil {
+			log.Printf("[Cron] 创建数据源 %s 客户端失败: %v", ds.Name, err)
+			database.DB.Create(&database.InspectRecord{
+				TaskID: taskID, Status: "failed", DatasourceID: &dsID,
+				DatasourceName: ds.Name, Message: "创建客户端失败", Error: err.Error(),
+				StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+			})
+			return false
+		}
+
+		// 先检查连通性，不可用则立即终止
+		hcCtx, hcCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		if err := client.HealthCheck(hcCtx); err != nil {
+			hcCancel()
+			log.Printf("[Cron] 数据源 %s 不可用: %v，跳过巡检", ds.Name, err)
+			database.DB.Create(&database.InspectRecord{
+				TaskID: taskID, Status: "failed", DatasourceID: &dsID,
+				DatasourceName: ds.Name, Message: "数据源不可用", Error: err.Error(),
+				StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+			})
+			return false
+		}
+		hcCancel()
+
+		activeCfg := cfg
+		if ds.TemplateID != nil {
+			var links []database.InspectionTemplateMetric
+			database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
+			if len(links) > 0 {
+				cfgIDs := make([]uint, len(links))
+				for i, l := range links {
+					cfgIDs[i] = l.MetricConfigID
+				}
+				var tmplConfigs []database.MetricConfig
+				database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
+				for i := range tmplConfigs {
+					var override database.TemplateMetricOverride
+					if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
+						override.Apply(&tmplConfigs[i])
+					}
+				}
+				if len(tmplConfigs) > 0 {
+					activeCfg = buildFilteredConfig(cfg, tmplConfigs)
+				}
+			}
+		}
+
+		database.DB.Create(&database.InspectRecord{
+			TaskID: taskID, Status: "running", DatasourceID: &dsID,
+			DatasourceName: ds.Name, Message: "正在执行巡检...",
+			StartedAt: time.Now(),
+		})
+
+		dsCollector := metrics.NewCollectorWithURL(client.API, activeCfg, ds.URL)
+		data, err := dsCollector.CollectMetrics()
+		if err != nil {
+			log.Printf("[Cron] 数据源 %s 收集指标失败: %v", ds.Name, err)
+			database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+				"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+			})
+			return false
+		}
+		data.Datasource = ds.URL
+		setLatestReport(data.Datasource, reportDataToHealth(data))
+
+		reportFilePath, err := report.GenerateReport(*data)
+		if err != nil {
+			log.Printf("[Cron] 数据源 %s 生成报告失败: %v", ds.Name, err)
+			database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+				"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+			})
+			return false
+		}
+		saveReportRecord(data, reportFilePath)
+		sendNotifications(cfg, reportFilePath, data)
+		sendJobNotifications(job, reportFilePath, data)
+		reportURL := "/api/promai/reports/" + filepath.Base(reportFilePath)
+		database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+			"status": "completed", "message": "巡检完成", "report_url": reportURL, "completed_at": time.Now(),
+		})
+		log.Printf("[Cron] 数据源 %s 巡检完成: %s", ds.Name, reportFilePath)
+		return true
+	}
+
+	// No datasource specified — use default collector
+	// 先检查默认数据源连通性
+	hcCtx, hcCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	client, err := prometheus.NewClient(cfg.PrometheusURL, cfg.PrometheusUsername, cfg.PrometheusPassword)
+	if err != nil {
+		hcCancel()
+		log.Printf("[Cron] 创建默认数据源客户端失败: %v", err)
+		database.DB.Create(&database.InspectRecord{
+			TaskID: taskID, Status: "failed",
+			DatasourceName: cfg.PrometheusURL, Message: "创建客户端失败", Error: err.Error(),
+			StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+		})
+		return false
+	}
+	if err := client.HealthCheck(hcCtx); err != nil {
+		hcCancel()
+		log.Printf("[Cron] 默认数据源 %s 不可用: %v，跳过巡检", cfg.PrometheusURL, err)
+		database.DB.Create(&database.InspectRecord{
+			TaskID: taskID, Status: "failed",
+			DatasourceName: cfg.PrometheusURL, Message: "数据源不可用", Error: err.Error(),
+			StartedAt: time.Now(), CompletedAt: &[]time.Time{time.Now()}[0],
+		})
+		return false
+	}
+	hcCancel()
+
+	database.DB.Create(&database.InspectRecord{
+		TaskID: taskID, Status: "running",
+		DatasourceName: cfg.PrometheusURL, Message: "正在执行巡检...",
+		StartedAt: time.Now(),
+	})
+	data, err := collector.CollectMetrics()
+	if err != nil {
+		log.Printf("[Cron] 收集指标失败: %v", err)
+		database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+			"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+		})
+		database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": "failed"})
+		return false
+	}
+	data.Datasource = cfg.PrometheusURL
+	setLatestReport(data.Datasource, reportDataToHealth(data))
+	reportFilePath, err := report.GenerateReport(*data)
+	if err != nil {
+		log.Printf("[Cron] 生成报告失败: %v", err)
+		database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+			"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+		})
+		return false
+	}
+	saveReportRecord(data, reportFilePath)
+	sendNotifications(cfg, reportFilePath, data)
+	sendJobNotifications(job, reportFilePath, data)
+	reportURL := "/api/promai/reports/" + filepath.Base(reportFilePath)
+	database.DB.Model(&database.InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]interface{}{
+		"status": "completed", "message": "巡检完成", "report_url": reportURL, "completed_at": time.Now(),
+	})
+	database.DB.Model(&job).Updates(map[string]interface{}{"last_run_at": time.Now(), "last_status": "success"})
+	log.Printf("[Cron] 定时任务 %s 完成: %s", job.Name, reportFilePath)
+	return true
+}
+
+func resolveJobDatasourceIDs(job database.CronJob) []uint {
+	if job.AllDatasources {
+		var dsList []database.DataSource
+		database.DB.Where("enabled = ?", true).Find(&dsList)
+		ids := make([]uint, len(dsList))
+		for i, ds := range dsList {
+			ids[i] = ds.ID
+		}
+		return ids
+	}
+	if job.DatasourceIDs != "" {
+		var ids []uint
+		if err := json.Unmarshal([]byte(job.DatasourceIDs), &ids); err == nil && len(ids) > 0 {
+			return ids
+		}
+	}
+	if job.DatasourceID != nil {
+		return []uint{*job.DatasourceID}
+	}
+	return nil
+}
+
+// saveReportRecord 保存报告记录到数据库
+func saveReportRecord(data *report.ReportData, reportPath string) {
+	alertCount := 0
+	criticalCount := 0
+	warningCount := 0
+	totalMetrics := 0
+	hasCritical := false
+	hasWarning := false
+
+	for _, group := range data.MetricGroups {
+		for _, metrics := range group.MetricsByName {
+			for _, m := range metrics {
+				totalMetrics++
+				switch m.Status {
+				case "critical":
+					criticalCount++
+					alertCount++
+					hasCritical = true
+				case "warning":
+					warningCount++
+					alertCount++
+					hasWarning = true
+				}
+			}
+		}
+	}
+
+	status := "success"
+	if hasCritical {
+		status = "danger"
+	} else if hasWarning {
+		status = "warning"
+	}
+
+	info, _ := os.Stat(reportPath)
+	database.DB.Create(&database.ReportRecord{
+		Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
+		DatasourceName: data.Datasource,
+		FilePath:       reportPath,
+		FileSize:       func() int64 { if info != nil { return info.Size() }; return 0 }(),
+		TotalMetrics:   totalMetrics,
+		AlertCount:     alertCount,
+		CriticalCount:  criticalCount,
+		WarningCount:   warningCount,
+		Status:         status,
+		MetricsJSON:    buildHealthSnapshot(data),
+	})
 }
 
 // tasksHandler 处理任务列表API

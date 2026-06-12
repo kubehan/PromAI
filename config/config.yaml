@@ -1,11 +1,19 @@
-## 使用K8s部署时候将该文件创建为configmap，然后挂载到容器中
-# PromAI配置文件
 prometheus_url: "http://prometheus-k8s.monitoring.svc.cluster.local:9090"
+prometheus_username: "admin"  # 无鉴权可不填
+prometheus_password: "admin"  # 无鉴权可不填
+
+# 管理后台登录认证
+auth:
+  username: "admin"
+  password: "promai2024"
+  jwt_secret: "promai-jwt-secret-change-in-production"
 
 # 多数据源配置
 data_sources:
   - name: "cluster1"
     url: "http://prometheus.k8s.monitoring.kubehan.cn"
+    username: ""
+    password: ""
   - name: "cluster2"
     url: "http://prometheus.monitoring.kubehan.cn"
   - name: "test-cluster"
@@ -49,7 +57,22 @@ notifications:
     webhook: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=0c4ef257-a6f0-430c-b454-d2b82bbd6e53"  # 企业微信机器人webhook地址
     proxy_url: ""  # HTTP代理地址，例如: http://proxy.example.com:8080 或 socks5://proxy.example.com:1080
     report_url: "https://alert.intra.kubehan.cn"  # 报告访问地址
-
+  wechat_app:
+    enabled: false  # 是否启用企业微信应用通知
+    corpid: "xxxxxxxx"  # 企业ID
+    agentid: 1000009  # 应用AgentID
+    secret: "xxxxxxxxxxxxxxxxxxxx"  # 应用Secret
+    touser: "@all"  # 接收人企业微信ID，多个用|分隔，如"user1|user2|user3"，默认"@all"发送给所有人
+    proxy_url: ""  # HTTP代理地址
+    report_url: "https://alert.kubehan.cn"  # 报告访问地址
+  feishu:
+    enabled: false  # 是否启用飞书通知
+    webhook: "https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxxxxxxxxxxxxxx"  # 飞书机器人webhook地址
+    secret: ""  # 飞书机器人签名密钥（可选）
+    report_url: "https://your-report-server.com:8091"  # 报告访问地址（添加端口以匹配服务器配置）
+    timeout: 5  # 请求超时时间（秒）
+    verify_sign: false  # 是否启用签名校验
+    
 metric_types:
   - type: "L1-基础设施层：硬件设备监控"
     metrics:
@@ -931,7 +954,7 @@ metric_types:
 
   - type: "L7-采集层：监控数据采集状态"
     metrics:
-      - name: "大数据服务监控数据采集状态监控-已排除"
+      - name: "监控数据采集状态监控"
         description: "Exporter数据采集服务状态监控"
         query: >-
            up{job!~"hive.*|hadoop.*|hbase.*|spark.*|yarn.*|.*kafka.*"} 

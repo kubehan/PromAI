@@ -26,16 +26,17 @@ type GroupStats struct {
 	TotalCount    int // 总指标数
 }
 type MetricData struct {
-	Instance    string
-	Name        string
-	Description string
-	Value       float64
-	Threshold   float64
-	Unit        string
-	Status      string
-	StatusText  string
-	Timestamp   time.Time
-	Labels      []LabelData // 改用结构化的标签数据
+	Instance      string
+	Name          string
+	Description   string
+	Value         float64
+	Threshold     float64
+	ThresholdType string
+	Unit          string
+	Status        string
+	StatusText    string
+	Timestamp     time.Time
+	Labels        []LabelData // 改用结构化的标签数据
 }
 
 type MetricGroup struct {
@@ -49,6 +50,7 @@ type ReportData struct {
 	ChartData    map[string]template.JS
 	Project      string
 	Datasource   string
+	ReportUrl    string
 }
 
 func GetStatusText(status string) string {

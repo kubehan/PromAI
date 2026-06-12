@@ -1,0 +1,15 @@
+*.db
+*.db-journal
+promai
+promai-test
+promai.db
+promai-test.db
+reports
+.agent
+.idea
+.vscode
+frontend/node_modules
+frontend/dist
+*.log
+.DS_Store.playwright-cli/
+.playwright-cli/

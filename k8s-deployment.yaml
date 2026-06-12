@@ -24,6 +24,10 @@ spec:
         env:
         - name: PROMETHEUS_URL
           value: "http://prometheus.kubehan.cn"
+        - name: PROMETHEUS_USERNAME
+          value: "admin"
+        - name: PROMETHEUS_PASSWORD
+          value: "admin"
         volumeMounts:
         - name: config
           mountPath: /app/config
@@ -36,13 +40,13 @@ spec:
             cpu: "100m"
         livenessProbe:
           httpGet:
-            path: /api/promai/status
+            path: /api/promai
             port: 8091
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /api/promai/status
+            path: /api/promai
             port: 8091
           initialDelaySeconds: 5
           periodSeconds: 5

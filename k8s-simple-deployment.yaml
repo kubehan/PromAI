@@ -28,6 +28,10 @@ spec:
         env:
         - name: PROMETHEUS_URL
           value: "http://prometheus.k8s.bruneihealth.kubehan.cn"
+        - name: PROMETHEUS_USERNAME
+          value: "admin"
+        - name: PROMETHEUS_PASSWORD
+          value: "admin"
         volumeMounts:
         - name: config
           mountPath: /app/config
