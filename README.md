@@ -7,13 +7,13 @@
 基于 Prometheus 的监控巡检工具，支持自动采集指标、生成可视化 HTML 报告，并提供 **Web 管理后台**（SQLite 持久化）进行数据源、指标、模板、定时任务、通知渠道的全生命周期管理。
 
 ## 效果展示
-![xx](images/image%20copy%202.png)
-![xx](images/image%20copy%203.png)
-![xx](images/image%20copy%204.png)
-![xx](images/image%20copy%205.png)
-![xx](images/image%20copy%206.png)
-![xx](images/image%20copy%207.png)
-![xx](images/image%20copy.png)
+![xx](images/screenshot-02.png)
+![xx](images/screenshot-03.png)
+![xx](images/screenshot-04.png)
+![xx](images/screenshot-05.png)
+![xx](images/screenshot-06.png)
+![xx](images/screenshot-07.png)
+![xx](images/screenshot-01.png)
 ![xx](images/image.png)
 ![xx](images/image2.png)
 ## 快速开始
