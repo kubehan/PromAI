@@ -8,6 +8,22 @@ type AuthConfig struct {
 	JWTSecret  string `yaml:"jwt_secret"`
 }
 
+type AIConfig struct {
+	Enabled      bool             `yaml:"enabled"`
+	DefaultModel string           `yaml:"default_model"`
+	Models       []AIModelConfig  `yaml:"models"`
+}
+
+type AIModelConfig struct {
+	Name          string `yaml:"name" json:"name"`
+	Provider      string `yaml:"provider" json:"provider"`
+	Model         string `yaml:"model" json:"model"`
+	BaseURL       string `yaml:"base_url" json:"base_url"`
+	APIKey        string `yaml:"api_key" json:"api_key,omitempty"`
+	ThinkingLevel string `yaml:"thinking_level" json:"thinking_level"`
+	MaxTokens     int    `yaml:"max_tokens" json:"max_tokens"`
+}
+
 type Config struct {
 	PrometheusURL      string       `yaml:"prometheus_url"`
 	PrometheusUsername string       `yaml:"prometheus_username"`
@@ -29,7 +45,8 @@ type Config struct {
 		WeChatApp  notify.WeChatAppConfig  `yaml:"wechat_app"`
 		Feishu     notify.FeishuConfig     `yaml:"feishu"`
 	} `yaml:"notifications"`
-	Port string `yaml:"port"`
+	Port string   `yaml:"port"`
+	AI   AIConfig `yaml:"ai"`
 }
 
 type DataSource struct {

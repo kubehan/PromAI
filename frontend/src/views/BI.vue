@@ -42,7 +42,7 @@
       <!-- Datasource health donut -->
       <grid-item :x="item('donut').x" :y="item('donut').y" :w="item('donut').w" :h="item('donut').h" i="donut"
         drag-allow-from=".stat-card">
-        <div class="stat-card" style="border-left-color: #00d4ff;">
+        <div class="stat-card" style="  border-left-color: var(--cyan);">
           <div class="stat-title">数据源分布</div>
           <div ref="dsDonutRef" style="flex: 1; min-height: 0; width: 100%;"></div>
         </div>
@@ -56,13 +56,13 @@
             <h3>
               <el-icon :size="16" color="#ef4444"><WarningFilled /></el-icon>
               <span style="color: #ef4444;">异常指标</span>
-              <el-tag size="small" style="margin-left: 8px; background: rgba(239,68,68,0.15); color: #ef4444; border: none;" v-if="abnormalMetrics.length > 0">{{ abnormalMetrics.length }} 项</el-tag>
+              <el-tag size="small" style="margin-left: 10px; background: rgba(239,68,68,0.15); color: #ef4444; border: none;" v-if="abnormalMetrics.length > 0">{{ abnormalMetrics.length }} 项</el-tag>
             </h3>
-            <div style="display: flex; gap: 8px; align-items: center;" v-if="abnormalMetrics.length > 0">
-              <el-select v-model="abnormalStatusFilter" placeholder="状态" size="small" style="width: 90px;" clearable>
+            <div style="display: flex; gap: 10px; align-items: center;" v-if="abnormalMetrics.length > 0">
+              <el-select v-model="abnormalStatusFilter" placeholder="状态" size="small" style="width: 60px;" clearable>
                 <el-option label="严重" value="critical" /><el-option label="告警" value="warning" />
               </el-select>
-              <el-select v-model="abnormalTypeFilter" placeholder="类型" size="small" style="width: 120px;" clearable>
+              <el-select v-model="abnormalTypeFilter" placeholder="类型" size="small" style="width: 100px;" clearable>
                 <el-option v-for="t in typeOptions" :key="t" :label="t" :value="t" />
               </el-select>
               <el-input v-model="abnormalSearch" placeholder="搜索" size="small" style="width: 140px;" clearable />
@@ -90,7 +90,7 @@
         drag-allow-from=".grid-drag-handle">
         <div class="section-card h-full">
           <div class="section-header grid-drag-handle" style="cursor: grab;">
-            <h3><el-icon :size="16" color="#00d4ff"><PieChart /></el-icon> 指标状态分布</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--cyan')"><PieChart /></el-icon> 指标状态分布</h3>
           </div>
           <div ref="pieChartRef" style="flex: 1; min-height: 0;"></div>
         </div>
@@ -113,7 +113,7 @@
         drag-allow-from=".grid-drag-handle">
         <div class="section-card h-full">
           <div class="section-header grid-drag-handle" style="cursor: grab;">
-            <h3><el-icon :size="16" color="#00d4ff"><Histogram /></el-icon> 健康分分布</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--cyan')"><Histogram /></el-icon> 健康分分布</h3>
             <span style="color: var(--text-tertiary); font-size: 11px;">数据源维度</span>
           </div>
           <div ref="distChartRef" style="flex: 1; min-height: 0;"></div>
@@ -125,7 +125,7 @@
         drag-allow-from=".grid-drag-handle">
         <div class="section-card h-full">
           <div class="section-header grid-drag-handle" style="cursor: grab;">
-            <h3><el-icon :size="16" color="#00d4ff"><TrendCharts /></el-icon> 异常趋势（近 {{ trendDays }} 天）</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--cyan')"><TrendCharts /></el-icon> 异常趋势（近 {{ trendDays }} 天）</h3>
             <el-radio-group v-model="trendDays" size="small" @change="fetchTrend">
               <el-radio-button :value="7">7天</el-radio-button>
               <el-radio-button :value="14">14天</el-radio-button>
@@ -141,7 +141,7 @@
         drag-allow-from=".grid-drag-handle">
         <div class="section-card h-full">
           <div class="section-header grid-drag-handle" style="cursor: grab;">
-            <h3><el-icon :size="16" color="#00d4ff"><Connection /></el-icon> 数据源健康</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--cyan')"><Connection /></el-icon> 数据源健康</h3>
             <div style="display: flex; gap: 8px; align-items: center;">
               <el-input v-model="dsSearch" placeholder="搜索" size="small" style="width: 160px;" clearable />
               <span style="color: var(--text-tertiary); font-size: 12px;">{{ filteredDatasources.length }} 个</span>
@@ -185,7 +185,7 @@
         drag-allow-from=".grid-drag-handle">
         <div class="section-card h-full">
           <div class="section-header grid-drag-handle" style="cursor: grab;">
-            <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> <span v-if="expandedDS">{{ expandedDS.datasource.name }} - </span>指标明细</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> <span v-if="expandedDS">{{ expandedDS.datasource.name }} - </span>指标明细</h3>
             <div style="display: flex; gap: 8px;" v-if="expandedDS">
               <el-button size="small" text @click="exportDetailCSV" style="color: var(--cyan);">导出CSV</el-button>
               <el-button size="small" text @click="expandedDS = null" style="color: var(--text-tertiary);">收起</el-button>
@@ -236,6 +236,10 @@ import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { getAllDataSources, getDashboardHealth, getDashboardHealthTrend } from '../api'
 import type { DataSource } from '../types'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 const loading = ref(false)
 const allDatasources = ref<DataSource[]>([])
@@ -315,11 +319,11 @@ const dsHealthCounts = computed(() => {
 })
 
 const overviewStats = computed(() => [
-  { label: '健康分', value: overallHealth.value.toFixed(1) + '%', icon: 'DataAnalysis', color: overallHealth.value >= 90 ? '#10b981' : overallHealth.value >= 70 ? '#f59e0b' : '#ef4444', bg: 'rgba(0,212,255,0.08)' },
-  { label: '数据源', value: totalDatasources.value, icon: 'Connection', color: '#00d4ff', bg: 'rgba(0,212,255,0.08)' },
-  { label: '正常指标', value: summary.value.normal_total, icon: 'Check', color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
-  { label: '告警指标', value: summary.value.warning_total, icon: 'WarningFilled', color: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-  { label: '严重指标', value: summary.value.critical_total, icon: 'CircleCloseFilled', color: '#ef4444', bg: 'rgba(239,68,68,0.08)' },
+  { label: '健康分', value: overallHealth.value.toFixed(1) + '%', icon: 'DataAnalysis', color: overallHealth.value >= 90 ? getCssVar('--emerald') : overallHealth.value >= 70 ? getCssVar('--amber') : getCssVar('--red'), bg: getCssVar('--cyan-dim') },
+  { label: '数据源', value: totalDatasources.value, icon: 'Connection', color: getCssVar('--cyan'), bg: getCssVar('--cyan-dim') },
+  { label: '正常指标', value: summary.value.normal_total, icon: 'Check', color: getCssVar('--emerald'), bg: getCssVar('--emerald-dim') },
+  { label: '告警指标', value: summary.value.warning_total, icon: 'WarningFilled', color: getCssVar('--amber'), bg: getCssVar('--amber-dim') },
+  { label: '严重指标', value: summary.value.critical_total, icon: 'CircleCloseFilled', color: getCssVar('--red'), bg: getCssVar('--red-dim') },
 ])
 
 const summary = computed(() => {
@@ -443,16 +447,34 @@ function downloadCSV(rows: string[][], filename: string) {
   document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
 }
 
+function getChartTheme() {
+  return {
+    textPrimary: getCssVar('--text-primary'),
+    textSecondary: getCssVar('--text-secondary'),
+    textTertiary: getCssVar('--text-tertiary'),
+    bgCard: getCssVar('--bg-card'),
+    bgElevated: getCssVar('--bg-elevated'),
+    bgPrimary: getCssVar('--bg-primary'),
+    border: getCssVar('--border'),
+    cyan: getCssVar('--cyan'),
+    emerald: getCssVar('--emerald'),
+    amber: getCssVar('--amber'),
+    red: getCssVar('--red'),
+    purple: getCssVar('--purple'),
+  }
+}
+
 function renderCharts() {
   nextTick(() => {
+    const t = getChartTheme()
     if (dsDonutRef.value) {
       if (!dsDonutChart) dsDonutChart = echarts.init(dsDonutRef.value)
       const { healthy, warning, critical } = dsHealthCounts.value
       const total = healthy + warning + critical
       dsDonutChart.setOption({
         backgroundColor: 'transparent',
-        tooltip: { trigger: 'item', textStyle: { color: '#f1f5f9' }, backgroundColor: 'rgba(17,24,39,0.95)', borderColor: 'rgba(56,189,248,0.2)' },
-        series: [{ type: 'pie', radius: ['45%', '70%'], center: ['50%', '50%'], avoidLabelOverlap: true, padAngle: 2, itemStyle: { borderRadius: 6, borderColor: 'rgba(8,12,24,0.8)', borderWidth: 2 }, label: { color: '#94a3b8', fontSize: 11, formatter: (p: any) => `${p.name}\n${p.value}` }, labelLine: { lineStyle: { color: 'rgba(148,163,184,0.3)' } }, data: [{ value: healthy, name: '健康', itemStyle: { color: '#10b981', shadowBlur: 10, shadowColor: 'rgba(16,185,129,0.3)' } }, { value: warning, name: '告警', itemStyle: { color: '#f59e0b', shadowBlur: 10, shadowColor: 'rgba(245,158,11,0.3)' } }, { value: critical, name: '严重', itemStyle: { color: '#ef4444', shadowBlur: 10, shadowColor: 'rgba(239,68,68,0.3)' } }].filter(d => d.value > 0) }],
+        tooltip: { trigger: 'item', textStyle: { color: t.textPrimary }, backgroundColor: t.bgCard, borderColor: t.border },
+        series: [{ type: 'pie', radius: ['45%', '70%'], center: ['50%', '50%'], avoidLabelOverlap: true, padAngle: 2, itemStyle: { borderRadius: 6, borderColor: t.bgPrimary || 'transparent', borderWidth: 2 }, label: { color: t.textSecondary, fontSize: 11, formatter: (p: any) => `${p.name}\n${p.value}` }, labelLine: { lineStyle: { color: t.textTertiary } }, data: [{ value: healthy, name: '健康', itemStyle: { color: t.emerald, shadowBlur: 10, shadowColor: 'rgba(16,185,129,0.3)' } }, { value: warning, name: '告警', itemStyle: { color: t.amber, shadowBlur: 10, shadowColor: 'rgba(245,158,11,0.3)' } }, { value: critical, name: '严重', itemStyle: { color: t.red, shadowBlur: 10, shadowColor: 'rgba(239,68,68,0.3)' } }].filter(d => d.value > 0) }],
       })
     }
 
@@ -460,8 +482,8 @@ function renderCharts() {
       if (!pieChart) pieChart = echarts.init(pieChartRef.value)
       pieChart.setOption({
         backgroundColor: 'transparent',
-        tooltip: { trigger: 'item', textStyle: { color: '#f1f5f9' }, backgroundColor: 'rgba(17,24,39,0.95)', borderColor: 'rgba(56,189,248,0.2)' },
-        series: [{ type: 'pie', radius: ['45%', '70%'], center: ['50%', '50%'], avoidLabelOverlap: true, padAngle: 2, itemStyle: { borderRadius: 6, borderColor: 'rgba(8,12,24,0.8)', borderWidth: 2 }, label: { color: '#94a3b8', fontSize: 11 }, labelLine: { lineStyle: { color: 'rgba(148,163,184,0.3)' } }, data: [{ value: summary.value.normal_total, name: '正常', itemStyle: { color: '#10b981', shadowBlur: 10, shadowColor: 'rgba(16,185,129,0.3)' } }, { value: summary.value.warning_total, name: '告警', itemStyle: { color: '#f59e0b', shadowBlur: 10, shadowColor: 'rgba(245,158,11,0.3)' } }, { value: summary.value.critical_total, name: '严重', itemStyle: { color: '#ef4444', shadowBlur: 10, shadowColor: 'rgba(239,68,68,0.3)' } }].filter(d => d.value > 0) }],
+        tooltip: { trigger: 'item', textStyle: { color: t.textPrimary }, backgroundColor: t.bgCard, borderColor: t.border },
+        series: [{ type: 'pie', radius: ['45%', '70%'], center: ['50%', '50%'], avoidLabelOverlap: true, padAngle: 2, itemStyle: { borderRadius: 6, borderColor: t.bgPrimary || 'transparent', borderWidth: 2 }, label: { color: t.textSecondary, fontSize: 11 }, labelLine: { lineStyle: { color: t.textTertiary } }, data: [{ value: summary.value.normal_total, name: '正常', itemStyle: { color: t.emerald, shadowBlur: 10, shadowColor: 'rgba(16,185,129,0.3)' } }, { value: summary.value.warning_total, name: '告警', itemStyle: { color: t.amber, shadowBlur: 10, shadowColor: 'rgba(245,158,11,0.3)' } }, { value: summary.value.critical_total, name: '严重', itemStyle: { color: t.red, shadowBlur: 10, shadowColor: 'rgba(239,68,68,0.3)' } }].filter(d => d.value > 0) }],
       })
     }
 
@@ -470,12 +492,12 @@ function renderCharts() {
       const top = (typeAlerts.value || []).slice(0, 15)
       typeBarChart.setOption({
         backgroundColor: 'transparent',
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, textStyle: { color: '#f1f5f9' }, backgroundColor: 'rgba(17,24,39,0.95)', borderColor: 'rgba(56,189,248,0.2)' },
-        legend: { data: ['严重', '告警'], textStyle: { color: '#94a3b8', fontSize: 11 }, top: 0, right: 0 },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, textStyle: { color: t.textPrimary }, backgroundColor: t.bgCard, borderColor: t.border },
+        legend: { data: ['严重', '告警'], textStyle: { color: t.textSecondary, fontSize: 11 }, top: 0, right: 0 },
         grid: { left: '3%', right: '4%', bottom: '8%', top: '20%', containLabel: true },
-        xAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(56,189,248,0.06)', type: 'dashed' } }, axisLabel: { color: '#94a3b8', fontSize: 10 } },
-        yAxis: { type: 'category', data: top.map((t: any) => t.type_name), axisLabel: { color: '#94a3b8', fontSize: 10 }, axisLine: { lineStyle: { color: 'rgba(56,189,248,0.1)' } }, axisTick: { show: false } },
-        series: [{ name: '严重', type: 'bar', stack: 'total', barWidth: 14, itemStyle: { color: '#ef4444' }, data: top.map((t: any) => t.critical_count) }, { name: '告警', type: 'bar', stack: 'total', barWidth: 14, itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] }, data: top.map((t: any) => t.warning_count) }],
+        xAxis: { type: 'value', splitLine: { lineStyle: { color: t.border, type: 'dashed' } }, axisLabel: { color: t.textSecondary, fontSize: 10 } },
+        yAxis: { type: 'category', data: top.map((t: any) => t.type_name), axisLabel: { color: t.textSecondary, fontSize: 10 }, axisLine: { lineStyle: { color: t.border } }, axisTick: { show: false } },
+        series: [{ name: '严重', type: 'bar', stack: 'total', barWidth: 14, itemStyle: { color: t.red }, data: top.map((t: any) => t.critical_count) }, { name: '告警', type: 'bar', stack: 'total', barWidth: 14, itemStyle: { color: t.amber, borderRadius: [0, 4, 4, 0] }, data: top.map((t: any) => t.warning_count) }],
       })
     }
 
@@ -484,11 +506,11 @@ function renderCharts() {
       const dist = healthDistribution.value || []
       distChart.setOption({
         backgroundColor: 'transparent',
-        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (params: any) => { const p = params[0]; const d = dist[p.dataIndex]; return `${d.range} 分<br/>数据源: ${d.count} 个<br/>占比: ${d.pct?.toFixed(1) || 0}%` }, textStyle: { color: '#f1f5f9' }, backgroundColor: 'rgba(17,24,39,0.95)', borderColor: 'rgba(56,189,248,0.2)' },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (params: any) => { const p = params[0]; const d = dist[p.dataIndex]; return `${d.range} 分<br/>数据源: ${d.count} 个<br/>占比: ${d.pct?.toFixed(1) || 0}%` }, textStyle: { color: t.textPrimary }, backgroundColor: t.bgCard, borderColor: t.border },
         grid: { left: '3%', right: '4%', bottom: '10%', top: '15%', containLabel: true },
-        xAxis: { type: 'category', data: dist.map((d: any) => d.range), axisLabel: { color: '#94a3b8', fontSize: 11 }, axisLine: { lineStyle: { color: 'rgba(56,189,248,0.1)' } }, axisTick: { show: false } },
-        yAxis: { type: 'value', min: 0, splitLine: { lineStyle: { color: 'rgba(56,189,248,0.06)', type: 'dashed' } }, axisLabel: { color: '#94a3b8', fontSize: 10 } },
-        series: [{ type: 'bar', barWidth: 30, borderRadius: [6, 6, 0, 0], label: { show: true, position: 'top', color: '#94a3b8', fontSize: 11, fontWeight: 600 }, data: dist.map((d: any, i: number) => ({ value: d.count, itemStyle: { color: ['#ef4444', '#fb923c', '#f59e0b', '#34d399', '#10b981'][i], shadowBlur: 8, shadowColor: [, 'rgba(239,68,68,0.3)', 'rgba(251,146,60,0.3)', 'rgba(245,158,11,0.3)', 'rgba(52,211,153,0.3)', 'rgba(16,185,129,0.3)'][i] } })) }],
+        xAxis: { type: 'category', data: dist.map((d: any) => d.range), axisLabel: { color: t.textSecondary, fontSize: 11 }, axisLine: { lineStyle: { color: t.border } }, axisTick: { show: false } },
+        yAxis: { type: 'value', min: 0, splitLine: { lineStyle: { color: t.border, type: 'dashed' } }, axisLabel: { color: t.textSecondary, fontSize: 10 } },
+        series: [{ type: 'bar', barWidth: 30, borderRadius: [6, 6, 0, 0], label: { show: true, position: 'top', color: t.textSecondary, fontSize: 11, fontWeight: 600 }, data: dist.map((d: any, i: number) => ({ value: d.count, itemStyle: { color: [t.red, '#fb923c', t.amber, '#34d399', t.emerald][i], shadowBlur: 8, shadowColor: [,, 'rgba(239,68,68,0.3)', 'rgba(251,146,60,0.3)', 'rgba(245,158,11,0.3)', 'rgba(52,211,153,0.3)', 'rgba(16,185,129,0.3)'][i] } })) }],
       })
     }
   })
@@ -498,16 +520,17 @@ function renderTrendChart(trend: any[]) {
   nextTick(() => {
     if (!trendChartRef.value) return
     if (!trendChart) trendChart = echarts.init(trendChartRef.value)
+    const t = getChartTheme()
     trendChart.setOption({
       backgroundColor: 'transparent',
-      tooltip: { trigger: 'axis', textStyle: { color: '#f1f5f9' }, backgroundColor: 'rgba(17,24,39,0.95)', borderColor: 'rgba(56,189,248,0.2)' },
-      legend: { data: ['严重', '告警'], textStyle: { color: '#94a3b8', fontSize: 12 }, top: 0, right: 0 },
+      tooltip: { trigger: 'axis', textStyle: { color: t.textPrimary }, backgroundColor: t.bgCard, borderColor: t.border },
+      legend: { data: ['严重', '告警'], textStyle: { color: t.textSecondary, fontSize: 12 }, top: 0, right: 0 },
       grid: { left: '3%', right: '4%', bottom: '8%', top: '20%', containLabel: true },
-      xAxis: { type: 'category', data: trend.map((d: any) => d.date), boundaryGap: false, axisLabel: { color: '#94a3b8', fontSize: 11 }, axisLine: { lineStyle: { color: 'rgba(56,189,248,0.1)' } }, axisTick: { show: false } },
-      yAxis: { type: 'value', min: 0, splitLine: { lineStyle: { color: 'rgba(56,189,248,0.06)', type: 'dashed' } }, axisLabel: { color: '#94a3b8', fontSize: 11 } },
+      xAxis: { type: 'category', data: trend.map((d: any) => d.date), boundaryGap: false, axisLabel: { color: t.textSecondary, fontSize: 11 }, axisLine: { lineStyle: { color: t.border } }, axisTick: { show: false } },
+      yAxis: { type: 'value', min: 0, splitLine: { lineStyle: { color: t.border, type: 'dashed' } }, axisLabel: { color: t.textSecondary, fontSize: 11 } },
       series: [
-        { name: '严重', type: 'line', smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: { color: '#ef4444', width: 2 }, itemStyle: { color: '#ef4444' }, areaStyle: { color: 'rgba(239,68,68,0.1)' }, data: trend.map((d: any) => d.critical) },
-        { name: '告警', type: 'line', smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: { color: '#f59e0b', width: 2 }, itemStyle: { color: '#f59e0b' }, areaStyle: { color: 'rgba(245,158,11,0.1)' }, data: trend.map((d: any) => d.warning) },
+        { name: '严重', type: 'line', smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: { color: t.red, width: 2 }, itemStyle: { color: t.red }, areaStyle: { color: 'rgba(239,68,68,0.1)' }, data: trend.map((d: any) => d.critical) },
+        { name: '告警', type: 'line', smooth: true, symbol: 'circle', symbolSize: 5, lineStyle: { color: t.amber, width: 2 }, itemStyle: { color: t.amber }, areaStyle: { color: 'rgba(245,158,11,0.1)' }, data: trend.map((d: any) => d.warning) },
       ],
     })
   })
@@ -551,7 +574,7 @@ onUnmounted(() => {
 
 .stat-card {
   height: 100%;
-  background: var(--card-bg);
+  background: var(--bg-card);
   border-radius: 10px;
   border-left: 3px solid var(--cyan);
   padding: 10px 12px 12px;
@@ -562,7 +585,7 @@ onUnmounted(() => {
 }
 .stat-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  box-shadow: var(--shadow-card);
 }
 .stat-title {
   font-size: 11px;
@@ -570,7 +593,7 @@ onUnmounted(() => {
   color: var(--text-primary);
   padding-bottom: 6px;
   margin-bottom: 4px;
-  border-bottom: 1px solid rgba(56,189,248,0.07);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 .stat-card-body {

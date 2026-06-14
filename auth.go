@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -21,7 +22,12 @@ func generateToken(username, secret string) (string, error) {
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	signed, err := token.SignedString([]byte(secret))
+	if err != nil {
+		log.Printf("[Auth] 生成 Token 失败: %v", err)
+		return "", err
+	}
+	return signed, nil
 }
 
 func validateToken(tokenString, secret string) (*Claims, error) {

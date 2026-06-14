@@ -81,8 +81,8 @@ async function handleLogin() {
   justify-content: center;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(ellipse at 50% 0%, rgba(0, 212, 255, 0.06) 0%, transparent 60%),
-              radial-gradient(ellipse at 50% 100%, rgba(124, 58, 237, 0.06) 0%, transparent 60%),
+  background: radial-gradient(ellipse at 50% 0%, var(--cyan-dim) 0%, transparent 60%),
+              radial-gradient(ellipse at 50% 100%, var(--purple-dim) 0%, transparent 60%),
               var(--bg-primary);
 }
 
@@ -95,8 +95,8 @@ async function handleLogin() {
 }
 
 .login-card {
-  background: rgba(13, 19, 38, 0.9);
-  border: 1px solid rgba(56, 189, 248, 0.1);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 40px 32px;
   backdrop-filter: blur(20px);
@@ -110,7 +110,7 @@ async function handleLogin() {
 .login-header h2 {
   font-size: 24px;
   font-weight: 800;
-  background: linear-gradient(135deg, #00d4ff, #7c3aed);
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -119,7 +119,7 @@ async function handleLogin() {
 
 .login-header p {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-tertiary);
   letter-spacing: 2px;
 }
 

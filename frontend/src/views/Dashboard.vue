@@ -22,7 +22,7 @@
       <el-col :span="16">
         <div class="section-card">
           <div class="section-header">
-            <h3><el-icon :size="16" color="#00d4ff"><Document /></el-icon> 最近报告</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--cyan')"><Document /></el-icon> 最近报告</h3>
             <el-button size="small" text @click="$router.push('/reports')" style="color: var(--cyan);">
               查看全部 <el-icon><ArrowRight /></el-icon>
             </el-button>
@@ -62,7 +62,7 @@
       <el-col :span="8">
         <div class="section-card">
           <div class="section-header">
-            <h3><el-icon :size="16" color="#00d4ff"><Lightning /></el-icon> 快速操作</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--cyan')"><Lightning /></el-icon> 快速操作</h3>
           </div>
           <div style="padding: 20px;">
             <el-button type="primary" class="quick-action-btn" @click="$router.push('/inspection')" style="margin-bottom: 12px;">
@@ -78,7 +78,7 @@
         </div>
         <div class="section-card" style="margin-top: 20px;">
           <div class="section-header">
-            <h3><el-icon :size="16" color="#10b981"><InfoFilled /></el-icon> 系统信息</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--emerald')"><InfoFilled /></el-icon> 系统信息</h3>
           </div>
           <div style="padding: 20px; font-size: 13px; color: var(--text-tertiary); line-height: 2.2;">
             <div style="display: flex; justify-content: space-between;">
@@ -105,19 +105,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import { getAllDataSources, getCronJobs, getAllNotifications, getReports } from '../api'
 import type { ReportRecord } from '../types'
+import { useTheme } from '../composables/useTheme'
 
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+const { currentTheme } = useTheme()
 const loading = ref(false)
 const recentReports = ref<ReportRecord[]>([])
-const stats = ref([
-  { label: '数据源', value: 0, icon: 'Connection', color: '#00d4ff', glow: '#00d4ff', bg: 'rgba(0,212,255,0.08)' },
-  { label: '定时任务', value: 0, icon: 'Clock', color: '#10b981', glow: '#10b981', bg: 'rgba(16,185,129,0.08)' },
-  { label: '通知渠道', value: 0, icon: 'Bell', color: '#f59e0b', glow: '#f59e0b', bg: 'rgba(245,158,11,0.08)' },
-  { label: '历史报告', value: 0, icon: 'Document', color: '#7c3aed', glow: '#7c3aed', bg: 'rgba(124,58,237,0.08)' },
-])
+const statValues = ref([0, 0, 0, 0])
+const stats = computed(() => {
+  // read currentTheme to re-evaluate on theme change
+  void currentTheme.value
+  return [
+    { label: '数据源', value: statValues.value[0], icon: 'Connection', color: getCssVar('--cyan'), glow: getCssVar('--cyan'), bg: getCssVar('--cyan-dim') },
+    { label: '定时任务', value: statValues.value[1], icon: 'Clock', color: getCssVar('--emerald'), glow: getCssVar('--emerald'), bg: getCssVar('--emerald-dim') },
+    { label: '通知渠道', value: statValues.value[2], icon: 'Bell', color: getCssVar('--amber'), glow: getCssVar('--amber'), bg: getCssVar('--amber-dim') },
+    { label: '历史报告', value: statValues.value[3], icon: 'Document', color: getCssVar('--purple'), glow: getCssVar('--purple'), bg: getCssVar('--purple-dim') },
+  ]
+})
 
 onMounted(async () => {
   loading.value = true
@@ -125,10 +136,10 @@ onMounted(async () => {
     const [ds, cron, notif, reps] = await Promise.all([
       getAllDataSources(), getCronJobs(), getAllNotifications(), getReports(),
     ])
-    stats.value[0].value = ds.data.length
-    stats.value[1].value = cron.data.length
-    stats.value[2].value = notif.data.length
-    stats.value[3].value = reps.data.total
+    statValues.value[0] = ds.data.length
+    statValues.value[1] = cron.data.length
+    statValues.value[2] = notif.data.length
+    statValues.value[3] = reps.data.total
     recentReports.value = reps.data.items.slice(0, 5)
   } catch { /* ignore */ } finally {
     loading.value = false

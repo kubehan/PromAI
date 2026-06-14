@@ -7,7 +7,7 @@
 
     <div class="section-card">
       <div class="section-header">
-        <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 渠道列表</h3>
+        <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> 渠道列表</h3>
         <div style="display: flex; gap: 8px; align-items: center;">
           <el-input v-model="keyword" placeholder="搜索名称" clearable style="width: 200px;" @keyup.enter="fetchData" @clear="fetchData" />
           <el-select v-model="typeFilter" placeholder="类型" clearable style="width: 140px;" @change="fetchData">
@@ -171,6 +171,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getNotifications, createNotification, updateNotification, deleteNotification, testNotification } from '../api'
 import type { NotificationChannel } from '../types'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 const loading = ref(false)
 const channels = ref<NotificationChannel[]>([])

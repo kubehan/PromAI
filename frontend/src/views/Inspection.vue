@@ -8,7 +8,7 @@
     <el-row :gutter="24">
       <el-col :span="16">
         <div class="form-section" style="margin-bottom: 0;">
-          <h3><el-icon :size="16" color="#00d4ff"><Setting /></el-icon> 巡检配置</h3>
+          <h3><el-icon :size="16" :color="getCssVar('--cyan')"><Setting /></el-icon> 巡检配置</h3>
           <el-form :model="form" label-width="120px">
             <el-form-item label="选择数据源">
               <el-select v-model="form.datasource_id" placeholder="使用默认数据源" clearable filterable style="width: 100%;" @change="onDSChange">
@@ -77,7 +77,7 @@
       <el-col :span="8">
         <div class="section-card" style="margin-bottom: 16px;">
           <div class="section-header">
-            <h3><el-icon :size="16" color="#00d4ff"><InfoFilled /></el-icon> 使用说明</h3>
+            <h3><el-icon :size="16" :color="getCssVar('--cyan')"><InfoFilled /></el-icon> 使用说明</h3>
           </div>
           <div style="padding: 20px; font-size: 13px; color: var(--text-tertiary); line-height: 2.4;">
             <div>• 选择已配置的数据源</div>
@@ -115,6 +115,10 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getAllDataSources, getMetricTypes, triggerInspect, getInspectTask } from '../api'
 import type { DataSource, MetricType } from '../types'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 const route = useRoute()
 const inspecting = ref(false)
