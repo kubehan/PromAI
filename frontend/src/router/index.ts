@@ -77,6 +77,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/InspectionTemplates.vue'),
     meta: { title: '巡检模板', icon: 'Collection' },
   },
+  {
+    path: '/ai',
+    name: 'AiChat',
+    component: () => import('../views/AiChat.vue'),
+    meta: { title: 'AI 助手', icon: 'MagicStick' },
+  },
 ]
 
 const router = createRouter({

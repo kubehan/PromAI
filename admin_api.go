@@ -19,6 +19,7 @@ import (
 	"PromAI/pkg/database"
 	"PromAI/pkg/metrics"
 	"PromAI/pkg/notify"
+	piagent "PromAI/pkg/pi-agent"
 	"PromAI/pkg/prometheus"
 	"PromAI/pkg/report"
 
@@ -237,44 +238,46 @@ func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, scheduler *cr
 }
 
 func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
+	logged := a.logRequest
+
 	// Public auth routes (no auth required)
-	mux.HandleFunc("/api/promai/auth/login", a.handleLogin)
+	mux.HandleFunc("/api/promai/auth/login", logged(a.handleLogin))
 
 	// Auth middleware helper
 	auth := a.authMiddleware
 
 	// Protected routes
-	mux.HandleFunc("/api/promai/auth/me", auth(a.handleMe))
-	mux.HandleFunc("/api/promai/datasources", auth(a.handleDataSources))
-	mux.HandleFunc("/api/promai/datasources/all", auth(a.handleAllDataSources))
-	mux.HandleFunc("/api/promai/datasources/", auth(a.handleDataSourceByID))
-	mux.HandleFunc("/api/promai/notifications", auth(a.handleNotifications))
-	mux.HandleFunc("/api/promai/notifications/all", auth(a.handleAllNotifications))
-	mux.HandleFunc("/api/promai/notifications/", auth(a.handleNotificationByID))
-	mux.HandleFunc("/api/promai/cronjobs", auth(a.handleCronJobs))
-	mux.HandleFunc("/api/promai/cronjobs/", auth(a.handleCronJobByID))
-	mux.HandleFunc("/api/promai/report-records", auth(a.handleReports))
-	mux.HandleFunc("/api/promai/report-records/", auth(a.handleReportByID))
-	mux.HandleFunc("/api/promai/metrics/types", auth(a.handleMetricTypes))
-	mux.HandleFunc("/api/promai/metrics/types/", auth(a.handleMetricTypeByID))
-	mux.HandleFunc("/api/promai/metrics/configs", auth(a.handleMetricConfigs))
-	mux.HandleFunc("/api/promai/metrics/configs/", auth(a.handleMetricConfigByID))
-	mux.HandleFunc("/api/promai/metrics/validate", auth(a.handleValidatePromQL))
-	mux.HandleFunc("/api/promai/templates", auth(a.handleTemplates))
-	mux.HandleFunc("/api/promai/templates/all", auth(a.handleAllTemplates))
-	mux.HandleFunc("/api/promai/templates/", auth(a.handleTemplateByID))
-	mux.HandleFunc("/api/promai/settings", auth(a.handleSettings))
-	mux.HandleFunc("/api/promai/inspect", auth(a.handleInspect))
-	mux.HandleFunc("/api/promai/inspect/records", auth(a.handleInspectRecords))
-	mux.HandleFunc("/api/promai/inspect/task/", auth(a.handleInspectTask))
-	mux.HandleFunc("/api/promai/datasources/import", auth(a.handleImportDatasource))
-	mux.HandleFunc("/api/promai/notifications/test", auth(a.handleTestNotification))
-	mux.HandleFunc("/api/promai/dashboard/stats", auth(a.handleDashboardStats))
-	mux.HandleFunc("/api/promai/dashboard/health", auth(a.handleDashboardHealth))
-	mux.HandleFunc("/api/promai/dashboard/health/trend", auth(a.handleDashboardHealthTrend))
-	mux.HandleFunc("/api/promai/datasources/apply-template", auth(a.handleApplyTemplate))
-	mux.HandleFunc("/api/promai/sync-sources", auth(a.handleSyncSources))
-	mux.HandleFunc("/api/promai/sync-sources/", auth(a.handleSyncSourceByID))
+	mux.HandleFunc("/api/promai/auth/me", logged(auth(a.handleMe)))
+	mux.HandleFunc("/api/promai/datasources", logged(auth(a.handleDataSources)))
+	mux.HandleFunc("/api/promai/datasources/all", logged(auth(a.handleAllDataSources)))
+	mux.HandleFunc("/api/promai/datasources/", logged(auth(a.handleDataSourceByID)))
+	mux.HandleFunc("/api/promai/datasources/import", logged(auth(a.handleImportDatasource)))
+	mux.HandleFunc("/api/promai/datasources/apply-template", logged(auth(a.handleApplyTemplate)))
+	mux.HandleFunc("/api/promai/notifications", logged(auth(a.handleNotifications)))
+	mux.HandleFunc("/api/promai/notifications/all", logged(auth(a.handleAllNotifications)))
+	mux.HandleFunc("/api/promai/notifications/", logged(auth(a.handleNotificationByID)))
+	mux.HandleFunc("/api/promai/notifications/test", logged(auth(a.handleTestNotification)))
+	mux.HandleFunc("/api/promai/cronjobs", logged(auth(a.handleCronJobs)))
+	mux.HandleFunc("/api/promai/cronjobs/", logged(auth(a.handleCronJobByID)))
+	mux.HandleFunc("/api/promai/report-records", logged(auth(a.handleReports)))
+	mux.HandleFunc("/api/promai/report-records/", logged(auth(a.handleReportByID)))
+	mux.HandleFunc("/api/promai/metrics/types", logged(auth(a.handleMetricTypes)))
+	mux.HandleFunc("/api/promai/metrics/types/", logged(auth(a.handleMetricTypeByID)))
+	mux.HandleFunc("/api/promai/metrics/configs", logged(auth(a.handleMetricConfigs)))
+	mux.HandleFunc("/api/promai/metrics/configs/", logged(auth(a.handleMetricConfigByID)))
+	mux.HandleFunc("/api/promai/metrics/validate", logged(auth(a.handleValidatePromQL)))
+	mux.HandleFunc("/api/promai/templates", logged(auth(a.handleTemplates)))
+	mux.HandleFunc("/api/promai/templates/all", logged(auth(a.handleAllTemplates)))
+	mux.HandleFunc("/api/promai/templates/", logged(auth(a.handleTemplateByID)))
+	mux.HandleFunc("/api/promai/settings", logged(auth(a.handleSettings)))
+	mux.HandleFunc("/api/promai/inspect", logged(auth(a.handleInspect)))
+	mux.HandleFunc("/api/promai/inspect/records", logged(auth(a.handleInspectRecords)))
+	mux.HandleFunc("/api/promai/inspect/task/", logged(auth(a.handleInspectTask)))
+	mux.HandleFunc("/api/promai/dashboard/stats", logged(auth(a.handleDashboardStats)))
+	mux.HandleFunc("/api/promai/dashboard/health", logged(auth(a.handleDashboardHealth)))
+	mux.HandleFunc("/api/promai/dashboard/health/trend", logged(auth(a.handleDashboardHealthTrend)))
+	mux.HandleFunc("/api/promai/sync-sources", logged(auth(a.handleSyncSources)))
+	mux.HandleFunc("/api/promai/sync-sources/", logged(auth(a.handleSyncSourceByID)))
 
 	log.Printf("[AdminAPI] 管理接口已注册")
 }
@@ -284,16 +287,19 @@ func (a *AdminAPI) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
+			log.Printf("[Auth] Token 缺失: %s %s", r.Method, r.URL.Path)
 			writeError(w, 401, "未登录")
 			return
 		}
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
+			log.Printf("[Auth] Token 格式错误: %s %s", r.Method, r.URL.Path)
 			writeError(w, 401, "无效的认证令牌")
 			return
 		}
 		claims, err := validateToken(parts[1], a.jwtSecret)
 		if err != nil {
+			log.Printf("[Auth] Token 校验失败: %v", err)
 			writeError(w, 401, "认证令牌无效或已过期")
 			return
 		}
@@ -321,14 +327,17 @@ func (a *AdminAPI) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Username != a.authUser || req.Password != a.authPass {
+		log.Printf("[Auth] 登录失败: %s (密码错误)", req.Username)
 		writeError(w, 401, "用户名或密码错误")
 		return
 	}
 	token, err := generateToken(req.Username, a.jwtSecret)
 	if err != nil {
+		log.Printf("[Auth] 生成令牌失败: %v", err)
 		writeError(w, 500, "生成令牌失败")
 		return
 	}
+	log.Printf("[Auth] 登录成功: %s", req.Username)
 	writeJSON(w, map[string]interface{}{
 		"token":    token,
 		"username": req.Username,
@@ -390,6 +399,31 @@ func maskPassword(ds []database.DataSource) {
 	}
 }
 
+// loggingResponseWriter 捕获状态码用于请求日志
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (lrw *loggingResponseWriter) WriteHeader(code int) {
+	lrw.statusCode = code
+	lrw.ResponseWriter.WriteHeader(code)
+}
+
+func (a *AdminAPI) logRequest(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: 200}
+		next(lrw, r)
+		dur := time.Since(start)
+		if dur > time.Second {
+			log.Printf("[API] %s %s %d %v", r.Method, r.URL.Path, lrw.statusCode, dur)
+		} else {
+			log.Printf("[API] %s %s %d %dms", r.Method, r.URL.Path, lrw.statusCode, dur.Milliseconds())
+		}
+	}
+}
+
 func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
@@ -435,6 +469,7 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 		}
 		d.Enabled = true
 		database.DB.Create(&d)
+		log.Printf("[Admin] 创建数据源: id=%d name=%s url=%s", d.ID, d.Name, d.URL)
 		w.WriteHeader(201)
 		d.Password = ""
 		writeJSON(w, d)
@@ -456,12 +491,14 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "请选择数据源")
 			return
 		}
+		log.Printf("[Admin] 批量操作数据源: action=%s ids=%v", req.Action, req.IDs)
 		switch req.Action {
 		case "delete":
 			database.DB.Delete(&database.DataSource{}, req.IDs)
 		case "toggle":
 			if req.Enabled != nil {
 				database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("enabled", *req.Enabled)
+				log.Printf("[Admin] 数据源 %v 启用状态 -> %v", req.IDs, *req.Enabled)
 			}
 		case "set-template":
 			if req.TemplateID != nil {
@@ -562,10 +599,14 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 		}
 		database.DB.Model(&d).Updates(upd)
 		database.DB.First(&d, id)
+		log.Printf("[Admin] 更新数据源: id=%d name=%s", id, d.Name)
 		d.Password = ""
 		writeJSON(w, d)
 	case "DELETE":
+		var d database.DataSource
+		database.DB.First(&d, id)
 		database.DB.Delete(&database.DataSource{}, id)
+		log.Printf("[Admin] 删除数据源: id=%d name=%s", id, d.Name)
 		w.WriteHeader(204)
 	default:
 		writeError(w, 405, "不支持的请求方法")
@@ -613,6 +654,7 @@ func (a *AdminAPI) handleImportDatasource(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, map[string]interface{}{"imported": imported, "message": fmt.Sprintf("成功导入 %d 个数据源", imported)})
+	log.Printf("[Admin] 批量导入数据源完成: %d 个", imported)
 }
 
 func (a *AdminAPI) handleApplyTemplate(w http.ResponseWriter, r *http.Request) {
@@ -1124,8 +1166,52 @@ func (a *AdminAPI) handleSettings(w http.ResponseWriter, r *http.Request) {
 		var settings []database.AppSetting
 		database.DB.Find(&settings)
 		m := make(map[string]string)
+		hasNewFormat := false
 		for _, s := range settings {
-			m[s.Key] = s.Value
+			if s.Key == "ai_models" {
+				hasNewFormat = true
+				// 脱敏模型中所有 API Key
+				var models []config.AIModelConfig
+				if json.Unmarshal([]byte(s.Value), &models) == nil {
+					for i := range models {
+						if models[i].APIKey != "" {
+							models[i].APIKey = "********"
+							m["ai_api_key_configured"] = "true"
+						}
+					}
+					if b, err := json.Marshal(models); err == nil {
+						m["ai_models"] = string(b)
+					}
+				}
+			} else if s.Key == "ai_api_key" {
+				if s.Value != "" {
+					m["ai_api_key"] = "********"
+					m["ai_api_key_configured"] = "true"
+				}
+			} else {
+				m[s.Key] = s.Value
+			}
+		}
+		// 旧格式兼容 — 从单个 key 构造 ai_models
+		if !hasNewFormat {
+			provider, hasP := m["ai_provider"]
+			model, hasM := m["ai_model"]
+			baseURL, hasB := m["ai_base_url"]
+			_, hasK := m["ai_api_key"]
+			level, hasL := m["ai_thinking_level"]
+			tokens, hasT := m["ai_max_tokens"]
+			if hasP || hasM || hasB || hasK || hasL || hasT {
+				mc := config.AIModelConfig{Name: "default"}
+				if hasP { mc.Provider = provider }
+				if hasM { mc.Model = model }
+				if hasB { mc.BaseURL = baseURL }
+				if hasL { mc.ThinkingLevel = level }
+				if hasT { fmt.Sscanf(tokens, "%d", &mc.MaxTokens) }
+				if b, _ := json.Marshal([]config.AIModelConfig{mc}); b != nil {
+					m["ai_models"] = string(b)
+				}
+				m["ai_default_model"] = "default"
+			}
 		}
 		writeJSON(w, m)
 	case "PUT":
@@ -1135,6 +1221,55 @@ func (a *AdminAPI) handleSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	for k, v := range updates {
+		if k == "ai_models" {
+			// 解析、加密 API Key、写回 DB
+			var models []config.AIModelConfig
+			if err := json.Unmarshal([]byte(v), &models); err != nil {
+				writeError(w, 400, "ai_models 格式错误")
+				return
+			}
+			// 加载旧的 models 以保留未修改的 Key
+			var oldRaw string
+			var oldSetting database.AppSetting
+			if database.DB.Where("key = ?", "ai_models").First(&oldSetting).Error == nil {
+				oldRaw = oldSetting.Value
+			}
+			var oldModels []config.AIModelConfig
+			json.Unmarshal([]byte(oldRaw), &oldModels)
+			oldMap := make(map[string]string)
+			for _, om := range oldModels {
+				oldMap[om.Name] = om.APIKey
+			}
+			for i := range models {
+				if models[i].APIKey == "" || models[i].APIKey == "********" {
+					// 保持已有值（加密或明文）
+					if oldKey, ok := oldMap[models[i].Name]; ok {
+						models[i].APIKey = oldKey
+					} else {
+						models[i].APIKey = ""
+					}
+				} else {
+					encrypted, err := piagent.EncryptAPIKey(models[i].APIKey, a.jwtSecret)
+					if err != nil {
+						writeError(w, 500, "加密 API Key 失败")
+						return
+					}
+					models[i].APIKey = "enc:" + encrypted
+				}
+			}
+			encBytes, _ := json.Marshal(models)
+			v = string(encBytes)
+		} else if k == "ai_api_key" {
+			if v == "" || v == "********" {
+				continue
+			}
+			encrypted, err := piagent.EncryptAPIKey(v, a.jwtSecret)
+			if err != nil {
+				writeError(w, 500, "加密 API Key 失败")
+				return
+			}
+			v = "enc:" + encrypted
+		}
 		var s database.AppSetting
 		if database.DB.Where("key = ?", k).First(&s).Error != nil {
 			database.DB.Create(&database.AppSetting{Key: k, Value: v})
@@ -1145,14 +1280,88 @@ func (a *AdminAPI) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if k == "cron_schedule" && a.config != nil {
 			a.config.CronSchedule = v
 		}
+		a.syncAIConfigSetting(k, v)
 	}
 	// 如果更新了定时调度，重启调度器
 	if _, ok := updates["cron_schedule"]; ok {
+		log.Printf("[Admin] 更新定时调度: %s", updates["cron_schedule"])
 		startGlobalScheduler(a.config, a.collector)
+	}
+	if _, ok := updates["ai_enabled"]; ok {
+		log.Printf("[Admin] AI 助手启用状态: %s", updates["ai_enabled"])
+	}
+	if _, ok := updates["ai_models"]; ok {
+		log.Printf("[Admin] AI 模型配置已更新")
 	}
 	writeJSON(w, updates)
 	default:
 		writeError(w, 405, "不支持的请求方法")
+	}
+}
+
+func (a *AdminAPI) syncAIConfigSetting(key, value string) {
+	if a.config == nil {
+		return
+	}
+	switch key {
+	case "ai_enabled":
+		a.config.AI.Enabled = value == "true"
+	case "ai_default_model":
+		a.config.AI.DefaultModel = value
+	case "ai_models":
+		var models []config.AIModelConfig
+		if json.Unmarshal([]byte(value), &models) == nil {
+			for i := range models {
+				if strings.HasPrefix(models[i].APIKey, "enc:") {
+					decrypted, err := piagent.DecryptAPIKey(strings.TrimPrefix(models[i].APIKey, "enc:"), a.jwtSecret)
+					if err == nil {
+						models[i].APIKey = decrypted
+					}
+				}
+			}
+			if len(models) > 0 {
+				a.config.AI.Models = models
+			}
+		}
+	case "ai_api_key":
+		// 旧格式兼容 — 构建一个默认模型
+		if len(a.config.AI.Models) == 0 {
+			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		}
+		m := &a.config.AI.Models[0]
+		if strings.HasPrefix(value, "enc:") {
+			decrypted, err := piagent.DecryptAPIKey(strings.TrimPrefix(value, "enc:"), a.jwtSecret)
+			if err == nil {
+				m.APIKey = decrypted
+			}
+		} else if value != "" && value != "********" {
+			m.APIKey = value
+		}
+	case "ai_provider":
+		if len(a.config.AI.Models) == 0 {
+			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		}
+		a.config.AI.Models[0].Provider = value
+	case "ai_model":
+		if len(a.config.AI.Models) == 0 {
+			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		}
+		a.config.AI.Models[0].Model = value
+	case "ai_base_url":
+		if len(a.config.AI.Models) == 0 {
+			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		}
+		a.config.AI.Models[0].BaseURL = value
+	case "ai_thinking_level":
+		if len(a.config.AI.Models) == 0 {
+			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		}
+		a.config.AI.Models[0].ThinkingLevel = value
+	case "ai_max_tokens":
+		if len(a.config.AI.Models) == 0 {
+			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		}
+		fmt.Sscanf(value, "%d", &a.config.AI.Models[0].MaxTokens)
 	}
 }
 
@@ -1189,6 +1398,7 @@ func (a *AdminAPI) handleInspect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	taskID := newTaskID()
+	log.Printf("[Admin] 触发巡检: datasource_id=%d url=%s task_id=%s", req.DatasourceID, promURL, taskID)
 	task := &InspectTask{
 		ID:        taskID,
 		Status:    "running",

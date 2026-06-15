@@ -1,0 +1,161 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 800" width="960" height="800">
+<style>
+  text { font-family: "Helvetica Neue", Helvetica, Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .title { font-size: 17px; font-weight: 700; fill: #111827; text-anchor: middle; }
+  .label { font-size: 13px; fill: #111827; font-weight: 600; text-anchor: middle; }
+  .sub-label { font-size: 11px; fill: #6b7280; text-anchor: middle; }
+  .layer-label { font-size: 11px; font-weight: 700; fill: #6b7280; letter-spacing: 0.08em; }
+  .legend-text { font-size: 11px; fill: #6b7280; }
+  .arrow-label { font-size: 10px; fill: #ffffff; text-anchor: middle; font-weight: 600; }
+</style>
+<defs>
+  <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+  </marker>
+  <marker id="arrow-green" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#059669"/>
+  </marker>
+  <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#ea580c"/>
+  </marker>
+  <marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#7c3aed"/>
+  </marker>
+  <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+    <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.08"/>
+  </filter>
+
+</defs>
+<rect width="960" height="800" fill="#ffffff"/>
+<text x="480" y="32" class="title">PromAI 系统架构图</text>
+<rect x="30" y="50" width="900" height="80" rx="6" fill="#eff6ff" fill-opacity="0.4" stroke="#bfdbfe" stroke-width="1" stroke-dasharray="6,4"/>
+<rect x="35" y="54" width="70" height="18" rx="4" fill="#bfdbfe"/>
+<text x="70" y="67" class="layer-label" font-size="9" fill="#1e40af">触发接入层</text>
+<rect x="30" y="150" width="900" height="290" rx="6" fill="#fff7ed" fill-opacity="0.3" stroke="#fed7aa" stroke-width="1" stroke-dasharray="6,4"/>
+<rect x="35" y="154" width="70" height="18" rx="4" fill="#fed7aa"/>
+<text x="70" y="167" class="layer-label" font-size="9" fill="#9a3412">核心引擎</text>
+<rect x="30" y="460" width="900" height="90" rx="6" fill="#f0fdfa" fill-opacity="0.4" stroke="#ccfbf1" stroke-width="1" stroke-dasharray="6,4"/>
+<rect x="35" y="464" width="70" height="18" rx="4" fill="#ccfbf1"/>
+<text x="70" y="477" class="layer-label" font-size="9" fill="#065f46">数据存储层</text>
+<rect x="30" y="570" width="900" height="90" rx="6" fill="#fef2f2" fill-opacity="0.4" stroke="#fecaca" stroke-width="1" stroke-dasharray="6,4"/>
+<rect x="35" y="574" width="70" height="18" rx="4" fill="#fecaca"/>
+<text x="70" y="587" class="layer-label" font-size="9" fill="#991b1b">通知目标层</text>
+<rect x="100" y="72" width="200" height="44" rx="6" fill="#ffffff" stroke="#93c5fd" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="200" y="98" class="label" font-size="12">Web 管理后台</text>
+<text x="200" y="110" class="sub-label" font-size="10">Vue 3 + Element Plus</text>
+<rect x="380" y="72" width="200" height="44" rx="6" fill="#ffffff" stroke="#93c5fd" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="480" y="98" class="label" font-size="12">公开 API</text>
+<text x="480" y="110" class="sub-label" font-size="10">GET /api/promai/getreport</text>
+<rect x="660" y="72" width="200" height="44" rx="6" fill="#ffffff" stroke="#93c5fd" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="760" y="98" class="label" font-size="12">Cron 定时器</text>
+<text x="760" y="110" class="sub-label" font-size="10">robfig/cron v3</text>
+  <rect x="330" y="172" width="300" height="36" rx="18" fill="#1e40af" stroke="#1e3a8a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="480" y="194" class="label" font-size="12" fill="#ffffff">HTTP 路由 + JWT 认证中间件</text>
+<rect x="120" y="230" width="190" height="95" rx="8" fill="#ffffff" stroke="#2563eb" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="128" y="238" width="24" height="24" rx="6" fill="#dbeafe"/>
+<text x="140" y="255" text-anchor="middle" font-size="13" fill="#1d4ed8">Q</text>
+<text x="160" y="255" class="label" font-size="13" text-anchor="start">指标采集器</text>
+<text x="215.0" y="278" class="sub-label" font-size="10">PromQL 查询执行</text>
+<text x="215.0" y="293" class="sub-label" font-size="10">阈值评估 · 告警判定</text>
+<text x="215.0" y="308" class="sub-label" font-size="10">Warning / Critical 两级</text>
+<rect x="340" y="230" width="190" height="95" rx="8" fill="#ffffff" stroke="#059669" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="348" y="238" width="24" height="24" rx="6" fill="#d1fae5"/>
+<text x="360" y="255" text-anchor="middle" font-size="13" fill="#047857">R</text>
+<text x="380" y="255" class="label" font-size="13" text-anchor="start">报告生成器</text>
+<text x="435.0" y="278" class="sub-label" font-size="10">HTML 报告渲染</text>
+<text x="435.0" y="293" class="sub-label" font-size="10">ECharts 趋势图表</text>
+<text x="435.0" y="308" class="sub-label" font-size="10">分组统计 · 状态总览</text>
+<rect x="120" y="345" width="190" height="95" rx="8" fill="#ffffff" stroke="#ea580c" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="128" y="353" width="24" height="24" rx="6" fill="#fed7aa"/>
+<text x="140" y="370" text-anchor="middle" font-size="13" fill="#c2410c">N</text>
+<text x="160" y="370" class="label" font-size="13" text-anchor="start">通知管理器</text>
+<text x="215.0" y="393" class="sub-label" font-size="10">多渠道消息分发</text>
+<text x="215.0" y="408" class="sub-label" font-size="10">消息模板格式化</text>
+<text x="215.0" y="423" class="sub-label" font-size="10">签名验证 · 代理支持</text>
+<rect x="340" y="345" width="190" height="95" rx="8" fill="#ffffff" stroke="#7c3aed" stroke-width="1.5" filter="url(#shadow)"/>
+<rect x="348" y="353" width="24" height="24" rx="6" fill="#e9d5ff"/>
+<text x="360" y="370" text-anchor="middle" font-size="13" fill="#6d28d9">T</text>
+<text x="380" y="370" class="label" font-size="13" text-anchor="start">任务管理器</text>
+<text x="435.0" y="393" class="sub-label" font-size="10">任务进度追踪</text>
+<text x="435.0" y="408" class="sub-label" font-size="10">并发巡检控制</text>
+<text x="435.0" y="423" class="sub-label" font-size="10">数据源健康检测</text>
+<rect x="120.0" y="485" width="220" height="52" rx="6" fill="#ffffff" stroke="#e6522c" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="230.0" y="507" class="label" font-size="12" fill="#e6522c">Prometheus 数据源</text>
+<text x="230.0" y="525" class="sub-label" font-size="10">PromQL API · Basic Auth</text>
+<rect x="370.0" y="485" width="220" height="52" rx="6" fill="#ffffff" stroke="#003b57" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="480.0" y="507" class="label" font-size="12" fill="#003b57">SQLite 数据库</text>
+<text x="480.0" y="525" class="sub-label" font-size="10">GORM · 配置持久化</text>
+<rect x="620.0" y="485" width="220" height="52" rx="6" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="730.0" y="507" class="label" font-size="12">HTML 报告文件</text>
+<text x="730.0" y="525" class="sub-label" font-size="10">按日期归档 · 自动清理</text>
+<rect x="153.0" y="595" width="150" height="50" rx="6" fill="#ffffff" stroke="#0089ff" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="228.0" y="617" class="label" font-size="13" fill="#0089ff">钉钉</text>
+<text x="228.0" y="635" class="sub-label" font-size="10">Webhook + 签名</text>
+<rect x="321.0" y="595" width="150" height="50" rx="6" fill="#ffffff" stroke="#00c853" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="396.0" y="617" class="label" font-size="13" fill="#00c853">企业微信</text>
+<text x="396.0" y="635" class="sub-label" font-size="10">机器人 · 应用消息</text>
+<rect x="489.0" y="595" width="150" height="50" rx="6" fill="#ffffff" stroke="#3370ff" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="564.0" y="617" class="label" font-size="13" fill="#3370ff">飞书</text>
+<text x="564.0" y="635" class="sub-label" font-size="10">富文本 + 验证</text>
+<rect x="657.0" y="595" width="150" height="50" rx="6" fill="#ffffff" stroke="#ea4335" stroke-width="1.5" filter="url(#shadow)"/>
+<text x="732.0" y="617" class="label" font-size="13" fill="#ea4335">邮件</text>
+<text x="732.0" y="635" class="sub-label" font-size="10">SMTP + 附件</text>
+<path d="M 200 116 L 200 140 L 330 140 L 330 172" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+<line x1="480" y1="116" x2="480" y2="172" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+<rect x="492" y="132" width="32" height="16" rx="4" fill="#2563eb"/>
+<text x="508" y="144" class="arrow-label">请求</text>
+<path d="M 760 116 L 760 140 L 630 140 L 630 172" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+<line x1="480" y1="208" x2="480" y2="218" fill="none" stroke="#2563eb" stroke-width="1.5"/>
+<path d="M 480 218 L 215.0 218 L 215.0 230" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+<rect x="464" y="202" width="32" height="16" rx="4" fill="#2563eb"/>
+<text x="480" y="214" class="arrow-label">触发</text>
+<line x1="310" y1="277.5" x2="340" y2="277.5" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+<rect x="309.0" y="269.5" width="32" height="16" rx="4" fill="#2563eb"/>
+<text x="325.0" y="281.5" class="arrow-label">分析数据</text>
+<path d="M 215.0 325 L 215.0 430 L 230.0 430 L 230.0 485" fill="none" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+<rect x="214.0" y="417" width="32" height="16" rx="4" fill="#059669"/>
+<text x="230.0" y="429" class="arrow-label">PromQL</text>
+<path d="M 280.0 485 L 280.0 430 L 265.0 430 L 265.0 325" fill="none" stroke="#059669" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-green)"/>
+<rect x="249.0" y="417" width="32" height="16" rx="4" fill="#059669"/>
+<text x="265.0" y="429" class="arrow-label">返回</text>
+  <line x1="435.0" y1="325" x2="435.0" y2="345" fill="none" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <rect x="419.0" y="333" width="32" height="16" rx="4" fill="#2563eb"/>
+  <text x="435.0" y="345" class="arrow-label">报告</text>
+<path d="M 435.0 325 L 435.0 430 L 730.0 430 L 730.0 485" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow-purple)"/>
+<rect x="714.0" y="417" width="32" height="16" rx="4" fill="#7c3aed"/>
+<text x="730.0" y="429" class="arrow-label">持久化</text>
+<line x1="215.0" y1="440" x2="215.0" y2="555" fill="none" stroke="#ea580c" stroke-width="1.5"/>
+<rect x="199.0" y="539" width="32" height="16" rx="4" fill="#ea580c"/>
+<text x="215.0" y="551" class="arrow-label">推送</text>
+<line x1="228.0" y1="555" x2="228.0" y2="595" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+<line x1="396.0" y1="555" x2="396.0" y2="595" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+<line x1="564.0" y1="555" x2="564.0" y2="595" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+<line x1="732.0" y1="555" x2="732.0" y2="595" fill="none" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <line x1="215.0" y1="555" x2="732.0" y2="555" fill="none" stroke="#ea580c" stroke-width="1.5"/>
+  <path d="M 340 377.5 L 340 320 L 310 320 L 310 262.5" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-purple)"/>
+<rect x="309" y="246.5" width="32" height="16" rx="4" fill="#7c3aed"/>
+<text x="325" y="258.5" class="arrow-label">跟踪</text>
+  <path d="M 530 407.5 L 560 407.5 L 560 292.5 L 530 292.5" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-purple)"/>
+<rect x="544" y="394.5" width="32" height="16" rx="4" fill="#7c3aed"/>
+<text x="560" y="406.5" class="arrow-label">跟踪</text>
+<rect x="30" y="680" width="900" height="80" rx="6" fill="#f9fafb" stroke="#e5e7eb" stroke-width="1"/>
+<text x="50" y="700" class="legend-text" font-weight="600" fill="#374151">图例</text>
+<line x1="50" y1="718" x2="74" y2="718" stroke="#2563eb" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+<text x="80" y="722" class="legend-text">主要数据流</text>
+<line x1="180" y1="718" x2="204" y2="718" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+<text x="210" y="722" class="legend-text">PromQL 查询</text>
+<line x1="310" y1="718" x2="334" y2="718" stroke="#059669" stroke-width="1.5" stroke-dasharray="5,3"/>
+<text x="340" y="722" class="legend-text">查询返回</text>
+<line x1="430" y1="718" x2="454" y2="718" stroke="#ea580c" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+<text x="460" y="722" class="legend-text">通知推送</text>
+<line x1="550" y1="718" x2="574" y2="718" stroke="#7c3aed" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-purple)"/>
+<text x="580" y="722" class="legend-text">持久化 / 跟踪</text>
+<rect x="50" y="736" width="14" height="14" rx="2" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1"/>
+<text x="70" y="748" class="legend-text" font-size="10">触发接入层</text>
+<rect x="170" y="736" width="14" height="14" rx="2" fill="#fff7ed" stroke="#fed7aa" stroke-width="1"/>
+<text x="190" y="748" class="legend-text" font-size="10">核心引擎</text>
+<rect x="280" y="736" width="14" height="14" rx="2" fill="#f0fdfa" stroke="#ccfbf1" stroke-width="1"/>
+<text x="300" y="748" class="legend-text" font-size="10">数据存储层</text>
+<rect x="400" y="736" width="14" height="14" rx="2" fill="#fef2f2" stroke="#fecaca" stroke-width="1"/>
+<text x="420" y="748" class="legend-text" font-size="10">通知目标层</text>
+</svg>

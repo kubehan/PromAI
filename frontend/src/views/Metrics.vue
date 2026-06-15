@@ -7,7 +7,7 @@
 
     <div class="section-card">
       <div class="section-header">
-        <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 指标列表</h3>
+        <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> 指标列表</h3>
         <div class="action-bar">
           <el-select v-model="filterDS" placeholder="全部数据源" clearable filterable style="width: 160px;" @change="fetchData">
             <el-option label="全局指标" :value="0" />
@@ -226,6 +226,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getMetricTypes, createMetricConfig, updateMetricConfig, deleteMetricConfig, getAllDataSources, validatePromQL, createMetricType, updateMetricType, deleteMetricType } from '../api'
 import type { MetricType, MetricConfig, DataSource } from '../types'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 interface FlatMetric extends MetricConfig {
   type_name: string

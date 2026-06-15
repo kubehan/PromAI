@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  promai:
+    build: .
+    container_name: promai
+    restart: unless-stopped
+    ports:
+      - "8091:8091"
+    volumes:
+      - ./data/promai.db:/app/promai.db:rw
+      - ./reports:/app/reports
+      - ./config/config.yaml:/app/config/config.yaml:ro
+      - ./templates:/app/templates:ro
+
+  nginx:
+    image: nginx:alpine
+    container_name: promai-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html/promai:ro
+    depends_on:
+      - promai

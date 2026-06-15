@@ -1,0 +1,14 @@
+package agent
+
+const (
+	AGENT_MESSAGE_EVENT_AGENT_START = "agent_start"
+	AGENT_MESSAGE_EVENT_AGENT_END = "agent_end"
+	AGENT_MESSAGE_EVENT_MESSAGE_START = "message_start"
+	AGENT_MESSAGE_EVENT_MESSAGE_UPDATE = "message_update"
+	AGENT_MESSAGE_EVENT_MESSAGE_END = "message_end"
+	AGENT_MESSAGE_EVENT_TURN_START = "turn_start"
+	AGENT_MESSAGE_EVENT_TURN_END = "turn_end"
+	AGENT_MESSAGE_EVENT_TOOL_EXECUTION_START = "tool_execution_start"
+	AGENT_MESSAGE_EVENT_TOOL_EXECUTION_UPDATE = "tool_execution_update"
+	AGENT_MESSAGE_EVENT_TOOL_EXECUTION_END = "tool_execution_end"
+)

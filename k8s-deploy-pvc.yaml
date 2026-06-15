@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: promai
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: promai-data
+  namespace: promai
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  # storageClassName: ""  # 按需指定 StorageClass
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promai-config
+  namespace: promai
+data:
+  config.yaml: |
+    prometheus_url: "http://prometheus.monitoring.svc.cluster.local:9090"
+    project_name: "PromAI"
+    cron_schedule: "00 08,17 * * *"
+    report_cleanup:
+      enabled: true
+      max_age: 7
+      cron_schedule: "0 0 * * *"
+    notifications:
+      dingtalk:
+        enabled: false
+        webhook: ""
+        secret: ""
+        report_url: ""
+      wechat_work:
+        enabled: false
+        webhook: ""
+        proxy_url: ""
+        report_url: ""
+      email:
+        enabled: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: promai
+  namespace: promai
+  labels:
+    app: promai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: promai
+  template:
+    metadata:
+      labels:
+        app: promai
+    spec:
+      containers:
+      - name: promai
+        image: kubehan/promai:latest
+        ports:
+        - containerPort: 8091
+          name: http
+        env:
+        - name: PROMAI_DB_PATH
+          value: /app/data/promai.db
+        - name: PROMETHEUS_URL
+          value: "http://prometheus.monitoring.svc.cluster.local:9090"
+        - name: PROMETHEUS_USERNAME
+          value: ""
+        - name: PROMETHEUS_PASSWORD
+          value: ""
+        - name: TZ
+          value: Asia/Shanghai
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        - name: data
+          mountPath: /app/data
+        - name: data
+          subPath: reports
+          mountPath: /app/reports
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /api/promai
+            port: 8091
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/promai
+            port: 8091
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: config
+        configMap:
+          name: promai-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: promai-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: promai-service
+  namespace: promai
+spec:
+  selector:
+    app: promai
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8091
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: promai-ingress
+  namespace: promai
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: promai.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: promai-service
+            port:
+              number: 80

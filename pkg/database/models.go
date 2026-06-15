@@ -184,6 +184,22 @@ type SyncLog struct {
 	CreatedAt    time.Time `json:"created_at"`
 }
 
+type AiSession struct {
+	ID        string      `gorm:"primaryKey;size:100" json:"id"`
+	ModelName string      `gorm:"size:100" json:"model_name"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+	Messages  []AiMessage `gorm:"foreignKey:SessionID;constraint:OnDelete:CASCADE" json:"messages,omitempty"`
+}
+
+type AiMessage struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	SessionID string    `gorm:"index;size:100;not null" json:"session_id"`
+	Role      string    `gorm:"size:20;not null" json:"role"`
+	Content   string    `gorm:"type:text" json:"content"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&DataSource{},
@@ -199,5 +215,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&InspectRecord{},
 		&SyncSource{},
 		&SyncLog{},
+		&AiSession{},
+		&AiMessage{},
 	)
 }

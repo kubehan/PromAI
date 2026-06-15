@@ -22,6 +22,7 @@ import (
 	"PromAI/pkg/database"
 	"PromAI/pkg/metrics"
 	"PromAI/pkg/notify"
+	piagent "PromAI/pkg/pi-agent"
 	"PromAI/pkg/prometheus"
 	"PromAI/pkg/report"
 	"PromAI/pkg/status"
@@ -256,6 +257,10 @@ func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler 
 	// 注册管理 API 路由
 	adminAPI := NewAdminAPI(collector, config, scheduler)
 	adminAPI.RegisterHandlers(http.DefaultServeMux)
+
+	// 注册 AI Agent 路由
+	aiAgent := piagent.NewAgentHandler(config, collector, database.DB, config.Auth.JWTSecret)
+	aiAgent.RegisterRoutes(http.DefaultServeMux, adminAPI.authMiddleware)
 
 }
 

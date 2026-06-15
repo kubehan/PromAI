@@ -7,7 +7,7 @@
 
     <div class="section-card">
       <div class="section-header">
-        <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 任务列表</h3>
+        <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> 任务列表</h3>
         <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon> 新增任务</el-button>
       </div>
       <el-table :data="jobs" v-loading="loading" stripe>
@@ -104,6 +104,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getCronJobs, createCronJob, updateCronJob, deleteCronJob, getAllDataSources, getAllNotifications } from '../api'
 import type { CronJob, DataSource, NotificationChannel } from '../types'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 const loading = ref(false)
 const saving = ref(false)

@@ -7,7 +7,7 @@
 
     <div class="section-card">
       <div class="section-header">
-        <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 历史报告</h3>
+        <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> 历史报告</h3>
         <div style="display: flex; gap: 8px; align-items: center;">
           <el-input v-model="keyword" placeholder="搜索标题/数据源" clearable style="width: 200px;" @keyup.enter="fetchData" @clear="fetchData" />
           <el-select v-model="statusFilter" placeholder="状态" clearable style="width: 110px;" @change="fetchData">
@@ -81,6 +81,10 @@ import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getReports, deleteReport } from '../api'
 import type { ReportRecord } from '../types'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 const loading = ref(false)
 const reports = ref<ReportRecord[]>([])

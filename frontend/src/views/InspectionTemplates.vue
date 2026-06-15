@@ -7,7 +7,7 @@
 
     <div class="section-card">
       <div class="section-header">
-        <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 模板列表</h3>
+        <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> 模板列表</h3>
         <div style="display: flex; gap: 8px; align-items: center;">
           <el-input v-model="keyword" placeholder="搜索模板名称" clearable style="width: 200px;" @keyup.enter="fetchData" @clear="fetchData" />
           <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon> 新建模板</el-button>
@@ -246,6 +246,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate, getTemplate, getTemplateMetrics, setTemplateMetrics, getMetricTypes, saveTemplateMetricOverride } from '../api'
 import type { MetricType } from '../types'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 const loading = ref(false)
 const saving = ref(false)

@@ -7,7 +7,7 @@
 
     <div class="section-card">
       <div class="section-header">
-        <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 任务列表</h3>
+        <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> 任务列表</h3>
         <div style="display: flex; gap: 8px; align-items: center;">
           <el-input v-model="keyword" placeholder="搜索目标/消息" clearable style="width: 200px;" @keyup.enter="fetchRecords" @clear="fetchRecords" />
           <el-select v-model="statusFilter" placeholder="状态" clearable style="width: 110px;" @change="fetchRecords">
@@ -63,6 +63,10 @@ import { ref, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage } from 'element-plus'
 import { getInspectRecords } from '../api'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 interface InspectRecord {
   id: number

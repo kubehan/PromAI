@@ -7,7 +7,7 @@
 
     <div class="section-card">
       <div class="section-header">
-        <h3><el-icon :size="16" color="#00d4ff"><List /></el-icon> 数据源列表</h3>
+        <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> 数据源列表</h3>
         <div class="action-bar">
           <el-button plain @click="importVisible = true">
             <el-icon><Upload /></el-icon> YAML 导入
@@ -390,6 +390,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
 import { getDataSources, createDataSource, updateDataSource, deleteDataSource, importDatasources, applyTemplate, getAllTemplates, getAllNotifications, triggerInspect, getInspectTask, testDataSource, getSyncSources, createSyncSource, updateSyncSource, deleteSyncSource, triggerSync, getSyncLogs, batchDeleteDataSources, batchToggleDataSources, batchSetTemplate, batchSetNotify, batchApplyTemplate, batchInspect, batchSetCreds } from '../api'
 import type { DataSource, SyncSource } from '../types'
+
+function getCssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
 
 const loading = ref(false)
 const saving = ref(false)

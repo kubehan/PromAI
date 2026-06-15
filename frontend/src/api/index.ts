@@ -129,4 +129,27 @@ export const setTemplateMetrics = (id: number, metricConfigIds: number[]) => api
 export const saveTemplateMetricOverride = (templateId: number, configId: number, data: any) => api.put(`/templates/${templateId}/metrics/${configId}/override`, data)
 export const inspectWithTemplate = (id: number, req: any) => api.post(`/templates/${id}/inspect`, req)
 
+// AI Agent
+export const aiChat = (message: string, sessionId?: string) =>
+  api.post<{session_id: string}>('/ai/chat', { message, session_id: sessionId })
+
+export const aiChatStream = (message: string, sessionId?: string): Promise<Response> => {
+  const token = localStorage.getItem('token')
+  return fetch('/api/promai/ai/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ message, session_id: sessionId }),
+  })
+}
+
+export const getAiSessions = () => api.get('/ai/sessions')
+export const deleteAiSession = (id: string) => api.delete(`/ai/sessions/${id}`)
+export const testAiModel = (model: {
+  name: string; provider: string; model: string; base_url: string;
+  api_key: string; thinking_level: string; max_tokens: number; proxy_url?: string
+}) => api.post('/ai/test-model', model)
+
 export default api

@@ -25,7 +25,7 @@
               </div>
             </div>
             <el-button text class="collapse-btn" @click="toggleCollapse">
-              <el-icon :size="18" color="rgba(255,255,255,0.4)">
+              <el-icon :size="18" class="collapse-icon">
                 <Fold v-if="!collapsed" /><Expand v-else />
               </el-icon>
             </el-button>
@@ -37,8 +37,6 @@
               :collapse="collapsed"
               :collapse-transition="false"
               background-color="transparent"
-              text-color="rgba(255,255,255,0.5)"
-              active-text-color="#00d4ff"
               router
             >
               <el-menu-item index="/dashboard">
@@ -79,6 +77,10 @@
                   <span>巡检模板</span>
                 </el-menu-item>
               </el-sub-menu>
+              <el-menu-item index="/ai">
+                <el-icon><MagicStick /></el-icon>
+                <span>AI 助手</span>
+              </el-menu-item>
               <el-menu-item index="/settings">
                 <el-icon><Setting /></el-icon>
                 <span>系统设置</span>
@@ -109,11 +111,26 @@
               </el-breadcrumb>
             </div>
             <div class="header-right">
+              <el-dropdown trigger="click" @command="handleThemeChange">
+                <el-button text class="header-btn">
+                  <el-icon :size="18"><Brush /></el-icon>
+                  <span style="margin-left: 4px; font-size: 13px;">主题</span>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item v-for="t in themeOptions" :key="t.value" :command="t.value" :class="{ active: currentTheme === t.value }">
+                      <span style="margin-right: 8px;">{{ t.icon }}</span>
+                      <span>{{ t.label }}</span>
+                      <el-icon v-if="currentTheme === t.value" style="margin-left: auto; color: var(--cyan);"><Check /></el-icon>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
               <div class="header-user">
                 <el-icon><User /></el-icon>
                 <span class="user-name">{{ username }}</span>
               </div>
-              <el-button text style="color: rgba(255,255,255,0.4);" @click="handleLogout">
+              <el-button text class="header-btn" @click="handleLogout">
                 <el-icon><SwitchButton /></el-icon>
                 <span style="margin-left: 4px; font-size: 13px;">退出</span>
               </el-button>
@@ -139,6 +156,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useTheme } from './composables/useTheme'
 
 const route = useRoute()
 const router = useRouter()
@@ -149,8 +167,14 @@ const currentMeta = computed(() => route.meta)
 const showLayout = computed(() => route.path !== '/login')
 const username = ref(localStorage.getItem('username') || 'Admin')
 
+const { currentTheme, setTheme, themeOptions } = useTheme()
+
 function toggleCollapse() {
   collapsed.value = !collapsed.value
+}
+
+function handleThemeChange(name: string) {
+  setTheme(name as any)
 }
 
 function handleLogout() {
@@ -171,8 +195,8 @@ function handleLogout() {
   position: fixed;
   inset: 0;
   background-image:
-    linear-gradient(rgba(56, 189, 248, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.03) 1px, transparent 1px);
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 48px 48px;
   pointer-events: none;
   z-index: 0;
@@ -185,8 +209,8 @@ function handleLogout() {
 }
 
 .app-sidebar {
-  background: linear-gradient(180deg, rgba(13, 19, 38, 0.98) 0%, rgba(8, 12, 24, 0.98) 100%);
-  border-right: 1px solid rgba(56, 189, 248, 0.08);
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
   display: flex;
@@ -211,7 +235,7 @@ function handleLogout() {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px 0 20px;
-  border-bottom: 1px solid rgba(56, 189, 248, 0.06);
+  border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 
@@ -235,16 +259,20 @@ function handleLogout() {
 .logo-text {
   font-size: 18px;
   font-weight: 800;
-  background: linear-gradient(135deg, #00d4ff, #7c3aed);
+  background: linear-gradient(135deg, var(--cyan), var(--purple));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   letter-spacing: -0.5px;
 }
 
+.collapse-icon {
+  color: var(--text-tertiary);
+}
+
 .logo-sub {
   font-size: 10px;
-  color: rgba(255,255,255,0.3);
+  color: var(--text-tertiary);
   letter-spacing: 2px;
   text-transform: uppercase;
   font-weight: 500;
@@ -275,17 +303,31 @@ function handleLogout() {
   font-size: 13px;
   font-weight: 500;
   transition: all 0.2s ease;
+  color: var(--text-secondary) !important;
 }
 
 .el-menu-item:hover {
-  background: rgba(56, 189, 248, 0.08) !important;
-  color: rgba(255,255,255,0.8) !important;
+  background: var(--cyan-dim) !important;
+  color: var(--text-primary) !important;
 }
 
 .el-menu-item.is-active {
-  background: rgba(0, 212, 255, 0.1) !important;
-  color: #00d4ff !important;
+  background: var(--cyan-dim) !important;
+  color: var(--cyan) !important;
   font-weight: 600;
+}
+
+:deep(.el-sub-menu__title) {
+  color: var(--text-secondary) !important;
+}
+
+:deep(.el-sub-menu__title:hover) {
+  color: var(--text-primary) !important;
+  background: var(--cyan-dim) !important;
+}
+
+:deep(.el-sub-menu.is-active .el-sub-menu__title) {
+  color: var(--cyan) !important;
 }
 
 .el-menu-item.is-active::before {
@@ -298,17 +340,17 @@ function handleLogout() {
   height: 20px;
   background: var(--cyan);
   border-radius: 0 4px 4px 0;
-  box-shadow: 0 0 12px rgba(0, 212, 255, 0.5);
+  box-shadow: 0 0 12px var(--cyan-dim);
 }
 
 .sidebar-footer {
-  border-top: 1px solid rgba(56, 189, 248, 0.06);
+  border-top: 1px solid var(--border);
   padding: 14px 20px;
   display: flex;
   align-items: center;
   gap: 10px;
   font-size: 12px;
-  color: rgba(255,255,255,0.3);
+  color: var(--text-tertiary);
   flex-shrink: 0;
 }
 
@@ -317,7 +359,7 @@ function handleLogout() {
   height: 8px;
   border-radius: 50%;
   background: var(--emerald);
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 12px var(--emerald-dim);
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
@@ -328,10 +370,10 @@ function handleLogout() {
 
 .app-header {
   height: 64px;
-  background: rgba(13, 19, 38, 0.8);
+  background: var(--bg-elevated);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(56, 189, 248, 0.06);
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -347,7 +389,7 @@ function handleLogout() {
   left: 5%;
   width: 90%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.08), transparent);
+  background: linear-gradient(90deg, transparent, var(--border), transparent);
 }
 
 .header-left {
@@ -364,12 +406,17 @@ function handleLogout() {
   gap: 8px;
 }
 
+.header-btn {
+  color: var(--text-secondary) !important;
+  font-size: 13px;
+}
+
 .header-user {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 4px 12px;
-  color: rgba(255,255,255,0.5);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
