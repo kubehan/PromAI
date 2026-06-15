@@ -26,47 +26,47 @@ import (
 )
 
 type DingtalkConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	Webhook   string `yaml:"webhook"`
-	Secret    string `yaml:"secret"`
-	ReportURL string `yaml:"report_url"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	Webhook   string `yaml:"webhook" json:"webhook"`
+	Secret    string `yaml:"secret" json:"secret"`
+	ReportURL string `yaml:"report_url" json:"report_url"`
 }
 
 type EmailConfig struct {
-	Enabled   bool     `yaml:"enabled"`
-	SMTPHost  string   `yaml:"smtp_host"`
-	SMTPPort  int      `yaml:"smtp_port"`
-	Username  string   `yaml:"username"`
-	Password  string   `yaml:"password"`
-	From      string   `yaml:"from"`
-	To        []string `yaml:"to"`
-	ReportURL string   `yaml:"report_url"`
+	Enabled   bool     `yaml:"enabled" json:"enabled"`
+	SMTPHost  string   `yaml:"smtp_host" json:"smtp_host"`
+	SMTPPort  int      `yaml:"smtp_port" json:"smtp_port"`
+	Username  string   `yaml:"username" json:"username"`
+	Password  string   `yaml:"password" json:"password"`
+	From      string   `yaml:"from" json:"from"`
+	To        []string `yaml:"to" json:"to"`
+	ReportURL string   `yaml:"report_url" json:"report_url"`
 }
 
 type WeChatWorkConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	Webhook   string `yaml:"webhook"`
-	ProxyURL  string `yaml:"proxy_url"`
-	ReportURL string `yaml:"report_url"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	Webhook   string `yaml:"webhook" json:"webhook"`
+	ProxyURL  string `yaml:"proxy_url" json:"proxy_url"`
+	ReportURL string `yaml:"report_url" json:"report_url"`
 }
 
 type WeChatAppConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	CorpID    string `yaml:"corpid"`
-	AgentID   int    `yaml:"agentid"`
-	Secret    string `yaml:"secret"`
-	ToUser    string `yaml:"touser"` // 接收人企业微信ID，多个用|分隔，如"user1|user2"，默认"@all"发送给所有人
-	ProxyURL  string `yaml:"proxy_url"`
-	ReportURL string `yaml:"report_url"` // 新增 ReportURL 字段
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	CorpID    string `yaml:"corpid" json:"corpid"`
+	AgentID   int    `yaml:"agentid" json:"agentid"`
+	Secret    string `yaml:"secret" json:"secret"`
+	ToUser    string `yaml:"touser" json:"touser"` // 接收人企业微信ID，多个用|分隔，如"user1|user2"，默认"@all"发送给所有人
+	ProxyURL  string `yaml:"proxy_url" json:"proxy_url"`
+	ReportURL string `yaml:"report_url" json:"report_url"` // 新增 ReportURL 字段
 }
 
 type FeishuConfig struct {
-	Enabled    bool   `yaml:"enabled"`
-	Webhook    string `yaml:"webhook"`
-	Secret     string `yaml:"secret"`
-	ReportURL  string `yaml:"report_url"`
-	Timeout    int    `yaml:"timeout"`
-	VerifySign bool   `yaml:"verify_sign"`
+	Enabled    bool   `yaml:"enabled" json:"enabled"`
+	Webhook    string `yaml:"webhook" json:"webhook"`
+	Secret     string `yaml:"secret" json:"secret"`
+	ReportURL  string `yaml:"report_url" json:"report_url"`
+	Timeout    int    `yaml:"timeout" json:"timeout"`
+	VerifySign bool   `yaml:"verify_sign" json:"verify_sign"`
 }
 
 type AlertSummary struct {

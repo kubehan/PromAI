@@ -1524,7 +1524,11 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 
 		if req.WechatBotKey != "" {
 			alertSummary := notify.CalculateAlertSummary(*data)
-			notify.SendWeChatWorkWithWebhook(context.Background(), req.WechatBotKey, "", reportPath, a.config.ProjectName, promURL, alertSummary)
+			proxyURL := ""
+			if a.config.Notifications.WeChatWork.ProxyURL != "" {
+				proxyURL = a.config.Notifications.WeChatWork.ProxyURL
+			}
+			notify.SendWeChatWorkWithWebhook(context.Background(), req.WechatBotKey, proxyURL, reportPath, a.config.ProjectName, promURL, alertSummary)
 		}
 
 		if req.DatasourceID > 0 {
