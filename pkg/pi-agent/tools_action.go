@@ -2,8 +2,10 @@ package piagent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -129,6 +131,67 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 			t.tasksMu.Unlock()
 			return
 		}
+
+		// 保存报告记录到数据库
+		alertCount := 0
+		criticalCount := 0
+		warningCount := 0
+		totalMetrics := 0
+		hasCritical := false
+		hasWarning := false
+
+		for _, group := range data.MetricGroups {
+			for _, metrics := range group.MetricsByName {
+				for _, m := range metrics {
+					totalMetrics++
+					switch m.Status {
+					case "critical":
+						criticalCount++
+						alertCount++
+						hasCritical = true
+					case "warning":
+						warningCount++
+						alertCount++
+						hasWarning = true
+					}
+				}
+			}
+		}
+
+		status := "success"
+		if hasCritical {
+			status = "danger"
+		} else if hasWarning {
+			status = "warning"
+		}
+
+		info, _ := os.Stat(reportPath)
+		fileSize := int64(0)
+		if info != nil {
+			fileSize = info.Size()
+		}
+
+		snapshot := map[string]any{
+			"datasource_name": data.Datasource,
+			"total_metrics":   totalMetrics,
+			"critical_count":  criticalCount,
+			"warning_count":   warningCount,
+		}
+		metricsJSON, _ := json.Marshal(snapshot)
+
+		t.db.Create(&ReportRecord{
+			Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
+			DatasourceName: data.Datasource,
+			FilePath:       reportPath,
+			FileSize:       fileSize,
+			TotalMetrics:   totalMetrics,
+			AlertCount:     alertCount,
+			CriticalCount:  criticalCount,
+			WarningCount:   warningCount,
+			Status:         status,
+			MetricsJSON:    string(metricsJSON),
+			CreatedAt:      time.Now(),
+		})
 
 		t.tasksMu.Lock()
 		task.Status = "completed"
