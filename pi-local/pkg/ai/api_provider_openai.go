@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -120,8 +121,23 @@ func (p *OpenAICompletionsProvider) doStream(
 		return err
 	}
 
+	client := p.client
+	if proxyURL := model.GetProxyURL(); proxyURL != "" {
+		parsedURL, err := url.Parse(proxyURL)
+		if err != nil {
+			log.Printf("[DEBUG] parse proxy URL failed: %v", err)
+			return fmt.Errorf("parse proxy URL failed: %w", err)
+		}
+		client = &http.Client{
+			Timeout: 120 * time.Second,
+			Transport: &http.Transport{
+				Proxy: http.ProxyURL(parsedURL),
+			},
+		}
+	}
+
 	log.Printf("[DEBUG] doStream sending request...")
-	resp, err := p.client.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Printf("[DEBUG] doStream request failed: %v", err)
 		return fmt.Errorf("request failed: %w", err)

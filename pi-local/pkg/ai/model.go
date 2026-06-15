@@ -15,6 +15,7 @@ type Model interface {
 	GetHeaders() map[string]string
 	GetCompat() any
 	GetAPIKey() string
+	GetProxyURL() string
 }
 
 // BaseModel 默认模型实现
@@ -32,6 +33,7 @@ type BaseModel struct {
 	MaxTokens     int               `json:"maxTokens"`
 	Headers       map[string]string `json:"headers,omitempty"`
 	Compat        any               `json:"compat,omitempty"`
+	ProxyURL      string            `json:"proxyUrl,omitempty"`
 }
 
 func (m *BaseModel) GetID() string                 { return m.ID }
@@ -47,6 +49,7 @@ func (m *BaseModel) GetMaxTokens() int             { return m.MaxTokens }
 func (m *BaseModel) GetHeaders() map[string]string { return m.Headers }
 func (m *BaseModel) GetCompat() any                { return m.Compat }
 func (m *BaseModel) GetAPIKey() string             { return m.APIKey }
+func (m *BaseModel) GetProxyURL() string           { return m.ProxyURL }
 
 
 // 确保实现了 Model 接口

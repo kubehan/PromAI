@@ -149,7 +149,7 @@ export const getAiSessions = () => api.get('/ai/sessions')
 export const deleteAiSession = (id: string) => api.delete(`/ai/sessions/${id}`)
 export const testAiModel = (model: {
   name: string; provider: string; model: string; base_url: string;
-  api_key: string; thinking_level: string; max_tokens: number
+  api_key: string; thinking_level: string; max_tokens: number; proxy_url?: string
 }) => api.post('/ai/test-model', model)
 
 export default api

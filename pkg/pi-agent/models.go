@@ -56,4 +56,5 @@ type TestModelRequest struct {
 	APIKey        string `json:"api_key"`
 	ThinkingLevel string `json:"thinking_level"`
 	MaxTokens     int    `json:"max_tokens"`
+	ProxyURL      string `json:"proxy_url"`
 }

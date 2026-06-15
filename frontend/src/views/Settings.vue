@@ -128,6 +128,10 @@
           <el-form-item label="最大 Token">
             <el-input-number v-model="m.max_tokens" :min="1024" :max="128000" :step="1024" style="width: 100%;" />
           </el-form-item>
+          <el-form-item label="代理地址">
+            <el-input v-model="m.proxy_url" placeholder="http://proxy.example.com:8080 或 socks5://..." />
+            <div style="color: var(--text-tertiary); font-size: 12px; margin-top: 6px;">可选，留空则直连</div>
+          </el-form-item>
           <el-form-item label=" ">
             <div class="model-actions">
               <el-button type="success" size="small" plain :loading="m._testing" @click="testModel(idx)">
@@ -172,6 +176,7 @@ interface AIModelForm {
   api_key: string
   thinking_level: string
   max_tokens: number
+  proxy_url: string
   _testing?: boolean
   _testResult?: boolean
   _testMessage?: string
@@ -203,7 +208,7 @@ function defaultModel(): AIModelForm {
   return {
     name: '', provider: 'openai', model: 'gpt-4o-mini',
     base_url: 'https://api.openai.com/v1', api_key: '',
-    thinking_level: 'medium', max_tokens: 16384,
+    thinking_level: 'medium', max_tokens: 16384, proxy_url: '',
   }
 }
 
@@ -249,6 +254,7 @@ async function testModel(idx: number) {
       name: m.name, provider: m.provider, model: m.model,
       base_url: m.base_url, api_key: m.api_key,
       thinking_level: m.thinking_level, max_tokens: m.max_tokens,
+      proxy_url: m.proxy_url,
     })
     m._testResult = res.data.success
     m._testMessage = res.data.message

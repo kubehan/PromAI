@@ -22,6 +22,7 @@ type AIModelConfig struct {
 	APIKey        string `yaml:"api_key" json:"api_key,omitempty"`
 	ThinkingLevel string `yaml:"thinking_level" json:"thinking_level"`
 	MaxTokens     int    `yaml:"max_tokens" json:"max_tokens"`
+	ProxyURL      string `yaml:"proxy_url" json:"proxy_url"`
 }
 
 type Config struct {

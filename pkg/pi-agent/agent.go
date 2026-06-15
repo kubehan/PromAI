@@ -266,6 +266,7 @@ func (h *AgentHandler) getOrCreateSession(sessionID, modelName string) (*agent.A
 		Reasoning:     mc.ThinkingLevel != "off",
 		ContextWindow: 128000,
 		MaxTokens:     mc.MaxTokens,
+		ProxyURL:      mc.ProxyURL,
 	})
 	ag.SetSystemPrompt(systemPrompt)
 	ag.SetThinkingLevel(level)
@@ -518,6 +519,7 @@ func (h *AgentHandler) handleTestModel(w http.ResponseWriter, r *http.Request) {
 		Reasoning:     req.ThinkingLevel != "off",
 		ContextWindow: 128000,
 		MaxTokens:     req.MaxTokens,
+		ProxyURL:      req.ProxyURL,
 	})
 	ag.SetSystemPrompt("You are a helpful assistant.")
 	level := ai.ThinkingLevelOff
