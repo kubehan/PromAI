@@ -556,7 +556,7 @@ async function fetchData() {
     const params: any = { page: page.value, page_size: pageSize.value }
     if (searchKeyword.value) params.keyword = searchKeyword.value
     if (filterEnabled.value) params.enabled = filterEnabled.value
-    if (filterHealth.value !== '') params.health_status = filterHealth.value
+    if (filterHealth.value) params.health_status = filterHealth.value
     const [dsRes, tmplRes, notifRes] = await Promise.all([getDataSources(params), getAllTemplates(), getAllNotifications()])
     datasources.value = dsRes.data.items
     total.value = dsRes.data.total
