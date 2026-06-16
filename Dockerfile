@@ -16,7 +16,9 @@ RUN npm run build:docker
 FROM golang:1.25-alpine AS go-deps
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
+# 关键修复：复制整个项目以支持本地模块替换 (replace directive)
 COPY go.mod go.sum ./
+COPY pi-local/ ./pi-local/
 RUN go mod download -x
 
 # ---- Stage 4: Go后端编译 ----
@@ -25,6 +27,7 @@ RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
 COPY --from=go-deps /build/go /go
 COPY go.mod go.sum ./
+COPY pi-local/ ./pi-local/
 COPY . .
 # 优化编译参数：GOOS=linux GOARCH=amd64 明确目标平台
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -a -installsuffix cgo -o PromAI .
