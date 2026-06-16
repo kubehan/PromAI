@@ -207,6 +207,11 @@ func gzipMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// 跳过流式接口 (AI Chat SSE)
+		if strings.HasPrefix(r.URL.Path, "/api/promai/ai/chat") {
+			next.ServeHTTP(w, r)
+			return
+		}
 		gw := gzip.NewWriter(w)
 		defer gw.Close()
 		w.Header().Set("Content-Encoding", "gzip")
