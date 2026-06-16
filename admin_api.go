@@ -1,7 +1,6 @@
 package main
 
 import (
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -444,27 +443,11 @@ func (lrw *loggingResponseWriter) WriteHeader(code int) {
 	lrw.ResponseWriter.WriteHeader(code)
 }
 
-type gzipResponseWriter struct {
-	http.ResponseWriter
-	gw *gzip.Writer
-}
-
-func (grw *gzipResponseWriter) Write(b []byte) (int, error) {
-	return grw.gw.Write(b)
-}
-
 func (a *AdminAPI) logRequest(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: 200}
-		out := http.ResponseWriter(lrw)
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			gw := gzip.NewWriter(lrw)
-			lrw.Header().Set("Content-Encoding", "gzip")
-			out = &gzipResponseWriter{ResponseWriter: lrw, gw: gw}
-			defer gw.Close()
-		}
-		next(out, r)
+		next(lrw, r)
 		dur := time.Since(start)
 		if dur > time.Second {
 			log.Printf("[API] %s %s %d %v", r.Method, r.URL.Path, lrw.statusCode, dur)

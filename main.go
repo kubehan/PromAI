@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"flag"
@@ -195,9 +196,31 @@ func main() {
 	log.Printf("==========================================")
 	log.Printf("服务器正在运行...")
 
-	if err := http.ListenAndServe(*port, nil); err != nil {
+	if err := http.ListenAndServe(*port, gzipMiddleware(http.DefaultServeMux)); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+func gzipMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		gw := gzip.NewWriter(w)
+		defer gw.Close()
+		w.Header().Set("Content-Encoding", "gzip")
+		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, gw: gw}, r)
+	})
+}
+
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	gw *gzip.Writer
+}
+
+func (grw *gzipResponseWriter) Write(b []byte) (int, error) {
+	return grw.gw.Write(b)
 }
 
 // 全局定时调度器，由 admin API 动态管理
