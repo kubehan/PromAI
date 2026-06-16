@@ -16,21 +16,24 @@ RUN npm run build:docker
 FROM golang:1.25-alpine AS go-deps
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
-# 关键修复：复制整个项目以支持本地模块替换 (replace directive)
+# 复制go模块文件和本地模块以支持 replace directive
 COPY go.mod go.sum ./
 COPY pi-local/ ./pi-local/
-RUN go mod download -x
+# go mod download 将依赖缓存到 $GOPATH/pkg/mod (默认为 /go/pkg/mod)
+RUN go mod download
 
 # ---- Stage 4: Go后端编译 ----
 FROM golang:1.25-alpine AS backend-builder
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
-COPY --from=go-deps /build/go /go
+# 直接从官方 golang 镜像继承依赖缓存（buildx 跨阶段缓存）
+# 或手动复制缓存的模块
+COPY --from=go-deps /go/pkg/mod /go/pkg/mod
 COPY go.mod go.sum ./
 COPY pi-local/ ./pi-local/
 COPY . .
-# 优化编译参数：GOOS=linux GOARCH=amd64 明确目标平台
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -a -installsuffix cgo -o PromAI .
+# CGO编译，支持多架构构建（由buildx自动处理）
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -a -installsuffix cgo -o PromAI .
 
 # ---- Stage 5: 最终运行镜像 ----
 FROM alpine:3.21
