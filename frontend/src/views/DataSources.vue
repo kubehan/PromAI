@@ -117,6 +117,16 @@
             />
           </template>
         </el-table-column>
+        <el-table-column label="健康状态" width="90" align="center">
+          <template #default="{ row }">
+            <span v-if="row.health_status === 'online'" style="display: flex; align-items: center; justify-content: center; gap: 4px; color: #10b981; font-size: 13px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5);"></span>在线
+            </span>
+            <span v-else style="display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--text-tertiary); font-size: 13px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary);"></span>未知
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column prop="username" label="用户名" width="100">
           <template #default="{ row }">
             <span v-if="row.username" style="color: var(--text-secondary);">{{ row.username }}</span>

@@ -484,6 +484,12 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 		query.Order("is_default desc, enabled desc, name asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&ds)
 		maskPassword(ds)
 
+		for i := range ds {
+			if getLatestReport(ds[i].URL) != nil {
+				ds[i].HealthStatus = "online"
+			}
+		}
+
 		writeJSON(w, map[string]interface{}{
 			"items": ds,
 			"total": total,
@@ -599,8 +605,15 @@ func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) 
 	if dsCache != nil {
 		cached := dsCache
 		dsCacheMu.RUnlock()
+		result := make([]database.DataSource, len(cached))
+		copy(result, cached)
+		for i := range result {
+			if getLatestReport(result[i].URL) != nil {
+				result[i].HealthStatus = "online"
+			}
+		}
 		w.Header().Set("X-Cache", "HIT")
-		writeJSON(w, cached)
+		writeJSON(w, result)
 		return
 	}
 	dsCacheMu.RUnlock()
@@ -610,6 +623,11 @@ func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) 
 		Order("is_default desc, enabled desc, name asc").
 		Find(&ds)
 	maskPassword(ds)
+	for i := range ds {
+		if getLatestReport(ds[i].URL) != nil {
+			ds[i].HealthStatus = "online"
+		}
+	}
 
 	dsCacheMu.Lock()
 	dsCache = ds
