@@ -557,8 +557,11 @@ async function fetchData() {
 watch(selectedDS, fetchData)
 
 onMounted(async () => {
-  try { const ds = await getAllDataSources(); allDatasources.value = ds.data } catch { /* ignore */ }
-  await fetchData(); await fetchTrend()
+  await Promise.all([
+    getAllDataSources().then(ds => allDatasources.value = ds.data).catch(() => {}),
+    fetchData(),
+  ])
+  await fetchTrend()
 })
 
 onUnmounted(() => {

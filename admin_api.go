@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -153,6 +154,8 @@ func buildHealthSnapshot(data *report.ReportData) string {
 var (
 	latestReports   map[string]*DatasourceHealthSnapshot
 	latestReportsMu sync.RWMutex
+	healthCache     map[string]interface{}
+	healthCacheMu   sync.RWMutex
 )
 
 func setLatestReport(key string, data *DatasourceHealthSnapshot) {
@@ -162,6 +165,7 @@ func setLatestReport(key string, data *DatasourceHealthSnapshot) {
 		latestReports = make(map[string]*DatasourceHealthSnapshot)
 	}
 	latestReports[key] = data
+	invalidateHealthCache()
 }
 
 func getLatestReport(key string) *DatasourceHealthSnapshot {
@@ -171,6 +175,36 @@ func getLatestReport(key string) *DatasourceHealthSnapshot {
 		return nil
 	}
 	return latestReports[key]
+}
+
+func invalidateHealthCache() {
+	healthCacheMu.Lock()
+	defer healthCacheMu.Unlock()
+	healthCache = nil
+}
+
+func getHealthCache(dsID string) (map[string]interface{}, bool) {
+	healthCacheMu.RLock()
+	defer healthCacheMu.RUnlock()
+	if healthCache == nil {
+		return nil, false
+	}
+	key := dsID
+	if v, ok := healthCache[key]; ok {
+		if data, ok := v.(map[string]interface{}); ok {
+			return data, true
+		}
+	}
+	return nil, false
+}
+
+func setHealthCache(dsID string, data map[string]interface{}) {
+	healthCacheMu.Lock()
+	defer healthCacheMu.Unlock()
+	if healthCache == nil {
+		healthCache = make(map[string]interface{})
+	}
+	healthCache[dsID] = data
 }
 
 func loadLatestReports() {
@@ -410,11 +444,27 @@ func (lrw *loggingResponseWriter) WriteHeader(code int) {
 	lrw.ResponseWriter.WriteHeader(code)
 }
 
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	gw *gzip.Writer
+}
+
+func (grw *gzipResponseWriter) Write(b []byte) (int, error) {
+	return grw.gw.Write(b)
+}
+
 func (a *AdminAPI) logRequest(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: 200}
-		next(lrw, r)
+		out := http.ResponseWriter(lrw)
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			gw := gzip.NewWriter(lrw)
+			lrw.Header().Set("Content-Encoding", "gzip")
+			out = &gzipResponseWriter{ResponseWriter: lrw, gw: gw}
+			defer gw.Close()
+		}
+		next(out, r)
 		dur := time.Since(start)
 		if dur > time.Second {
 			log.Printf("[API] %s %s %d %v", r.Method, r.URL.Path, lrw.statusCode, dur)
@@ -469,6 +519,7 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 		}
 		d.Enabled = true
 		database.DB.Create(&d)
+		invalidateDSCache()
 		log.Printf("[Admin] 创建数据源: id=%d name=%s url=%s", d.ID, d.Name, d.URL)
 		w.WriteHeader(201)
 		d.Password = ""
@@ -538,10 +589,22 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "不支持的操作")
 			return
 		}
+		invalidateDSCache()
 		writeJSON(w, map[string]interface{}{"success": true})
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
+}
+
+var (
+	dsCache   []database.DataSource
+	dsCacheMu sync.RWMutex
+)
+
+func invalidateDSCache() {
+	dsCacheMu.Lock()
+	defer dsCacheMu.Unlock()
+	dsCache = nil
 }
 
 func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) {
@@ -549,11 +612,27 @@ func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) 
 		writeError(w, 405, "不支持的请求方法")
 		return
 	}
+	dsCacheMu.RLock()
+	if dsCache != nil {
+		cached := dsCache
+		dsCacheMu.RUnlock()
+		w.Header().Set("X-Cache", "HIT")
+		writeJSON(w, cached)
+		return
+	}
+	dsCacheMu.RUnlock()
+
 	var ds []database.DataSource
 	database.DB.Model(&database.DataSource{}).
 		Order("is_default desc, enabled desc, name asc").
 		Find(&ds)
 	maskPassword(ds)
+
+	dsCacheMu.Lock()
+	dsCache = ds
+	dsCacheMu.Unlock()
+
+	w.Header().Set("X-Cache", "MISS")
 	writeJSON(w, ds)
 }
 
@@ -599,6 +678,7 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 		}
 		database.DB.Model(&d).Updates(upd)
 		database.DB.First(&d, id)
+		invalidateDSCache()
 		log.Printf("[Admin] 更新数据源: id=%d name=%s", id, d.Name)
 		d.Password = ""
 		writeJSON(w, d)
@@ -606,6 +686,7 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 		var d database.DataSource
 		database.DB.First(&d, id)
 		database.DB.Delete(&database.DataSource{}, id)
+		invalidateDSCache()
 		log.Printf("[Admin] 删除数据源: id=%d name=%s", id, d.Name)
 		w.WriteHeader(204)
 	default:
@@ -653,6 +734,7 @@ func (a *AdminAPI) handleImportDatasource(w http.ResponseWriter, r *http.Request
 		imported++
 	}
 
+	invalidateDSCache()
 	writeJSON(w, map[string]interface{}{"imported": imported, "message": fmt.Sprintf("成功导入 %d 个数据源", imported)})
 	log.Printf("[Admin] 批量导入数据源完成: %d 个", imported)
 }
@@ -2247,6 +2329,13 @@ func (a *AdminAPI) getDatasourceMetricConfigs(ds database.DataSource) []database
 func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request) {
 	dsIDStr := r.URL.Query().Get("datasource_id")
 
+	if cached, hit := getHealthCache(dsIDStr); hit {
+		w.Header().Set("X-Cache", "HIT")
+		writeJSON(w, cached)
+		return
+	}
+	w.Header().Set("X-Cache", "MISS")
+
 	var datasources []database.DataSource
 	q := database.DB.Order("is_default desc, name asc")
 	if dsIDStr != "" {
@@ -2288,9 +2377,21 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 
 	var results []DatasourceHealth
 
+	urls := make([]string, len(datasources))
+	for i, ds := range datasources {
+		urls[i] = ds.URL
+	}
+	var latestRecords []database.ReportRecord
+	database.DB.Where("datasource_name IN ?", urls).Order("created_at desc").Find(&latestRecords)
+	reportMap := make(map[string]database.ReportRecord, len(datasources))
+	for _, r := range latestRecords {
+		if _, ok := reportMap[r.DatasourceName]; !ok {
+			reportMap[r.DatasourceName] = r
+		}
+	}
+
 	for _, ds := range datasources {
-		var lastReport database.ReportRecord
-		database.DB.Where("datasource_name = ?", ds.URL).Order("created_at desc").First(&lastReport)
+		lastReport := reportMap[ds.URL]
 
 		snapshot := getLatestReport(ds.URL)
 		if snapshot == nil {
@@ -2442,7 +2543,7 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 		return typeAlerts[i].Alerts > typeAlerts[j].Alerts
 	})
 
-	writeJSON(w, map[string]interface{}{
+	resp := map[string]interface{}{
 		"datasources":         results,
 		"overall_health":      overallHealth,
 		"total_metrics":       totalAll,
@@ -2453,7 +2554,9 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 		"health_distribution": healthDistribution,
 		"type_alerts":         typeAlerts,
 		"total_datasources":   totalDS,
-	})
+	}
+	setHealthCache(dsIDStr, resp)
+	writeJSON(w, resp)
 }
 
 func (a *AdminAPI) handleDashboardHealthTrend(w http.ResponseWriter, r *http.Request) {
