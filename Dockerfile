@@ -1,27 +1,35 @@
-# ---- Stage 1: Build frontend ----
+# ---- Stage 1: 前端依赖下载 ----
+FROM node:20-alpine AS frontend-deps
+WORKDIR /build
+COPY frontend/package*.json ./
+RUN npm ci --prefer-offline --no-audit --omit=dev
+
+# ---- Stage 2: 前端编译 ----
 FROM node:20-alpine AS frontend-builder
 WORKDIR /build
-# 优化：先复制package.json，单独一层，提升缓存命中率
-COPY frontend/package*.json ./
-RUN npm ci --prefer-offline --no-audit
-# 源码变化时只重新编译，不重新下载依赖
+COPY --from=frontend-deps /build/node_modules ./node_modules/
 COPY frontend/ .
-RUN npm run build
+# 跳过类型检查，仅运行vite打包 (Docker构建场景下类型检查在CI阶段已完成)
+RUN npm run build:docker
 
-# ---- Stage 2: Build Go backend ----
+# ---- Stage 3: Go依赖下载 ----
+FROM golang:1.25-alpine AS go-deps
+RUN apk add --no-cache gcc musl-dev
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download -x
+
+# ---- Stage 4: Go后端编译 ----
 FROM golang:1.25-alpine AS backend-builder
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
-# 优化：先复制go.mod/go.sum，与源码分离
-# 这样源码变化时，依赖下载层仍然使用缓存
+COPY --from=go-deps /build/go /go
 COPY go.mod go.sum ./
-RUN go mod download
-# 源码变化时只重新编译，不重新下载依赖
 COPY . .
-# 优化编译参数：GOOS=linux 明确目标系统
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-s -w" -a -installsuffix cgo -o PromAI .
+# 优化编译参数：GOOS=linux GOARCH=amd64 明确目标平台
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -a -installsuffix cgo -o PromAI .
 
-# ---- Stage 3: Runtime ----
+# ---- Stage 5: 最终运行镜像 ----
 FROM alpine:3.21
 RUN apk add --no-cache tzdata ca-certificates
 WORKDIR /app
