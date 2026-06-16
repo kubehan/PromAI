@@ -1642,10 +1642,15 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 					database.DB.Where("id IN ? AND enabled = ?", channelIDs, true).Find(&channels)
 					alertSummary := notify.CalculateAlertSummary(*data)
 					for _, ch := range channels {
+						log.Printf("[通知] 数据源通知渠道: id=%d type=%s name=%s", ch.ID, ch.ChannelType, ch.Name)
 						sendSingleNotification(ch, reportPath, data.Datasource, alertSummary, data)
 					}
 				}
+			} else {
+				sendNotifications(a.config, reportPath, data)
 			}
+		} else {
+			sendNotifications(a.config, reportPath, data)
 		}
 
 		database.DB.Create(&database.ReportRecord{
