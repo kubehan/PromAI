@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"PromAI/pkg/config"
+
 	"gorm.io/gorm"
 )
 
@@ -46,7 +47,7 @@ func BuildSystemPrompt(cfg *config.Config, db *gorm.DB) string {
 - 如果用户意图不明确，主动询问澄清
 - 使用中文回答
 - 触发巡检后，使用 query_task 轮询直到任务完成
-- 任务完成后，根据巡检报告摘要向用户给出分析结论（整体状态、告警数、严重/警告级别分布），并提供可点击的报告链接`, cfg.ProjectName, cfg.PrometheusURL, dsCount, typeCount)
+- 任务完成后，根据巡检报告摘要向用户给出分析结论（整体状态、告警数、严重/警告级别分布，严重告警明细，处理建议等信息），并提供可点击的报告链接`, cfg.ProjectName, cfg.PrometheusURL, dsCount, typeCount)
 
 	return prompt
 }
