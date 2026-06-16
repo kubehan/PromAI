@@ -477,21 +477,40 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			query = query.Where("enabled = ?", en == "true")
 		}
 
-		var total int64
-		query.Count(&total)
+		var all []database.DataSource
+		query.Order("is_default desc, enabled desc, name asc").Find(&all)
+		maskPassword(all)
 
-		var ds []database.DataSource
-		query.Order("is_default desc, enabled desc, name asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&ds)
-		maskPassword(ds)
-
-		for i := range ds {
-			if getLatestReport(ds[i].URL) != nil {
-				ds[i].HealthStatus = "online"
+		for i := range all {
+			if getLatestReport(all[i].URL) != nil {
+				all[i].HealthStatus = "online"
 			}
 		}
 
+		if hs := r.URL.Query().Get("health_status"); hs != "" {
+			filtered := make([]database.DataSource, 0, len(all))
+			for _, d := range all {
+				if (hs == "unknown" && d.HealthStatus == "") || d.HealthStatus == hs {
+					filtered = append(filtered, d)
+				}
+			}
+			all = filtered
+		}
+
+		total := len(all)
+		start := (page - 1) * pageSize
+		if start >= total {
+			all = nil
+		} else {
+			end := start + pageSize
+			if end > total {
+				end = total
+			}
+			all = all[start:end]
+		}
+
 		writeJSON(w, map[string]interface{}{
-			"items": ds,
+			"items": all,
 			"total": total,
 			"page":  page,
 			"page_size": pageSize,
