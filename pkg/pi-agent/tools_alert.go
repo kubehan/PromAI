@@ -57,12 +57,24 @@ func (t *AnalyzeAlertTool) Execute(ctx context.Context, params map[string]any, o
 	if dsParam != "" {
 		var dsList []DataSource
 		t.db.Model(&DataSource{}).Where("enabled = ?", true).Find(&dsList)
+		dsParamLower := strings.ToLower(dsParam)
 		for _, ds := range dsList {
-			if ds.Name == dsParam {
+			if strings.EqualFold(ds.Name, dsParam) || ds.Name == dsParam {
 				promURL = ds.URL
 				promUser = ds.Username
 				promPass = ds.Password
 				break
+			}
+		}
+		if promURL == t.config.PrometheusURL {
+			for _, ds := range dsList {
+				dsNameLower := strings.ToLower(ds.Name)
+				if strings.Contains(dsNameLower, dsParamLower) || strings.Contains(dsParamLower, dsNameLower) {
+					promURL = ds.URL
+					promUser = ds.Username
+					promPass = ds.Password
+					break
+				}
 			}
 		}
 	}

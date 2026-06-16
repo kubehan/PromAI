@@ -44,7 +44,9 @@ func BuildSystemPrompt(cfg *config.Config, db *gorm.DB) string {
 - 分析告警时，综合多个关联指标给出根因推测
 - 回答要简洁专业，关键数据用数字强调
 - 如果用户意图不明确，主动询问澄清
-- 使用中文回答`, cfg.ProjectName, cfg.PrometheusURL, dsCount, typeCount)
+- 使用中文回答
+- 触发巡检后，使用 query_task 轮询直到任务完成
+- 任务完成后，根据巡检报告摘要向用户给出分析结论（整体状态、告警数、严重/警告级别分布），并提供可点击的报告链接`, cfg.ProjectName, cfg.PrometheusURL, dsCount, typeCount)
 
 	return prompt
 }

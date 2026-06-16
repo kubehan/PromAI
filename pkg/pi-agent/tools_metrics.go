@@ -62,11 +62,22 @@ func (t *QueryMetricsTool) Execute(ctx context.Context, params map[string]any, o
 		} else {
 			var dsList []DataSource
 			t.db.Model(&DataSource{}).Where("enabled = ?", true).Find(&dsList)
+			dsParamLower := strings.ToLower(dsParam)
 			for _, ds := range dsList {
-				if ds.Name == dsParam {
+				if strings.EqualFold(ds.Name, dsParam) || ds.Name == dsParam {
 					promURL = ds.URL
 					found = true
 					break
+				}
+			}
+			if !found {
+				for _, ds := range dsList {
+					dsNameLower := strings.ToLower(ds.Name)
+					if strings.Contains(dsNameLower, dsParamLower) || strings.Contains(dsParamLower, dsNameLower) {
+						promURL = ds.URL
+						found = true
+						break
+					}
 				}
 			}
 		}
