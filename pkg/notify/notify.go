@@ -489,6 +489,48 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 		log.Printf("最终生成的 reportLink = %s", reportLink)
 	}
 
+	// 尝试从context中获取报告数据，用于分类汇总
+	var typeSummaries []TypeAlertSummary
+	if data, ok := ctx.Value("report_data").(report.ReportData); ok {
+		typeSummaries = CalculateTypeAlertSummary(data)
+		log.Printf("从报告数据中计算出分类汇总")
+	} else {
+		log.Printf("未找到报告数据，使用空分类汇总")
+		typeSummaries = []TypeAlertSummary{}
+	}
+
+	// 构建分类汇总HTML
+	typeSummaryHTML := ""
+	for _, summary := range typeSummaries {
+		typeStatus := "✅"
+		typeColor := "#28a745"
+		if summary.TotalMetrics == 0 {
+			typeStatus = "⚪"
+			typeColor = "#6c757d"
+		} else if summary.CriticalCount > 0 {
+			typeStatus = "❌"
+			typeColor = "#dc3545"
+		} else if summary.WarningCount > 0 {
+			typeStatus = "⚠️"
+			typeColor = "#ffc107"
+		}
+		typeSummaryHTML += fmt.Sprintf(`
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6;"><span style="color: %s;">%s</span> <strong>%s</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center;">%d</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #dc3545;">%d</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #dc3545;">%d</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #ffc107;">%d</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #28a745;">%d</td>
+                </tr>`,
+			typeColor, typeStatus, summary.Type,
+			summary.TotalMetrics,
+			summary.CriticalCount+summary.WarningCount,
+			summary.CriticalCount,
+			summary.WarningCount,
+			summary.NormalCount)
+	}
+
 	// 添加更丰富的邮件内容
 	alertStatus := "✅ 正常"
 	statusColor := "#28a745"
@@ -502,6 +544,24 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 
 	e.HTML = []byte(fmt.Sprintf(`
         <h2 style="color: %s;">🔍 %s 巡检报告已生成 %s</h2>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <h3 style="color: #495057; margin-top: 0;">📊 分类巡检结果</h3>
+            <table style="border-collapse: collapse; width: 100%%;">
+                <thead>
+                    <tr style="background-color: #e9ecef;">
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: left;">分类</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center;">总数</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center;">异常</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; color: #dc3545;">严重</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; color: #ffc107;">警告</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; color: #28a745;">正常</th>
+                    </tr>
+                </thead>
+                <tbody>%s
+                </tbody>
+            </table>
+        </div>
         
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <h3 style="color: #495057; margin-top: 0;">🚨 告警汇总</h3>
@@ -545,6 +605,7 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 		statusColor,
 		projectName,
 		alertStatus,
+		typeSummaryHTML,
 		statusColor,
 		alertStatus,
 		alertSummary.TotalMetrics,
@@ -556,10 +617,12 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 		reportFileName,
 		reportLink))
 
-	// 添加附件
-	if _, err := e.AttachFile(reportPath); err != nil {
-		log.Printf("添加附件失败: %v", err)
-		return fmt.Errorf("添加附件失败: %v", err)
+	// 添加附件（仅当有报告文件时）
+	if reportPath != "" {
+		if _, err := e.AttachFile(reportPath); err != nil {
+			log.Printf("添加附件失败: %v", err)
+			return fmt.Errorf("添加附件失败: %v", err)
+		}
 	}
 
 	// 发送邮件（使用TLS）
