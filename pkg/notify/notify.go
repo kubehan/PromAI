@@ -464,7 +464,7 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 	e := email.NewEmail()
 	e.From = config.From
 	e.To = config.To
-	e.Subject = "巡检报告"
+	e.Subject = fmt.Sprintf("%s 巡检报告", Datasource)
 
 	// 生成报告的访问链接
 	reportFileName := filepath.Base(reportPath)
@@ -544,6 +544,7 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 
 	e.HTML = []byte(fmt.Sprintf(`
         <h2 style="color: %s;">🔍 %s 巡检报告已生成 %s</h2>
+        <p><strong>数据源：</strong>%s</p>
         
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <h3 style="color: #495057; margin-top: 0;">📊 分类巡检结果</h3>
@@ -605,6 +606,7 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 		statusColor,
 		projectName,
 		alertStatus,
+		Datasource,
 		typeSummaryHTML,
 		statusColor,
 		alertStatus,
