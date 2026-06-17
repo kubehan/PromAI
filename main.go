@@ -228,6 +228,12 @@ func (grw *gzipResponseWriter) Write(b []byte) (int, error) {
 	return grw.gw.Write(b)
 }
 
+func (grw *gzipResponseWriter) Flush() {
+	if f, ok := grw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 // 全局定时调度器，由 admin API 动态管理
 var globalScheduler *cron.Cron
 var cronTaskCounter int64
@@ -607,7 +613,9 @@ func sendNotificationsWithContext(ctx context.Context, config *config.Config, re
 
 	if config.Notifications.Email.Enabled {
 		log.Printf("发送邮件")
-		notify.SendEmailWithContext(ctx, config.Notifications.Email, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary)
+		if err := notify.SendEmailWithContext(ctx, config.Notifications.Email, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+			log.Printf("发送邮件失败: %v", err)
+		}
 	}
 
 	if config.Notifications.WeChatWork.Enabled {
@@ -1358,8 +1366,14 @@ func saveReportRecord(data *report.ReportData, reportPath string) {
 	}
 
 	info, _ := os.Stat(reportPath)
+	var dsID *uint
+	var dsRecord database.DataSource
+	if database.DB.Where("url = ?", data.Datasource).First(&dsRecord).Error == nil {
+		dsID = &dsRecord.ID
+	}
 	database.DB.Create(&database.ReportRecord{
 		Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
+		DatasourceID:   dsID,
 		DatasourceName: data.Datasource,
 		FilePath:       reportPath,
 		FileSize:       func() int64 { if info != nil { return info.Size() }; return 0 }(),

@@ -92,25 +92,21 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 			promURL = dsParam
 			dsName = dsParam
 		} else {
-			var dsList []DataSource
-			t.db.Model(&DataSource{}).Where("enabled = ?", true).Find(&dsList)
-			// 先精确匹配，再模糊匹配（不区分大小写、子串匹配）
-			dsParamLower := strings.ToLower(dsParam)
-			for _, ds := range dsList {
-				if strings.EqualFold(ds.Name, dsParam) || ds.Name == dsParam {
+			// 精确匹配: name 不区分大小写
+			var ds DataSource
+			if t.db.Model(&DataSource{}).Where("enabled = ? AND LOWER(name) = LOWER(?)", true, dsParam).First(&ds).Error() == nil {
+				promURL = ds.URL
+				promUser = ds.Username
+				promPass = ds.Password
+				dsName = ds.Name
+			} else {
+				// 模糊匹配: 子串包含
+				like := "%" + dsParam + "%"
+				if t.db.Model(&DataSource{}).Where("enabled = ? AND name LIKE ?", true, like).First(&ds).Error() == nil {
 					promURL = ds.URL
+					promUser = ds.Username
+					promPass = ds.Password
 					dsName = ds.Name
-					break
-				}
-			}
-			if promURL == t.config.PrometheusURL {
-				for _, ds := range dsList {
-					dsNameLower := strings.ToLower(ds.Name)
-					if strings.Contains(dsNameLower, dsParamLower) || strings.Contains(dsParamLower, dsNameLower) {
-						promURL = ds.URL
-						dsName = ds.Name
-						break
-					}
 				}
 			}
 		}
@@ -189,23 +185,53 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 		totalMetrics := 0
 		hasCritical := false
 		hasWarning := false
+		var abnormalDetails []map[string]any
+		typeSummaries := map[string]map[string]int{}
 
-		for _, group := range data.MetricGroups {
+		for typeName, group := range data.MetricGroups {
+			ts := map[string]int{"critical": 0, "warning": 0, "normal": 0, "total": 0}
 			for _, metrics := range group.MetricsByName {
 				for _, m := range metrics {
 					totalMetrics++
+					ts["total"]++
 					switch m.Status {
 					case "critical":
 						criticalCount++
 						alertCount++
 						hasCritical = true
+						ts["critical"]++
 					case "warning":
 						warningCount++
 						alertCount++
 						hasWarning = true
+						ts["warning"]++
+					default:
+						ts["normal"]++
+					}
+					if m.Status == "critical" || m.Status == "warning" {
+						labels := make(map[string]string)
+						for _, lbl := range m.Labels {
+							if lbl.Value != "" && lbl.Name != "__name__" {
+								labels[lbl.Name] = lbl.Value
+							}
+						}
+						detail := map[string]any{
+							"type":     typeName,
+							"name":     m.Name,
+							"value":    m.Value,
+							"unit":     m.Unit,
+							"status":   m.Status,
+							"labels":   labels,
+						}
+						if m.ThresholdType != "" {
+							detail["threshold"] = m.Threshold
+							detail["threshold_type"] = m.ThresholdType
+						}
+						abnormalDetails = append(abnormalDetails, detail)
 					}
 				}
 			}
+			typeSummaries[typeName] = ts
 		}
 
 		status := "success"
@@ -222,10 +248,12 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 		}
 
 		snapshot := map[string]any{
-			"datasource_name": data.Datasource,
-			"total_metrics":   totalMetrics,
-			"critical_count":  criticalCount,
-			"warning_count":   warningCount,
+			"datasource_name":   data.Datasource,
+			"total_metrics":     totalMetrics,
+			"critical_count":    criticalCount,
+			"warning_count":     warningCount,
+			"abnormal_details":  abnormalDetails,
+			"type_summaries":    typeSummaries,
 		}
 		metricsJSON, _ := json.Marshal(snapshot)
 
@@ -338,6 +366,65 @@ func (t *QueryTaskTool) Execute(ctx context.Context, params map[string]any, onUp
 			lines = append(lines, fmt.Sprintf("   - 告警总数: %d", r.AlertCount))
 			lines = append(lines, fmt.Sprintf("   - 严重告警: %d", r.CriticalCount))
 			lines = append(lines, fmt.Sprintf("   - 警告告警: %d", r.WarningCount))
+
+			// 解析异常明细
+			if r.MetricsJSON != "" {
+				var snapshot map[string]any
+				if err := json.Unmarshal([]byte(r.MetricsJSON), &snapshot); err == nil {
+					if details, ok := snapshot["abnormal_details"].([]any); ok && len(details) > 0 {
+						lines = append(lines, "")
+						lines = append(lines, "📋 **异常明细**")
+						currentType := ""
+						for _, d := range details {
+							item, ok := d.(map[string]any)
+							if !ok {
+								continue
+							}
+							typeName, _ := item["type"].(string)
+							name, _ := item["name"].(string)
+							value, _ := item["value"].(float64)
+							unit, _ := item["unit"].(string)
+							status, _ := item["status"].(string)
+							threshold, _ := item["threshold"].(float64)
+							thresholdType, _ := item["threshold_type"].(string)
+
+							if typeName != "" && typeName != currentType {
+								currentType = typeName
+								lines = append(lines, fmt.Sprintf("  *%s*", typeName))
+							}
+
+							statusEmoji := "⚠️"
+							statusLabel := "警告"
+							if status == "critical" {
+								statusEmoji = "🔴"
+								statusLabel = "严重"
+							}
+
+							thresholdStr := ""
+							if thresholdType != "" {
+								thresholdStr = fmt.Sprintf(" (阈值: %s %.2f)", thresholdType, threshold)
+							}
+
+							labelStr := ""
+							if labels, ok := item["labels"].(map[string]any); ok {
+								var parts []string
+								for k, v := range labels {
+									val, _ := v.(string)
+									if val != "" {
+										parts = append(parts, fmt.Sprintf("%s=%s", k, val))
+									}
+								}
+								if len(parts) > 0 {
+									labelStr = " [" + strings.Join(parts, ", ") + "]"
+								}
+							}
+
+							lines = append(lines, fmt.Sprintf("    %s %s%s: %.2f%s%s (%s)",
+								statusEmoji, name, labelStr, value, unit, thresholdStr, statusLabel))
+						}
+					}
+				}
+			}
 		}
 	}
 

@@ -17,6 +17,7 @@ func CreateAllTools(cfg *config.Config, collector *metrics.Collector, db DB) []a
 		&ListDatasourcesTool{db: db},
 		inspectTool,
 		&QueryTaskTool{parent: inspectTool},
+		NewPushReportTool(cfg, db),
 	}
 
 	tools := make([]agent.AgentTool, len(configs))

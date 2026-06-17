@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"PromAI/pkg/config"
@@ -37,14 +38,13 @@ type InspectTask struct {
 }
 
 var (
-	inspectTasks   = make(map[string]*InspectTask)
-	inspectTasksMu sync.Mutex
-	taskCounter    int
+	inspectTasks      = make(map[string]*InspectTask)
+	inspectTasksMu    sync.RWMutex
+	taskCounter       int64
 )
 
 func newTaskID() string {
-	taskCounter++
-	return fmt.Sprintf("task_%d_%d", time.Now().Unix(), taskCounter)
+	return fmt.Sprintf("task_%d_%d", time.Now().Unix(), atomic.AddInt64(&taskCounter, 1))
 }
 
 type MetricHealthData struct {
@@ -225,12 +225,13 @@ func loadLatestReports() {
 }
 
 type AdminAPI struct {
-	collector    *metrics.Collector
-	config       *config.Config
-	authUser     string
-	authPass     string
-	jwtSecret    string
-	syncCronJobs map[uint]cron.EntryID
+	collector       *metrics.Collector
+	config          *config.Config
+	authUser        string
+	authPass        string
+	jwtSecret       string
+	syncCronJobs    map[uint]cron.EntryID
+	syncCronJobsMu  sync.Mutex
 }
 
 func NewAdminAPI(collector *metrics.Collector, cfg *config.Config) *AdminAPI {
@@ -691,8 +692,14 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 		}
 		delete(upd, "id")
 		delete(upd, "created_at")
-		if pw, ok := upd["password"].(string); ok && pw == "" {
-			delete(upd, "password")
+		delete(upd, "updated_at")
+		delete(upd, "health_status")
+		if pw, ok := upd["password"]; ok {
+			if pw == nil {
+				delete(upd, "password")
+			} else if s, ok := pw.(string); ok && s == "" {
+				delete(upd, "password")
+			}
 		}
 		database.DB.Model(&d).Updates(upd)
 		database.DB.First(&d, id)
@@ -820,6 +827,10 @@ func (a *AdminAPI) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		var nc []database.NotificationChannel
 		query.Order("channel_type asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&nc)
 
+		for i := range nc {
+			nc[i].ConfigJSON = maskNotificationConfig(nc[i].ChannelType, nc[i].ConfigJSON)
+		}
+
 		writeJSON(w, map[string]interface{}{
 			"items":     nc,
 			"total":     total,
@@ -861,6 +872,7 @@ func (a *AdminAPI) handleNotificationByID(w http.ResponseWriter, r *http.Request
 			writeError(w, 404, "通知渠道不存在")
 			return
 		}
+		n.ConfigJSON = maskNotificationConfig(n.ChannelType, n.ConfigJSON)
 		writeJSON(w, n)
 	case "PUT":
 		var n database.NotificationChannel
@@ -892,6 +904,9 @@ func (a *AdminAPI) handleAllNotifications(w http.ResponseWriter, r *http.Request
 	}
 	var nc []database.NotificationChannel
 	database.DB.Order("channel_type asc").Find(&nc)
+	for i := range nc {
+		nc[i].ConfigJSON = maskNotificationConfig(nc[i].ChannelType, nc[i].ConfigJSON)
+	}
 	writeJSON(w, nc)
 }
 
@@ -911,7 +926,8 @@ func (a *AdminAPI) handleCronJobs(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "名称和调度表达式不能为空")
 			return
 		}
-		if _, err := cron.ParseStandard(j.Schedule); err != nil {
+		parser := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+		if _, err := parser.Parse(j.Schedule); err != nil {
 			writeError(w, 400, "调度表达式格式无效: "+err.Error())
 			return
 		}
@@ -1105,6 +1121,11 @@ func (a *AdminAPI) handleMetricTypeByID(w http.ResponseWriter, r *http.Request) 
 		database.DB.Save(&upd)
 		writeJSON(w, upd)
 	case "DELETE":
+		var mcIDs []uint
+		database.DB.Model(&database.MetricConfig{}).Where("metric_type_id = ?", id).Pluck("id", &mcIDs)
+		if len(mcIDs) > 0 {
+			database.DB.Where("metric_config_id IN ?", mcIDs).Delete(&database.InspectionTemplateMetric{})
+		}
 		database.DB.Where("metric_type_id = ?", id).Delete(&database.MetricConfig{})
 		database.DB.Delete(&database.MetricType{}, id)
 		w.WriteHeader(204)
@@ -1425,10 +1446,12 @@ func (a *AdminAPI) syncAIConfigSetting(key, value string) {
 		}
 	case "ai_api_key":
 		// 旧格式兼容 — 构建一个默认模型
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		m := &a.config.AI.Models[0]
+		m := &models[0]
 		if strings.HasPrefix(value, "enc:") {
 			decrypted, err := piagent.DecryptAPIKey(strings.TrimPrefix(value, "enc:"), a.jwtSecret)
 			if err == nil {
@@ -1437,31 +1460,47 @@ func (a *AdminAPI) syncAIConfigSetting(key, value string) {
 		} else if value != "" && value != "********" {
 			m.APIKey = value
 		}
+		a.config.AI.Models = models
 	case "ai_provider":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		a.config.AI.Models[0].Provider = value
+		models[0].Provider = value
+		a.config.AI.Models = models
 	case "ai_model":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		a.config.AI.Models[0].Model = value
+		models[0].Model = value
+		a.config.AI.Models = models
 	case "ai_base_url":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		a.config.AI.Models[0].BaseURL = value
+		models[0].BaseURL = value
+		a.config.AI.Models = models
 	case "ai_thinking_level":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		a.config.AI.Models[0].ThinkingLevel = value
+		models[0].ThinkingLevel = value
+		a.config.AI.Models = models
 	case "ai_max_tokens":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		fmt.Sscanf(value, "%d", &a.config.AI.Models[0].MaxTokens)
+		fmt.Sscanf(value, "%d", &models[0].MaxTokens)
+		a.config.AI.Models = models
 	}
 }
 
@@ -1738,9 +1777,9 @@ func (a *AdminAPI) handleInspectTask(w http.ResponseWriter, r *http.Request) {
 	}
 	taskID := parts[4]
 
-	inspectTasksMu.Lock()
+	inspectTasksMu.RLock()
 	task, ok := inspectTasks[taskID]
-	inspectTasksMu.Unlock()
+	inspectTasksMu.RUnlock()
 
 	if !ok {
 		writeError(w, 404, "任务不存在")
@@ -2210,19 +2249,23 @@ func (a *AdminAPI) handleTestNotification(w http.ResponseWriter, r *http.Request
 		writeError(w, 405, "不支持的请求方法")
 		return
 	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, 400, "读取请求体失败")
+		return
+	}
+
 	var req struct {
 		ID uint `json:"id"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
-
 	var nc database.NotificationChannel
-	if req.ID > 0 {
+	if json.Unmarshal(body, &req); req.ID > 0 {
 		if database.DB.First(&nc, req.ID).Error != nil {
 			writeError(w, 404, "通知渠道不存在")
 			return
 		}
 	} else {
-		if err := json.NewDecoder(r.Body).Decode(&nc); err != nil {
+		if err := json.Unmarshal(body, &nc); err != nil {
 			writeError(w, 400, "请求体格式错误")
 			return
 		}
@@ -2768,11 +2811,20 @@ func (a *AdminAPI) handleSyncSourceByID(w http.ResponseWriter, r *http.Request) 
 		}
 		delete(upd, "id")
 		delete(upd, "created_at")
-		if pw, ok := upd["auth_password"].(string); ok && pw == "" {
-			delete(upd, "auth_password")
+		delete(upd, "updated_at")
+		if pw, ok := upd["auth_password"]; ok {
+			if pw == nil {
+				delete(upd, "auth_password")
+			} else if s, ok := pw.(string); ok && s == "" {
+				delete(upd, "auth_password")
+			}
 		}
-		if tok, ok := upd["auth_token"].(string); ok && tok == "" {
-			delete(upd, "auth_token")
+		if tok, ok := upd["auth_token"]; ok {
+			if tok == nil {
+				delete(upd, "auth_token")
+			} else if s, ok := tok.(string); ok && s == "" {
+				delete(upd, "auth_token")
+			}
 		}
 		database.DB.Model(&s).Updates(upd)
 		a.rescheduleSyncSource(&old, &s)
@@ -2821,8 +2873,10 @@ func (a *AdminAPI) executeSync(s *database.SyncSource) {
 	log.Printf("[Sync] 开始同步: %s", s.Name)
 	start := time.Now()
 
-	// Build request
-	req, err := http.NewRequest(s.Method, s.URL, nil)
+	// Build request with 30s timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, s.Method, s.URL, nil)
 	if err != nil {
 		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("创建请求失败: %v", err), 0, 0, 0, 0)
 		return
@@ -2945,32 +2999,17 @@ func (a *AdminAPI) executeSync(s *database.SyncSource) {
 		} else if s.URLField != "" {
 			url = fmt.Sprintf("%v", obj[s.URLField])
 		}
-		username := ""
-		if s.UsernameField != "" {
-			username = fmt.Sprintf("%v", obj[s.UsernameField])
-		}
-		password := ""
-		if s.PasswordField != "" {
-			password = fmt.Sprintf("%v", obj[s.PasswordField])
-		}
-
 		// Find or create datasource
 		var existing database.DataSource
 		result := database.DB.Where("name = ?", name).First(&existing)
 		if result.Error == nil {
 			existing.URL = url
-			existing.Username = username
-			if password != "" {
-				existing.Password = password
-			}
 			database.DB.Save(&existing)
 			updated++
 		} else {
 			ds := database.DataSource{
-				Name:     name,
-				URL:      url,
-				Username: username,
-				Password: password,
+				Name: name,
+				URL:  url,
 			}
 			database.DB.Create(&ds)
 			created++
@@ -3029,7 +3068,9 @@ func (a *AdminAPI) recordSyncLog(syncSourceID uint, status, message string, tota
 }
 
 func (a *AdminAPI) reloadSyncCron() {
+	a.syncCronJobsMu.Lock()
 	a.syncCronJobs = make(map[uint]cron.EntryID)
+	a.syncCronJobsMu.Unlock()
 	var syncSources []database.SyncSource
 	database.DB.Where("enabled = ?", true).Find(&syncSources)
 	for i := range syncSources {
@@ -3044,10 +3085,14 @@ func (a *AdminAPI) scheduleSyncSource(s *database.SyncSource) {
 	if globalScheduler == nil {
 		return
 	}
+	a.syncCronJobsMu.Lock()
 	id, ok := a.syncCronJobs[s.ID]
 	if ok {
 		globalScheduler.Remove(id)
+		delete(a.syncCronJobs, s.ID)
 	}
+	a.syncCronJobsMu.Unlock()
+
 	sourceID := s.ID
 	entryID, err := globalScheduler.AddFunc(s.CronExpr, func() {
 		var src database.SyncSource
@@ -3060,7 +3105,9 @@ func (a *AdminAPI) scheduleSyncSource(s *database.SyncSource) {
 		log.Printf("[Sync] 调度同步源 %s 失败: %v", s.Name, err)
 		return
 	}
+	a.syncCronJobsMu.Lock()
 	a.syncCronJobs[s.ID] = entryID
+	a.syncCronJobsMu.Unlock()
 	log.Printf("[Sync] 已调度同步源: %s (%s)", s.Name, s.CronExpr)
 }
 
@@ -3079,6 +3126,8 @@ func (a *AdminAPI) rescheduleSyncSource(old, new *database.SyncSource) {
 }
 
 func (a *AdminAPI) removeSyncCron(id uint) {
+	a.syncCronJobsMu.Lock()
+	defer a.syncCronJobsMu.Unlock()
 	if entryID, ok := a.syncCronJobs[id]; ok {
 		if globalScheduler != nil {
 			globalScheduler.Remove(entryID)
@@ -3108,4 +3157,60 @@ func safePct(n, total int) float64 {
 		return 0
 	}
 	return float64(n) / float64(total) * 100
+}
+
+func maskNotificationConfig(channelType, rawJSON string) string {
+	if rawJSON == "" {
+		return rawJSON
+	}
+	switch channelType {
+	case "dingtalk":
+		var cfg notify.DingtalkConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if cfg.Secret != "" {
+				cfg.Secret = "********"
+			}
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	case "email":
+		var cfg notify.EmailConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if cfg.Password != "" {
+				cfg.Password = "********"
+			}
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	case "wechat_work":
+		var cfg notify.WeChatWorkConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	case "wechat_app":
+		var cfg notify.WeChatAppConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if cfg.Secret != "" {
+				cfg.Secret = "********"
+			}
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	case "feishu":
+		var cfg notify.FeishuConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if cfg.Secret != "" {
+				cfg.Secret = "********"
+			}
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	}
+	return rawJSON
 }
