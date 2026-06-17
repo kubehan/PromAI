@@ -257,6 +257,7 @@ async function handleSave() {
     if (saveCfg.to && typeof saveCfg.to === 'string') {
       saveCfg.to = saveCfg.to.split(/[,，]\s*/).filter(Boolean)
     }
+    saveCfg.enabled = form.enabled ?? true
     const payload = { ...form, config_json: JSON.stringify(saveCfg) }
     if (editingId.value) {
       await updateNotification(editingId.value, payload)
@@ -273,7 +274,15 @@ async function handleSave() {
 
 async function toggleEnabled(row: NotificationChannel) {
   try {
-    await updateNotification(row.id!, { enabled: row.enabled } as any)
+    let cfg: any = {}
+    if (row.config_json) {
+      try { cfg = JSON.parse(row.config_json) } catch {}
+    }
+    cfg.enabled = row.enabled
+    await updateNotification(row.id!, {
+      enabled: row.enabled,
+      config_json: JSON.stringify(cfg)
+    } as any)
   } catch { ElMessage.error('更新失败') }
 }
 

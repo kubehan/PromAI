@@ -880,15 +880,45 @@ func (a *AdminAPI) handleNotificationByID(w http.ResponseWriter, r *http.Request
 			writeError(w, 404, "通知渠道不存在")
 			return
 		}
-		var upd database.NotificationChannel
-		if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
+
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeError(w, 400, "读取请求体失败")
+			return
+		}
+
+		var bodyFields map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &bodyFields); err != nil {
 			writeError(w, 400, "请求体格式错误")
 			return
 		}
-		upd.ID = n.ID
-		upd.CreatedAt = n.CreatedAt
-		database.DB.Save(&upd)
-		writeJSON(w, upd)
+
+		updates := map[string]interface{}{}
+		if v, ok := bodyFields["channel_type"]; ok {
+			updates["channel_type"] = v
+		}
+		if v, ok := bodyFields["name"]; ok {
+			updates["name"] = v
+		}
+		if _, ok := bodyFields["enabled"]; ok {
+			updates["enabled"] = bodyFields["enabled"]
+		}
+		if v, ok := bodyFields["config_json"]; ok {
+			rawJSON, _ := v.(string)
+			ct := n.ChannelType
+			if ctVal, ok := bodyFields["channel_type"].(string); ok && ctVal != "" {
+				ct = ctVal
+			}
+			updates["config_json"] = restoreSensitiveFields(ct, n.ConfigJSON, rawJSON)
+		}
+
+		if len(updates) > 0 {
+			database.DB.Model(&n).Updates(updates)
+		}
+
+		database.DB.First(&n, id)
+		n.ConfigJSON = maskNotificationConfig(n.ChannelType, n.ConfigJSON)
+		writeJSON(w, n)
 	case "DELETE":
 		database.DB.Delete(&database.NotificationChannel{}, id)
 		w.WriteHeader(204)
@@ -3213,4 +3243,57 @@ func maskNotificationConfig(channelType, rawJSON string) string {
 		}
 	}
 	return rawJSON
+}
+
+func restoreSensitiveFields(channelType, oldJSON, newJSON string) string {
+	if oldJSON == "" || newJSON == "" {
+		return newJSON
+	}
+	switch channelType {
+	case "email":
+		var old, new notify.EmailConfig
+		if json.Unmarshal([]byte(oldJSON), &old) != nil || json.Unmarshal([]byte(newJSON), &new) != nil {
+			return newJSON
+		}
+		if new.Password == "********" {
+			new.Password = old.Password
+		}
+		if b, err := json.Marshal(new); err == nil {
+			return string(b)
+		}
+	case "dingtalk":
+		var old, new notify.DingtalkConfig
+		if json.Unmarshal([]byte(oldJSON), &old) != nil || json.Unmarshal([]byte(newJSON), &new) != nil {
+			return newJSON
+		}
+		if new.Secret == "********" {
+			new.Secret = old.Secret
+		}
+		if b, err := json.Marshal(new); err == nil {
+			return string(b)
+		}
+	case "wechat_app":
+		var old, new notify.WeChatAppConfig
+		if json.Unmarshal([]byte(oldJSON), &old) != nil || json.Unmarshal([]byte(newJSON), &new) != nil {
+			return newJSON
+		}
+		if new.Secret == "********" {
+			new.Secret = old.Secret
+		}
+		if b, err := json.Marshal(new); err == nil {
+			return string(b)
+		}
+	case "feishu":
+		var old, new notify.FeishuConfig
+		if json.Unmarshal([]byte(oldJSON), &old) != nil || json.Unmarshal([]byte(newJSON), &new) != nil {
+			return newJSON
+		}
+		if new.Secret == "********" {
+			new.Secret = old.Secret
+		}
+		if b, err := json.Marshal(new); err == nil {
+			return string(b)
+		}
+	}
+	return newJSON
 }
