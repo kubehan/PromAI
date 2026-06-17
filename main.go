@@ -109,9 +109,9 @@ func main() {
 	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
 
 	// 设置 HTTP 路由
-	setupRoutes(collector, config, globalScheduler)
+	setupRoutes(collector, config)
 
-	// 启动全局定时调度器（从配置文件和数据库加载定时任务）
+	// 启动全局定时调度器（从配置文件和数据库加载定时任务，含数据源同步任务）
 	startGlobalScheduler(config, collector)
 
 	// 配置报告清理
@@ -231,9 +231,10 @@ func (grw *gzipResponseWriter) Write(b []byte) (int, error) {
 // 全局定时调度器，由 admin API 动态管理
 var globalScheduler *cron.Cron
 var cronTaskCounter int64
+var adminAPI *AdminAPI
 
 // setupRoutes 设置 HTTP 路由
-func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler *cron.Cron) {
+func setupRoutes(collector *metrics.Collector, config *config.Config) *AdminAPI {
 	// 设置首页路由
 	http.HandleFunc("/api/promai/", indexHandler)
 	http.HandleFunc("/api/promai/index", indexHandler)
@@ -283,12 +284,14 @@ func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler 
 	}
 
 	// 注册管理 API 路由
-	adminAPI := NewAdminAPI(collector, config, scheduler)
+	adminAPI = NewAdminAPI(collector, config)
 	adminAPI.RegisterHandlers(http.DefaultServeMux)
 
 	// 注册 AI Agent 路由
 	aiAgent := piagent.NewAgentHandler(config, collector, database.DB, config.Auth.JWTSecret)
 	aiAgent.RegisterRoutes(http.DefaultServeMux, adminAPI.authMiddleware)
+
+	return adminAPI
 
 }
 
@@ -296,10 +299,7 @@ func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler 
 func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
 	// 清除旧任务，防止泄漏
 	globalScheduler.Stop()
-	for globalScheduler.Entries() != nil {
-		globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
-		break
-	}
+	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
 
 	// 从数据库加载定时任务
 	var dbJobs []database.CronJob
@@ -340,6 +340,11 @@ func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
 		} else {
 			log.Printf("[Cron] 已调度配置文件任务: %s", config.CronSchedule)
 		}
+	}
+
+	// 重新加载数据源同步定时任务（调度器重建后原任务已丢失）
+	if adminAPI != nil {
+		adminAPI.reloadSyncCron()
 	}
 
 	globalScheduler.Start()

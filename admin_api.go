@@ -230,11 +230,10 @@ type AdminAPI struct {
 	authUser     string
 	authPass     string
 	jwtSecret    string
-	scheduler    *cron.Cron
 	syncCronJobs map[uint]cron.EntryID
 }
 
-func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, scheduler *cron.Cron) *AdminAPI {
+func NewAdminAPI(collector *metrics.Collector, cfg *config.Config) *AdminAPI {
 	authUser := cfg.Auth.Username
 	authPass := cfg.Auth.Password
 	jwtSecret := cfg.Auth.JWTSecret
@@ -265,7 +264,6 @@ func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, scheduler *cr
 		authUser:     authUser,
 		authPass:     authPass,
 		jwtSecret:    jwtSecret,
-		scheduler:    scheduler,
 		syncCronJobs: make(map[uint]cron.EntryID),
 	}
 }
@@ -2762,6 +2760,7 @@ func (a *AdminAPI) handleSyncSourceByID(w http.ResponseWriter, r *http.Request) 
 			writeError(w, 404, "同步源不存在")
 			return
 		}
+		old := s
 		var upd map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
 			writeError(w, 400, "请求体格式错误")
@@ -2776,7 +2775,7 @@ func (a *AdminAPI) handleSyncSourceByID(w http.ResponseWriter, r *http.Request) 
 			delete(upd, "auth_token")
 		}
 		database.DB.Model(&s).Updates(upd)
-		a.rescheduleSyncSource(&s, nil)
+		a.rescheduleSyncSource(&old, &s)
 		s.AuthPassword = ""
 		s.AuthToken = ""
 		writeJSON(w, s)
@@ -3029,19 +3028,28 @@ func (a *AdminAPI) recordSyncLog(syncSourceID uint, status, message string, tota
 	database.DB.Model(&database.SyncSource{}).Where("id = ?", syncSourceID).Update("updated_at", time.Now())
 }
 
+func (a *AdminAPI) reloadSyncCron() {
+	a.syncCronJobs = make(map[uint]cron.EntryID)
+	var syncSources []database.SyncSource
+	database.DB.Where("enabled = ?", true).Find(&syncSources)
+	for i := range syncSources {
+		a.scheduleSyncSource(&syncSources[i])
+	}
+}
+
 func (a *AdminAPI) scheduleSyncSource(s *database.SyncSource) {
 	if s.CronExpr == "" || !s.Enabled {
 		return
 	}
-	if a.scheduler == nil {
+	if globalScheduler == nil {
 		return
 	}
 	id, ok := a.syncCronJobs[s.ID]
 	if ok {
-		a.scheduler.Remove(id)
+		globalScheduler.Remove(id)
 	}
 	sourceID := s.ID
-	entryID, err := a.scheduler.AddFunc(s.CronExpr, func() {
+	entryID, err := globalScheduler.AddFunc(s.CronExpr, func() {
 		var src database.SyncSource
 		if database.DB.First(&src, sourceID).Error != nil {
 			return
@@ -3060,6 +3068,10 @@ func (a *AdminAPI) rescheduleSyncSource(old, new *database.SyncSource) {
 	if new == nil {
 		return
 	}
+	if old == nil {
+		a.scheduleSyncSource(new)
+		return
+	}
 	if old.CronExpr != new.CronExpr || old.Enabled != new.Enabled {
 		a.removeSyncCron(old.ID)
 		a.scheduleSyncSource(new)
@@ -3068,8 +3080,8 @@ func (a *AdminAPI) rescheduleSyncSource(old, new *database.SyncSource) {
 
 func (a *AdminAPI) removeSyncCron(id uint) {
 	if entryID, ok := a.syncCronJobs[id]; ok {
-		if a.scheduler != nil {
-			a.scheduler.Remove(entryID)
+		if globalScheduler != nil {
+			globalScheduler.Remove(entryID)
 		}
 		delete(a.syncCronJobs, id)
 	}
