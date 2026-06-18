@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"net/smtp"
 	"net/url"
 	"path/filepath"
@@ -1165,8 +1166,13 @@ func SendWeChatAppWithContext(ctx context.Context, config WeChatAppConfig, repor
 		reportLink = utils.GetReportURL(r, reportFileName)
 		log.Printf("使用动态URL生成报告链接: %s", reportLink)
 	} else {
-		// 回退到配置的静态URL
-		reportLink = fmt.Sprintf("%s/api/promai/reports/%s", config.ReportURL, reportFileName)
+		// 回退到配置的静态URL，优先使用环境变量 REPORT_URL
+		baseURL := config.ReportURL
+		if envURL := os.Getenv("REPORT_URL"); envURL != "" {
+			baseURL = envURL
+			log.Printf("使用环境变量 REPORT_URL: %s", baseURL)
+		}
+		reportLink = fmt.Sprintf("%s/api/promai/reports/%s", baseURL, reportFileName)
 		log.Printf("使用配置的静态URL生成报告链接: %s", reportLink)
 	}
 
