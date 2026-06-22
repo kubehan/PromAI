@@ -37,6 +37,10 @@
           <el-option label="仅启用" value="true" />
           <el-option label="仅禁用" value="false" />
         </el-select>
+        <el-select v-model="filterHealth" placeholder="健康状态" clearable style="width: 120px;" @change="onHealthFilterChange">
+          <el-option label="在线" value="online" />
+          <el-option label="未知" value="unknown" />
+        </el-select>
         <span style="font-size: 13px; color: var(--text-tertiary);">共 {{ total }} 个</span>
       </div>
 
@@ -115,6 +119,16 @@
               @click.stop
               @change="toggleEnabled(row)"
             />
+          </template>
+        </el-table-column>
+        <el-table-column label="健康状态" width="90" align="center">
+          <template #default="{ row }">
+            <span v-if="row.health_status === 'online'" style="display: flex; align-items: center; justify-content: center; gap: 4px; color: #10b981; font-size: 13px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5);"></span>在线
+            </span>
+            <span v-else style="display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--text-tertiary); font-size: 13px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary);"></span>未知
+            </span>
           </template>
         </el-table-column>
         <el-table-column prop="username" label="用户名" width="100">
@@ -419,6 +433,7 @@ const pageSize = ref(50)
 const total = ref(0)
 const searchKeyword = ref('')
 const filterEnabled = ref('')
+const filterHealth = ref('')
 const selectedIds = ref<number[]>([])
 const batchDialogVisible = ref(false)
 const batchMode = ref<'template' | 'notify' | 'creds'>('template')
@@ -530,12 +545,18 @@ watch(syncDialogVisible, (v) => {
   }
 })
 
+function onHealthFilterChange() {
+  page.value = 1
+  fetchData()
+}
+
 async function fetchData() {
   loading.value = true
   try {
     const params: any = { page: page.value, page_size: pageSize.value }
     if (searchKeyword.value) params.keyword = searchKeyword.value
     if (filterEnabled.value) params.enabled = filterEnabled.value
+    if (filterHealth.value) params.health_status = filterHealth.value
     const [dsRes, tmplRes, notifRes] = await Promise.all([getDataSources(params), getAllTemplates(), getAllNotifications()])
     datasources.value = dsRes.data.items
     total.value = dsRes.data.total

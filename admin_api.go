@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"PromAI/pkg/config"
@@ -37,14 +38,13 @@ type InspectTask struct {
 }
 
 var (
-	inspectTasks   = make(map[string]*InspectTask)
-	inspectTasksMu sync.Mutex
-	taskCounter    int
+	inspectTasks      = make(map[string]*InspectTask)
+	inspectTasksMu    sync.RWMutex
+	taskCounter       int64
 )
 
 func newTaskID() string {
-	taskCounter++
-	return fmt.Sprintf("task_%d_%d", time.Now().Unix(), taskCounter)
+	return fmt.Sprintf("task_%d_%d", time.Now().Unix(), atomic.AddInt64(&taskCounter, 1))
 }
 
 type MetricHealthData struct {
@@ -153,6 +153,8 @@ func buildHealthSnapshot(data *report.ReportData) string {
 var (
 	latestReports   map[string]*DatasourceHealthSnapshot
 	latestReportsMu sync.RWMutex
+	healthCache     map[string]interface{}
+	healthCacheMu   sync.RWMutex
 )
 
 func setLatestReport(key string, data *DatasourceHealthSnapshot) {
@@ -162,6 +164,7 @@ func setLatestReport(key string, data *DatasourceHealthSnapshot) {
 		latestReports = make(map[string]*DatasourceHealthSnapshot)
 	}
 	latestReports[key] = data
+	invalidateHealthCache()
 }
 
 func getLatestReport(key string) *DatasourceHealthSnapshot {
@@ -171,6 +174,36 @@ func getLatestReport(key string) *DatasourceHealthSnapshot {
 		return nil
 	}
 	return latestReports[key]
+}
+
+func invalidateHealthCache() {
+	healthCacheMu.Lock()
+	defer healthCacheMu.Unlock()
+	healthCache = nil
+}
+
+func getHealthCache(dsID string) (map[string]interface{}, bool) {
+	healthCacheMu.RLock()
+	defer healthCacheMu.RUnlock()
+	if healthCache == nil {
+		return nil, false
+	}
+	key := dsID
+	if v, ok := healthCache[key]; ok {
+		if data, ok := v.(map[string]interface{}); ok {
+			return data, true
+		}
+	}
+	return nil, false
+}
+
+func setHealthCache(dsID string, data map[string]interface{}) {
+	healthCacheMu.Lock()
+	defer healthCacheMu.Unlock()
+	if healthCache == nil {
+		healthCache = make(map[string]interface{})
+	}
+	healthCache[dsID] = data
 }
 
 func loadLatestReports() {
@@ -192,16 +225,16 @@ func loadLatestReports() {
 }
 
 type AdminAPI struct {
-	collector    *metrics.Collector
-	config       *config.Config
-	authUser     string
-	authPass     string
-	jwtSecret    string
-	scheduler    *cron.Cron
-	syncCronJobs map[uint]cron.EntryID
+	collector       *metrics.Collector
+	config          *config.Config
+	authUser        string
+	authPass        string
+	jwtSecret       string
+	syncCronJobs    map[uint]cron.EntryID
+	syncCronJobsMu  sync.Mutex
 }
 
-func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, scheduler *cron.Cron) *AdminAPI {
+func NewAdminAPI(collector *metrics.Collector, cfg *config.Config) *AdminAPI {
 	authUser := cfg.Auth.Username
 	authPass := cfg.Auth.Password
 	jwtSecret := cfg.Auth.JWTSecret
@@ -232,7 +265,6 @@ func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, scheduler *cr
 		authUser:     authUser,
 		authPass:     authPass,
 		jwtSecret:    jwtSecret,
-		scheduler:    scheduler,
 		syncCronJobs: make(map[uint]cron.EntryID),
 	}
 }
@@ -444,15 +476,40 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			query = query.Where("enabled = ?", en == "true")
 		}
 
-		var total int64
-		query.Count(&total)
+		var all []database.DataSource
+		query.Order("is_default desc, enabled desc, name asc").Find(&all)
+		maskPassword(all)
 
-		var ds []database.DataSource
-		query.Order("is_default desc, enabled desc, name asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&ds)
-		maskPassword(ds)
+		for i := range all {
+			if getLatestReport(all[i].URL) != nil {
+				all[i].HealthStatus = "online"
+			}
+		}
+
+		if hs := r.URL.Query().Get("health_status"); hs != "" {
+			filtered := make([]database.DataSource, 0, len(all))
+			for _, d := range all {
+				if (hs == "unknown" && d.HealthStatus == "") || d.HealthStatus == hs {
+					filtered = append(filtered, d)
+				}
+			}
+			all = filtered
+		}
+
+		total := len(all)
+		start := (page - 1) * pageSize
+		if start >= total {
+			all = nil
+		} else {
+			end := start + pageSize
+			if end > total {
+				end = total
+			}
+			all = all[start:end]
+		}
 
 		writeJSON(w, map[string]interface{}{
-			"items": ds,
+			"items": all,
 			"total": total,
 			"page":  page,
 			"page_size": pageSize,
@@ -469,6 +526,7 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 		}
 		d.Enabled = true
 		database.DB.Create(&d)
+		invalidateDSCache()
 		log.Printf("[Admin] 创建数据源: id=%d name=%s url=%s", d.ID, d.Name, d.URL)
 		w.WriteHeader(201)
 		d.Password = ""
@@ -538,10 +596,22 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "不支持的操作")
 			return
 		}
+		invalidateDSCache()
 		writeJSON(w, map[string]interface{}{"success": true})
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
+}
+
+var (
+	dsCache   []database.DataSource
+	dsCacheMu sync.RWMutex
+)
+
+func invalidateDSCache() {
+	dsCacheMu.Lock()
+	defer dsCacheMu.Unlock()
+	dsCache = nil
 }
 
 func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) {
@@ -549,11 +619,39 @@ func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) 
 		writeError(w, 405, "不支持的请求方法")
 		return
 	}
+	dsCacheMu.RLock()
+	if dsCache != nil {
+		cached := dsCache
+		dsCacheMu.RUnlock()
+		result := make([]database.DataSource, len(cached))
+		copy(result, cached)
+		for i := range result {
+			if getLatestReport(result[i].URL) != nil {
+				result[i].HealthStatus = "online"
+			}
+		}
+		w.Header().Set("X-Cache", "HIT")
+		writeJSON(w, result)
+		return
+	}
+	dsCacheMu.RUnlock()
+
 	var ds []database.DataSource
 	database.DB.Model(&database.DataSource{}).
 		Order("is_default desc, enabled desc, name asc").
 		Find(&ds)
 	maskPassword(ds)
+	for i := range ds {
+		if getLatestReport(ds[i].URL) != nil {
+			ds[i].HealthStatus = "online"
+		}
+	}
+
+	dsCacheMu.Lock()
+	dsCache = ds
+	dsCacheMu.Unlock()
+
+	w.Header().Set("X-Cache", "MISS")
 	writeJSON(w, ds)
 }
 
@@ -594,11 +692,18 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 		}
 		delete(upd, "id")
 		delete(upd, "created_at")
-		if pw, ok := upd["password"].(string); ok && pw == "" {
-			delete(upd, "password")
+		delete(upd, "updated_at")
+		delete(upd, "health_status")
+		if pw, ok := upd["password"]; ok {
+			if pw == nil {
+				delete(upd, "password")
+			} else if s, ok := pw.(string); ok && s == "" {
+				delete(upd, "password")
+			}
 		}
 		database.DB.Model(&d).Updates(upd)
 		database.DB.First(&d, id)
+		invalidateDSCache()
 		log.Printf("[Admin] 更新数据源: id=%d name=%s", id, d.Name)
 		d.Password = ""
 		writeJSON(w, d)
@@ -606,6 +711,7 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 		var d database.DataSource
 		database.DB.First(&d, id)
 		database.DB.Delete(&database.DataSource{}, id)
+		invalidateDSCache()
 		log.Printf("[Admin] 删除数据源: id=%d name=%s", id, d.Name)
 		w.WriteHeader(204)
 	default:
@@ -653,6 +759,7 @@ func (a *AdminAPI) handleImportDatasource(w http.ResponseWriter, r *http.Request
 		imported++
 	}
 
+	invalidateDSCache()
 	writeJSON(w, map[string]interface{}{"imported": imported, "message": fmt.Sprintf("成功导入 %d 个数据源", imported)})
 	log.Printf("[Admin] 批量导入数据源完成: %d 个", imported)
 }
@@ -720,6 +827,10 @@ func (a *AdminAPI) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		var nc []database.NotificationChannel
 		query.Order("channel_type asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&nc)
 
+		for i := range nc {
+			nc[i].ConfigJSON = maskNotificationConfig(nc[i].ChannelType, nc[i].ConfigJSON)
+		}
+
 		writeJSON(w, map[string]interface{}{
 			"items":     nc,
 			"total":     total,
@@ -761,6 +872,7 @@ func (a *AdminAPI) handleNotificationByID(w http.ResponseWriter, r *http.Request
 			writeError(w, 404, "通知渠道不存在")
 			return
 		}
+		n.ConfigJSON = maskNotificationConfig(n.ChannelType, n.ConfigJSON)
 		writeJSON(w, n)
 	case "PUT":
 		var n database.NotificationChannel
@@ -768,15 +880,45 @@ func (a *AdminAPI) handleNotificationByID(w http.ResponseWriter, r *http.Request
 			writeError(w, 404, "通知渠道不存在")
 			return
 		}
-		var upd database.NotificationChannel
-		if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
+
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeError(w, 400, "读取请求体失败")
+			return
+		}
+
+		var bodyFields map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &bodyFields); err != nil {
 			writeError(w, 400, "请求体格式错误")
 			return
 		}
-		upd.ID = n.ID
-		upd.CreatedAt = n.CreatedAt
-		database.DB.Save(&upd)
-		writeJSON(w, upd)
+
+		updates := map[string]interface{}{}
+		if v, ok := bodyFields["channel_type"]; ok {
+			updates["channel_type"] = v
+		}
+		if v, ok := bodyFields["name"]; ok {
+			updates["name"] = v
+		}
+		if _, ok := bodyFields["enabled"]; ok {
+			updates["enabled"] = bodyFields["enabled"]
+		}
+		if v, ok := bodyFields["config_json"]; ok {
+			rawJSON, _ := v.(string)
+			ct := n.ChannelType
+			if ctVal, ok := bodyFields["channel_type"].(string); ok && ctVal != "" {
+				ct = ctVal
+			}
+			updates["config_json"] = restoreSensitiveFields(ct, n.ConfigJSON, rawJSON)
+		}
+
+		if len(updates) > 0 {
+			database.DB.Model(&n).Updates(updates)
+		}
+
+		database.DB.First(&n, id)
+		n.ConfigJSON = maskNotificationConfig(n.ChannelType, n.ConfigJSON)
+		writeJSON(w, n)
 	case "DELETE":
 		database.DB.Delete(&database.NotificationChannel{}, id)
 		w.WriteHeader(204)
@@ -792,6 +934,9 @@ func (a *AdminAPI) handleAllNotifications(w http.ResponseWriter, r *http.Request
 	}
 	var nc []database.NotificationChannel
 	database.DB.Order("channel_type asc").Find(&nc)
+	for i := range nc {
+		nc[i].ConfigJSON = maskNotificationConfig(nc[i].ChannelType, nc[i].ConfigJSON)
+	}
 	writeJSON(w, nc)
 }
 
@@ -811,7 +956,8 @@ func (a *AdminAPI) handleCronJobs(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "名称和调度表达式不能为空")
 			return
 		}
-		if _, err := cron.ParseStandard(j.Schedule); err != nil {
+		parser := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+		if _, err := parser.Parse(j.Schedule); err != nil {
 			writeError(w, 400, "调度表达式格式无效: "+err.Error())
 			return
 		}
@@ -1005,6 +1151,11 @@ func (a *AdminAPI) handleMetricTypeByID(w http.ResponseWriter, r *http.Request) 
 		database.DB.Save(&upd)
 		writeJSON(w, upd)
 	case "DELETE":
+		var mcIDs []uint
+		database.DB.Model(&database.MetricConfig{}).Where("metric_type_id = ?", id).Pluck("id", &mcIDs)
+		if len(mcIDs) > 0 {
+			database.DB.Where("metric_config_id IN ?", mcIDs).Delete(&database.InspectionTemplateMetric{})
+		}
 		database.DB.Where("metric_type_id = ?", id).Delete(&database.MetricConfig{})
 		database.DB.Delete(&database.MetricType{}, id)
 		w.WriteHeader(204)
@@ -1325,10 +1476,12 @@ func (a *AdminAPI) syncAIConfigSetting(key, value string) {
 		}
 	case "ai_api_key":
 		// 旧格式兼容 — 构建一个默认模型
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		m := &a.config.AI.Models[0]
+		m := &models[0]
 		if strings.HasPrefix(value, "enc:") {
 			decrypted, err := piagent.DecryptAPIKey(strings.TrimPrefix(value, "enc:"), a.jwtSecret)
 			if err == nil {
@@ -1337,31 +1490,47 @@ func (a *AdminAPI) syncAIConfigSetting(key, value string) {
 		} else if value != "" && value != "********" {
 			m.APIKey = value
 		}
+		a.config.AI.Models = models
 	case "ai_provider":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		a.config.AI.Models[0].Provider = value
+		models[0].Provider = value
+		a.config.AI.Models = models
 	case "ai_model":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		a.config.AI.Models[0].Model = value
+		models[0].Model = value
+		a.config.AI.Models = models
 	case "ai_base_url":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		a.config.AI.Models[0].BaseURL = value
+		models[0].BaseURL = value
+		a.config.AI.Models = models
 	case "ai_thinking_level":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		a.config.AI.Models[0].ThinkingLevel = value
+		models[0].ThinkingLevel = value
+		a.config.AI.Models = models
 	case "ai_max_tokens":
-		if len(a.config.AI.Models) == 0 {
-			a.config.AI.Models = []config.AIModelConfig{{Name: "default"}}
+		models := make([]config.AIModelConfig, len(a.config.AI.Models))
+		copy(models, a.config.AI.Models)
+		if len(models) == 0 {
+			models = []config.AIModelConfig{{Name: "default"}}
 		}
-		fmt.Sscanf(value, "%d", &a.config.AI.Models[0].MaxTokens)
+		fmt.Sscanf(value, "%d", &models[0].MaxTokens)
+		a.config.AI.Models = models
 	}
 }
 
@@ -1524,7 +1693,11 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 
 		if req.WechatBotKey != "" {
 			alertSummary := notify.CalculateAlertSummary(*data)
-			notify.SendWeChatWorkWithWebhook(context.Background(), req.WechatBotKey, "", reportPath, a.config.ProjectName, promURL, alertSummary)
+			proxyURL := ""
+			if a.config.Notifications.WeChatWork.ProxyURL != "" {
+				proxyURL = a.config.Notifications.WeChatWork.ProxyURL
+			}
+			notify.SendWeChatWorkWithWebhook(context.Background(), req.WechatBotKey, proxyURL, reportPath, a.config.ProjectName, promURL, alertSummary)
 		}
 
 		if req.DatasourceID > 0 {
@@ -1536,10 +1709,15 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 					database.DB.Where("id IN ? AND enabled = ?", channelIDs, true).Find(&channels)
 					alertSummary := notify.CalculateAlertSummary(*data)
 					for _, ch := range channels {
+						log.Printf("[通知] 数据源通知渠道: id=%d type=%s name=%s", ch.ID, ch.ChannelType, ch.Name)
 						sendSingleNotification(ch, reportPath, data.Datasource, alertSummary, data)
 					}
 				}
+			} else {
+				sendNotifications(a.config, reportPath, data)
 			}
+		} else {
+			sendNotifications(a.config, reportPath, data)
 		}
 
 		database.DB.Create(&database.ReportRecord{
@@ -1629,9 +1807,9 @@ func (a *AdminAPI) handleInspectTask(w http.ResponseWriter, r *http.Request) {
 	}
 	taskID := parts[4]
 
-	inspectTasksMu.Lock()
+	inspectTasksMu.RLock()
 	task, ok := inspectTasks[taskID]
-	inspectTasksMu.Unlock()
+	inspectTasksMu.RUnlock()
 
 	if !ok {
 		writeError(w, 404, "任务不存在")
@@ -2101,19 +2279,23 @@ func (a *AdminAPI) handleTestNotification(w http.ResponseWriter, r *http.Request
 		writeError(w, 405, "不支持的请求方法")
 		return
 	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, 400, "读取请求体失败")
+		return
+	}
+
 	var req struct {
 		ID uint `json:"id"`
 	}
-	json.NewDecoder(r.Body).Decode(&req)
-
 	var nc database.NotificationChannel
-	if req.ID > 0 {
+	if json.Unmarshal(body, &req); req.ID > 0 {
 		if database.DB.First(&nc, req.ID).Error != nil {
 			writeError(w, 404, "通知渠道不存在")
 			return
 		}
 	} else {
-		if err := json.NewDecoder(r.Body).Decode(&nc); err != nil {
+		if err := json.Unmarshal(body, &nc); err != nil {
 			writeError(w, 400, "请求体格式错误")
 			return
 		}
@@ -2243,6 +2425,13 @@ func (a *AdminAPI) getDatasourceMetricConfigs(ds database.DataSource) []database
 func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request) {
 	dsIDStr := r.URL.Query().Get("datasource_id")
 
+	if cached, hit := getHealthCache(dsIDStr); hit {
+		w.Header().Set("X-Cache", "HIT")
+		writeJSON(w, cached)
+		return
+	}
+	w.Header().Set("X-Cache", "MISS")
+
 	var datasources []database.DataSource
 	q := database.DB.Order("is_default desc, name asc")
 	if dsIDStr != "" {
@@ -2284,9 +2473,21 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 
 	var results []DatasourceHealth
 
+	urls := make([]string, len(datasources))
+	for i, ds := range datasources {
+		urls[i] = ds.URL
+	}
+	var latestRecords []database.ReportRecord
+	database.DB.Where("datasource_name IN ?", urls).Order("created_at desc").Find(&latestRecords)
+	reportMap := make(map[string]database.ReportRecord, len(datasources))
+	for _, r := range latestRecords {
+		if _, ok := reportMap[r.DatasourceName]; !ok {
+			reportMap[r.DatasourceName] = r
+		}
+	}
+
 	for _, ds := range datasources {
-		var lastReport database.ReportRecord
-		database.DB.Where("datasource_name = ?", ds.URL).Order("created_at desc").First(&lastReport)
+		lastReport := reportMap[ds.URL]
 
 		snapshot := getLatestReport(ds.URL)
 		if snapshot == nil {
@@ -2438,7 +2639,7 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 		return typeAlerts[i].Alerts > typeAlerts[j].Alerts
 	})
 
-	writeJSON(w, map[string]interface{}{
+	resp := map[string]interface{}{
 		"datasources":         results,
 		"overall_health":      overallHealth,
 		"total_metrics":       totalAll,
@@ -2449,7 +2650,9 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 		"health_distribution": healthDistribution,
 		"type_alerts":         typeAlerts,
 		"total_datasources":   totalDS,
-	})
+	}
+	setHealthCache(dsIDStr, resp)
+	writeJSON(w, resp)
 }
 
 func (a *AdminAPI) handleDashboardHealthTrend(w http.ResponseWriter, r *http.Request) {
@@ -2630,6 +2833,7 @@ func (a *AdminAPI) handleSyncSourceByID(w http.ResponseWriter, r *http.Request) 
 			writeError(w, 404, "同步源不存在")
 			return
 		}
+		old := s
 		var upd map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&upd); err != nil {
 			writeError(w, 400, "请求体格式错误")
@@ -2637,14 +2841,23 @@ func (a *AdminAPI) handleSyncSourceByID(w http.ResponseWriter, r *http.Request) 
 		}
 		delete(upd, "id")
 		delete(upd, "created_at")
-		if pw, ok := upd["auth_password"].(string); ok && pw == "" {
-			delete(upd, "auth_password")
+		delete(upd, "updated_at")
+		if pw, ok := upd["auth_password"]; ok {
+			if pw == nil {
+				delete(upd, "auth_password")
+			} else if s, ok := pw.(string); ok && s == "" {
+				delete(upd, "auth_password")
+			}
 		}
-		if tok, ok := upd["auth_token"].(string); ok && tok == "" {
-			delete(upd, "auth_token")
+		if tok, ok := upd["auth_token"]; ok {
+			if tok == nil {
+				delete(upd, "auth_token")
+			} else if s, ok := tok.(string); ok && s == "" {
+				delete(upd, "auth_token")
+			}
 		}
 		database.DB.Model(&s).Updates(upd)
-		a.rescheduleSyncSource(&s, nil)
+		a.rescheduleSyncSource(&old, &s)
 		s.AuthPassword = ""
 		s.AuthToken = ""
 		writeJSON(w, s)
@@ -2690,8 +2903,10 @@ func (a *AdminAPI) executeSync(s *database.SyncSource) {
 	log.Printf("[Sync] 开始同步: %s", s.Name)
 	start := time.Now()
 
-	// Build request
-	req, err := http.NewRequest(s.Method, s.URL, nil)
+	// Build request with 30s timeout context
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, s.Method, s.URL, nil)
 	if err != nil {
 		a.recordSyncLog(s.ID, "failed", fmt.Sprintf("创建请求失败: %v", err), 0, 0, 0, 0)
 		return
@@ -2814,32 +3029,17 @@ func (a *AdminAPI) executeSync(s *database.SyncSource) {
 		} else if s.URLField != "" {
 			url = fmt.Sprintf("%v", obj[s.URLField])
 		}
-		username := ""
-		if s.UsernameField != "" {
-			username = fmt.Sprintf("%v", obj[s.UsernameField])
-		}
-		password := ""
-		if s.PasswordField != "" {
-			password = fmt.Sprintf("%v", obj[s.PasswordField])
-		}
-
 		// Find or create datasource
 		var existing database.DataSource
 		result := database.DB.Where("name = ?", name).First(&existing)
 		if result.Error == nil {
 			existing.URL = url
-			existing.Username = username
-			if password != "" {
-				existing.Password = password
-			}
 			database.DB.Save(&existing)
 			updated++
 		} else {
 			ds := database.DataSource{
-				Name:     name,
-				URL:      url,
-				Username: username,
-				Password: password,
+				Name: name,
+				URL:  url,
 			}
 			database.DB.Create(&ds)
 			created++
@@ -2897,19 +3097,34 @@ func (a *AdminAPI) recordSyncLog(syncSourceID uint, status, message string, tota
 	database.DB.Model(&database.SyncSource{}).Where("id = ?", syncSourceID).Update("updated_at", time.Now())
 }
 
+func (a *AdminAPI) reloadSyncCron() {
+	a.syncCronJobsMu.Lock()
+	a.syncCronJobs = make(map[uint]cron.EntryID)
+	a.syncCronJobsMu.Unlock()
+	var syncSources []database.SyncSource
+	database.DB.Where("enabled = ?", true).Find(&syncSources)
+	for i := range syncSources {
+		a.scheduleSyncSource(&syncSources[i])
+	}
+}
+
 func (a *AdminAPI) scheduleSyncSource(s *database.SyncSource) {
 	if s.CronExpr == "" || !s.Enabled {
 		return
 	}
-	if a.scheduler == nil {
+	if globalScheduler == nil {
 		return
 	}
+	a.syncCronJobsMu.Lock()
 	id, ok := a.syncCronJobs[s.ID]
 	if ok {
-		a.scheduler.Remove(id)
+		globalScheduler.Remove(id)
+		delete(a.syncCronJobs, s.ID)
 	}
+	a.syncCronJobsMu.Unlock()
+
 	sourceID := s.ID
-	entryID, err := a.scheduler.AddFunc(s.CronExpr, func() {
+	entryID, err := globalScheduler.AddFunc(s.CronExpr, func() {
 		var src database.SyncSource
 		if database.DB.First(&src, sourceID).Error != nil {
 			return
@@ -2920,12 +3135,18 @@ func (a *AdminAPI) scheduleSyncSource(s *database.SyncSource) {
 		log.Printf("[Sync] 调度同步源 %s 失败: %v", s.Name, err)
 		return
 	}
+	a.syncCronJobsMu.Lock()
 	a.syncCronJobs[s.ID] = entryID
+	a.syncCronJobsMu.Unlock()
 	log.Printf("[Sync] 已调度同步源: %s (%s)", s.Name, s.CronExpr)
 }
 
 func (a *AdminAPI) rescheduleSyncSource(old, new *database.SyncSource) {
 	if new == nil {
+		return
+	}
+	if old == nil {
+		a.scheduleSyncSource(new)
 		return
 	}
 	if old.CronExpr != new.CronExpr || old.Enabled != new.Enabled {
@@ -2935,9 +3156,11 @@ func (a *AdminAPI) rescheduleSyncSource(old, new *database.SyncSource) {
 }
 
 func (a *AdminAPI) removeSyncCron(id uint) {
+	a.syncCronJobsMu.Lock()
+	defer a.syncCronJobsMu.Unlock()
 	if entryID, ok := a.syncCronJobs[id]; ok {
-		if a.scheduler != nil {
-			a.scheduler.Remove(entryID)
+		if globalScheduler != nil {
+			globalScheduler.Remove(entryID)
 		}
 		delete(a.syncCronJobs, id)
 	}
@@ -2964,4 +3187,113 @@ func safePct(n, total int) float64 {
 		return 0
 	}
 	return float64(n) / float64(total) * 100
+}
+
+func maskNotificationConfig(channelType, rawJSON string) string {
+	if rawJSON == "" {
+		return rawJSON
+	}
+	switch channelType {
+	case "dingtalk":
+		var cfg notify.DingtalkConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if cfg.Secret != "" {
+				cfg.Secret = "********"
+			}
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	case "email":
+		var cfg notify.EmailConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if cfg.Password != "" {
+				cfg.Password = "********"
+			}
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	case "wechat_work":
+		var cfg notify.WeChatWorkConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	case "wechat_app":
+		var cfg notify.WeChatAppConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if cfg.Secret != "" {
+				cfg.Secret = "********"
+			}
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	case "feishu":
+		var cfg notify.FeishuConfig
+		if json.Unmarshal([]byte(rawJSON), &cfg) == nil {
+			if cfg.Secret != "" {
+				cfg.Secret = "********"
+			}
+			if b, err := json.Marshal(cfg); err == nil {
+				return string(b)
+			}
+		}
+	}
+	return rawJSON
+}
+
+func restoreSensitiveFields(channelType, oldJSON, newJSON string) string {
+	if oldJSON == "" || newJSON == "" {
+		return newJSON
+	}
+	switch channelType {
+	case "email":
+		var old, new notify.EmailConfig
+		if json.Unmarshal([]byte(oldJSON), &old) != nil || json.Unmarshal([]byte(newJSON), &new) != nil {
+			return newJSON
+		}
+		if new.Password == "********" {
+			new.Password = old.Password
+		}
+		if b, err := json.Marshal(new); err == nil {
+			return string(b)
+		}
+	case "dingtalk":
+		var old, new notify.DingtalkConfig
+		if json.Unmarshal([]byte(oldJSON), &old) != nil || json.Unmarshal([]byte(newJSON), &new) != nil {
+			return newJSON
+		}
+		if new.Secret == "********" {
+			new.Secret = old.Secret
+		}
+		if b, err := json.Marshal(new); err == nil {
+			return string(b)
+		}
+	case "wechat_app":
+		var old, new notify.WeChatAppConfig
+		if json.Unmarshal([]byte(oldJSON), &old) != nil || json.Unmarshal([]byte(newJSON), &new) != nil {
+			return newJSON
+		}
+		if new.Secret == "********" {
+			new.Secret = old.Secret
+		}
+		if b, err := json.Marshal(new); err == nil {
+			return string(b)
+		}
+	case "feishu":
+		var old, new notify.FeishuConfig
+		if json.Unmarshal([]byte(oldJSON), &old) != nil || json.Unmarshal([]byte(newJSON), &new) != nil {
+			return newJSON
+		}
+		if new.Secret == "********" {
+			new.Secret = old.Secret
+		}
+		if b, err := json.Marshal(new); err == nil {
+			return string(b)
+		}
+	}
+	return newJSON
 }

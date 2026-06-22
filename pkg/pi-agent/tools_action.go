@@ -2,8 +2,10 @@ package piagent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -23,6 +25,24 @@ type InspectTaskItem struct {
 	ReportURL string    `json:"report_url,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 }
+
+// InspectRecord 巡检任务记录，映射数据库 inspect_records 表
+type InspectRecord struct {
+	ID             uint       `gorm:"primaryKey" json:"id"`
+	TaskID         string     `gorm:"size:100;index" json:"task_id"`
+	Status         string     `gorm:"size:50;default:running" json:"status"`
+	DatasourceID   *uint      `json:"datasource_id"`
+	DatasourceName string     `gorm:"size:200" json:"datasource_name"`
+	Message        string     `gorm:"size:500" json:"message"`
+	Error          string     `gorm:"size:500" json:"error"`
+	ReportURL      string     `gorm:"size:500" json:"report_url"`
+	StartedAt      time.Time  `json:"started_at"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+func (InspectRecord) TableName() string { return "inspect_records" }
 
 type TriggerInspectTool struct {
 	config    *config.Config
@@ -66,16 +86,27 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 	promUser := t.config.PrometheusUsername
 	promPass := t.config.PrometheusPassword
 
+	dsName := promURL
 	if dsParam != "" {
 		if strings.HasPrefix(dsParam, "http://") || strings.HasPrefix(dsParam, "https://") {
 			promURL = dsParam
+			dsName = dsParam
 		} else {
-			var dsList []DataSource
-			t.db.Model(&DataSource{}).Where("enabled = ?", true).Find(&dsList)
-			for _, ds := range dsList {
-				if ds.Name == dsParam {
+			// 精确匹配: name 不区分大小写
+			var ds DataSource
+			if t.db.Model(&DataSource{}).Where("enabled = ? AND LOWER(name) = LOWER(?)", true, dsParam).First(&ds).Error() == nil {
+				promURL = ds.URL
+				promUser = ds.Username
+				promPass = ds.Password
+				dsName = ds.Name
+			} else {
+				// 模糊匹配: 子串包含
+				like := "%" + dsParam + "%"
+				if t.db.Model(&DataSource{}).Where("enabled = ? AND name LIKE ?", true, like).First(&ds).Error() == nil {
 					promURL = ds.URL
-					break
+					promUser = ds.Username
+					promPass = ds.Password
+					dsName = ds.Name
 				}
 			}
 		}
@@ -109,6 +140,17 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 	t.tasks[taskID] = task
 	t.tasksMu.Unlock()
 
+	// 创建持久化巡检记录
+	now := time.Now()
+	t.db.Create(&InspectRecord{
+		TaskID:         taskID,
+		Status:         "running",
+		DatasourceName: dsName,
+		Message:        "正在执行巡检...",
+		StartedAt:      now,
+		CreatedAt:      now,
+	})
+
 	go func() {
 		dataCollector := metrics.NewCollectorWithURL(client.API, t.config, promURL)
 		data, err := dataCollector.CollectMetrics()
@@ -117,6 +159,9 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 			task.Status = "failed"
 			task.Message = fmt.Sprintf("收集指标失败: %v", err)
 			t.tasksMu.Unlock()
+			t.db.Model(&InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]any{
+				"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+			})
 			return
 		}
 		data.Datasource = promURL
@@ -127,14 +172,115 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 			task.Status = "failed"
 			task.Message = fmt.Sprintf("生成报告失败: %v", err)
 			t.tasksMu.Unlock()
+			t.db.Model(&InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]any{
+				"status": "failed", "error": err.Error(), "completed_at": time.Now(),
+			})
 			return
 		}
 
+		// 保存报告记录到数据库
+		alertCount := 0
+		criticalCount := 0
+		warningCount := 0
+		totalMetrics := 0
+		hasCritical := false
+		hasWarning := false
+		var abnormalDetails []map[string]any
+		typeSummaries := map[string]map[string]int{}
+
+		for typeName, group := range data.MetricGroups {
+			ts := map[string]int{"critical": 0, "warning": 0, "normal": 0, "total": 0}
+			for _, metrics := range group.MetricsByName {
+				for _, m := range metrics {
+					totalMetrics++
+					ts["total"]++
+					switch m.Status {
+					case "critical":
+						criticalCount++
+						alertCount++
+						hasCritical = true
+						ts["critical"]++
+					case "warning":
+						warningCount++
+						alertCount++
+						hasWarning = true
+						ts["warning"]++
+					default:
+						ts["normal"]++
+					}
+					if m.Status == "critical" || m.Status == "warning" {
+						labels := make(map[string]string)
+						for _, lbl := range m.Labels {
+							if lbl.Value != "" && lbl.Name != "__name__" {
+								labels[lbl.Name] = lbl.Value
+							}
+						}
+						detail := map[string]any{
+							"type":     typeName,
+							"name":     m.Name,
+							"value":    m.Value,
+							"unit":     m.Unit,
+							"status":   m.Status,
+							"labels":   labels,
+						}
+						if m.ThresholdType != "" {
+							detail["threshold"] = m.Threshold
+							detail["threshold_type"] = m.ThresholdType
+						}
+						abnormalDetails = append(abnormalDetails, detail)
+					}
+				}
+			}
+			typeSummaries[typeName] = ts
+		}
+
+		status := "success"
+		if hasCritical {
+			status = "danger"
+		} else if hasWarning {
+			status = "warning"
+		}
+
+		info, _ := os.Stat(reportPath)
+		fileSize := int64(0)
+		if info != nil {
+			fileSize = info.Size()
+		}
+
+		snapshot := map[string]any{
+			"datasource_name":   data.Datasource,
+			"total_metrics":     totalMetrics,
+			"critical_count":    criticalCount,
+			"warning_count":     warningCount,
+			"abnormal_details":  abnormalDetails,
+			"type_summaries":    typeSummaries,
+		}
+		metricsJSON, _ := json.Marshal(snapshot)
+
+		t.db.Create(&ReportRecord{
+			Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
+			DatasourceName: data.Datasource,
+			FilePath:       reportPath,
+			FileSize:       fileSize,
+			TotalMetrics:   totalMetrics,
+			AlertCount:     alertCount,
+			CriticalCount:  criticalCount,
+			WarningCount:   warningCount,
+			Status:         status,
+			MetricsJSON:    string(metricsJSON),
+			CreatedAt:      time.Now(),
+		})
+
+		reportURL := "/api/promai/reports/" + reportPath[len("reports/"):]
 		t.tasksMu.Lock()
 		task.Status = "completed"
 		task.Message = "巡检完成"
-		task.ReportURL = "/api/promai/reports/" + reportPath[len("reports/"):]
+		task.ReportURL = reportURL
 		t.tasksMu.Unlock()
+
+		t.db.Model(&InspectRecord{}).Where("task_id = ?", taskID).Updates(map[string]any{
+			"status": "completed", "message": "巡检完成", "report_url": reportURL, "completed_at": time.Now(),
+		})
 	}()
 
 	return &agent.AgentToolResult{
@@ -196,9 +342,91 @@ func (t *QueryTaskTool) Execute(ctx context.Context, params map[string]any, onUp
 		fmt.Sprintf("消息: %s", task.Message),
 	}
 	if task.ReportURL != "" {
-		lines = append(lines, fmt.Sprintf("报告: %s", task.ReportURL))
+		lines = append(lines, fmt.Sprintf("报告链接: [📄 点击查看报告](%s)", task.ReportURL))
 	}
 	lines = append(lines, fmt.Sprintf("创建: %s", task.CreatedAt.Format("2006-01-02 15:04:05")))
+
+	// 任务完成时，从数据库读取报告分析摘要
+	if task.Status == "completed" && task.ReportURL != "" {
+		filename := strings.TrimPrefix(task.ReportURL, "/api/promai/reports/")
+		var r ReportRecord
+		if t.parent.db.Model(&ReportRecord{}).Where("file_path LIKE ?", "%"+filename).First(&r).Error() == nil {
+			statusText := map[string]string{
+				"success": "✅ 正常",
+				"danger":  "🔴 高危",
+				"warning": "🟡 告警",
+			}[r.Status]
+			if statusText == "" {
+				statusText = r.Status
+			}
+			lines = append(lines, "")
+			lines = append(lines, "📊 **巡检报告摘要**")
+			lines = append(lines, fmt.Sprintf("   - 整体状态: %s", statusText))
+			lines = append(lines, fmt.Sprintf("   - 总指标数: %d", r.TotalMetrics))
+			lines = append(lines, fmt.Sprintf("   - 告警总数: %d", r.AlertCount))
+			lines = append(lines, fmt.Sprintf("   - 严重告警: %d", r.CriticalCount))
+			lines = append(lines, fmt.Sprintf("   - 警告告警: %d", r.WarningCount))
+
+			// 解析异常明细
+			if r.MetricsJSON != "" {
+				var snapshot map[string]any
+				if err := json.Unmarshal([]byte(r.MetricsJSON), &snapshot); err == nil {
+					if details, ok := snapshot["abnormal_details"].([]any); ok && len(details) > 0 {
+						lines = append(lines, "")
+						lines = append(lines, "📋 **异常明细**")
+						currentType := ""
+						for _, d := range details {
+							item, ok := d.(map[string]any)
+							if !ok {
+								continue
+							}
+							typeName, _ := item["type"].(string)
+							name, _ := item["name"].(string)
+							value, _ := item["value"].(float64)
+							unit, _ := item["unit"].(string)
+							status, _ := item["status"].(string)
+							threshold, _ := item["threshold"].(float64)
+							thresholdType, _ := item["threshold_type"].(string)
+
+							if typeName != "" && typeName != currentType {
+								currentType = typeName
+								lines = append(lines, fmt.Sprintf("  *%s*", typeName))
+							}
+
+							statusEmoji := "⚠️"
+							statusLabel := "警告"
+							if status == "critical" {
+								statusEmoji = "🔴"
+								statusLabel = "严重"
+							}
+
+							thresholdStr := ""
+							if thresholdType != "" {
+								thresholdStr = fmt.Sprintf(" (阈值: %s %.2f)", thresholdType, threshold)
+							}
+
+							labelStr := ""
+							if labels, ok := item["labels"].(map[string]any); ok {
+								var parts []string
+								for k, v := range labels {
+									val, _ := v.(string)
+									if val != "" {
+										parts = append(parts, fmt.Sprintf("%s=%s", k, val))
+									}
+								}
+								if len(parts) > 0 {
+									labelStr = " [" + strings.Join(parts, ", ") + "]"
+								}
+							}
+
+							lines = append(lines, fmt.Sprintf("    %s %s%s: %.2f%s%s (%s)",
+								statusEmoji, name, labelStr, value, unit, thresholdStr, statusLabel))
+						}
+					}
+				}
+			}
+		}
+	}
 
 	return &agent.AgentToolResult{
 		Content: []ai.ContentBlock{ai.NewTextContentBlock(strings.Join(lines, "\n"))},

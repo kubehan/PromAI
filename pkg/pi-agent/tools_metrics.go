@@ -60,13 +60,19 @@ func (t *QueryMetricsTool) Execute(ctx context.Context, params map[string]any, o
 			promURL = dsParam
 			found = true
 		} else {
-			var dsList []DataSource
-			t.db.Model(&DataSource{}).Where("enabled = ?", true).Find(&dsList)
-			for _, ds := range dsList {
-				if ds.Name == dsParam {
+			var ds DataSource
+			if t.db.Model(&DataSource{}).Where("enabled = ? AND LOWER(name) = LOWER(?)", true, dsParam).First(&ds).Error() == nil {
+				promURL = ds.URL
+				promUser = ds.Username
+				promPass = ds.Password
+				found = true
+			} else {
+				like := "%" + dsParam + "%"
+				if t.db.Model(&DataSource{}).Where("enabled = ? AND name LIKE ?", true, like).First(&ds).Error() == nil {
 					promURL = ds.URL
+					promUser = ds.Username
+					promPass = ds.Password
 					found = true
-					break
 				}
 			}
 		}

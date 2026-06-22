@@ -18,6 +18,7 @@ type DataSource struct {
 	NotifyChannels string    `gorm:"type:text" json:"notify_channels"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	HealthStatus   string    `gorm:"-" json:"health_status"`
 }
 
 type MetricType struct {

@@ -40,6 +40,14 @@ func (w *gormDBWrapper) Limit(limit int) DB {
 	return &gormDBWrapper{db: w.db.Limit(limit)}
 }
 
+func (w *gormDBWrapper) Create(value any) DB {
+	return &gormDBWrapper{db: w.db.Create(value)}
+}
+
+func (w *gormDBWrapper) Updates(values any) DB {
+	return &gormDBWrapper{db: w.db.Updates(values)}
+}
+
 func (w *gormDBWrapper) Error() error {
 	return w.db.Error
 }

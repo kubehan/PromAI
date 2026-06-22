@@ -9,6 +9,7 @@ export interface DataSource {
   template_id?: number | null
   notify_channels?: string
   created_at?: string
+  health_status?: string
 }
 
 export interface MetricConfig {

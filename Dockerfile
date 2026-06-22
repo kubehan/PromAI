@@ -1,8 +1,8 @@
 # ---- Stage 1: Build frontend ----
 FROM node:20-alpine AS frontend-builder
 WORKDIR /build
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+COPY frontend/package*.json ./
+RUN npm ci --prefer-offline --no-audit
 COPY frontend/ .
 RUN npm run build
 
@@ -10,13 +10,14 @@ RUN npm run build
 FROM golang:1.25-alpine AS backend-builder
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
-COPY . .
 COPY go.mod go.sum ./
+COPY pi-local/ ./pi-local/
 RUN go mod download
-RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o PromAI .
+COPY . .
+RUN CGO_ENABLED=1 go build -ldflags="-s -w" -a -installsuffix cgo -o PromAI .
 
 # ---- Stage 3: Runtime ----
-FROM alpine:3.19
+FROM alpine:3.21
 RUN apk add --no-cache tzdata ca-certificates
 WORKDIR /app
 COPY --from=backend-builder /build/PromAI .
@@ -25,4 +26,6 @@ COPY templates ./templates/
 COPY config/config.yaml ./config/config.yaml
 RUN mkdir -p /app/data /app/reports
 EXPOSE 8091
-CMD ["./PromAI", "-config", "/app/config/config.yaml"]
+VOLUME ["/app/data", "/app/reports"]
+ENTRYPOINT ["./PromAI"]
+CMD ["-config", "/app/config/config.yaml"]

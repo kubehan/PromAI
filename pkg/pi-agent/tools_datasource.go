@@ -69,6 +69,8 @@ type DB interface {
 	First(dest any, conds ...any) DB
 	Offset(offset int) DB
 	Limit(limit int) DB
+	Create(value any) DB
+	Updates(values any) DB
 	Error() error
 }
 

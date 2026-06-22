@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"flag"
@@ -108,9 +109,9 @@ func main() {
 	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
 
 	// 设置 HTTP 路由
-	setupRoutes(collector, config, globalScheduler)
+	setupRoutes(collector, config)
 
-	// 启动全局定时调度器（从配置文件和数据库加载定时任务）
+	// 启动全局定时调度器（从配置文件和数据库加载定时任务，含数据源同步任务）
 	startGlobalScheduler(config, collector)
 
 	// 配置报告清理
@@ -195,17 +196,51 @@ func main() {
 	log.Printf("==========================================")
 	log.Printf("服务器正在运行...")
 
-	if err := http.ListenAndServe(*port, nil); err != nil {
+	if err := http.ListenAndServe(*port, gzipMiddleware(http.DefaultServeMux)); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
+	}
+}
+
+func gzipMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		// 跳过流式接口 (AI Chat SSE)
+		if strings.HasPrefix(r.URL.Path, "/api/promai/ai/chat") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		gw := gzip.NewWriter(w)
+		defer gw.Close()
+		w.Header().Set("Content-Encoding", "gzip")
+		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, gw: gw}, r)
+	})
+}
+
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	gw *gzip.Writer
+}
+
+func (grw *gzipResponseWriter) Write(b []byte) (int, error) {
+	return grw.gw.Write(b)
+}
+
+func (grw *gzipResponseWriter) Flush() {
+	if f, ok := grw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
 	}
 }
 
 // 全局定时调度器，由 admin API 动态管理
 var globalScheduler *cron.Cron
 var cronTaskCounter int64
+var adminAPI *AdminAPI
 
 // setupRoutes 设置 HTTP 路由
-func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler *cron.Cron) {
+func setupRoutes(collector *metrics.Collector, config *config.Config) *AdminAPI {
 	// 设置首页路由
 	http.HandleFunc("/api/promai/", indexHandler)
 	http.HandleFunc("/api/promai/index", indexHandler)
@@ -255,12 +290,14 @@ func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler 
 	}
 
 	// 注册管理 API 路由
-	adminAPI := NewAdminAPI(collector, config, scheduler)
+	adminAPI = NewAdminAPI(collector, config)
 	adminAPI.RegisterHandlers(http.DefaultServeMux)
 
 	// 注册 AI Agent 路由
 	aiAgent := piagent.NewAgentHandler(config, collector, database.DB, config.Auth.JWTSecret)
 	aiAgent.RegisterRoutes(http.DefaultServeMux, adminAPI.authMiddleware)
+
+	return adminAPI
 
 }
 
@@ -268,10 +305,7 @@ func setupRoutes(collector *metrics.Collector, config *config.Config, scheduler 
 func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
 	// 清除旧任务，防止泄漏
 	globalScheduler.Stop()
-	for globalScheduler.Entries() != nil {
-		globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
-		break
-	}
+	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
 
 	// 从数据库加载定时任务
 	var dbJobs []database.CronJob
@@ -312,6 +346,11 @@ func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
 		} else {
 			log.Printf("[Cron] 已调度配置文件任务: %s", config.CronSchedule)
 		}
+	}
+
+	// 重新加载数据源同步定时任务（调度器重建后原任务已丢失）
+	if adminAPI != nil {
+		adminAPI.reloadSyncCron()
 	}
 
 	globalScheduler.Start()
@@ -574,7 +613,9 @@ func sendNotificationsWithContext(ctx context.Context, config *config.Config, re
 
 	if config.Notifications.Email.Enabled {
 		log.Printf("发送邮件")
-		notify.SendEmailWithContext(ctx, config.Notifications.Email, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary)
+		if err := notify.SendEmailWithContext(ctx, config.Notifications.Email, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+			log.Printf("发送邮件失败: %v", err)
+		}
 	}
 
 	if config.Notifications.WeChatWork.Enabled {
@@ -1325,8 +1366,14 @@ func saveReportRecord(data *report.ReportData, reportPath string) {
 	}
 
 	info, _ := os.Stat(reportPath)
+	var dsID *uint
+	var dsRecord database.DataSource
+	if database.DB.Where("url = ?", data.Datasource).First(&dsRecord).Error == nil {
+		dsID = &dsRecord.ID
+	}
 	database.DB.Create(&database.ReportRecord{
 		Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
+		DatasourceID:   dsID,
 		DatasourceName: data.Datasource,
 		FilePath:       reportPath,
 		FileSize:       func() int64 { if info != nil { return info.Size() }; return 0 }(),

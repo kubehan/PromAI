@@ -143,14 +143,17 @@
               <el-option label="无" value="none" />
             </el-select>
           </el-form-item>
-          <el-form-item label="发件人邮箱" prop="config.from_email">
-            <el-input v-model="cfg.from_email" placeholder="alert@example.com" />
+          <el-form-item label="SMTP 用户名">
+            <el-input v-model="cfg.username" placeholder="可选，通常与发件人邮箱相同" />
+          </el-form-item>
+          <el-form-item label="发件人邮箱" prop="config.from">
+            <el-input v-model="cfg.from" placeholder="alert@example.com" />
           </el-form-item>
           <el-form-item label="发件人密码" prop="config.password">
             <el-input v-model="cfg.password" placeholder="SMTP 密码或授权码" type="password" show-password />
           </el-form-item>
-          <el-form-item label="收件人" prop="config.to_emails">
-            <el-input v-model="cfg.to_emails" placeholder="多个邮箱用逗号分隔" type="textarea" :rows="2" />
+          <el-form-item label="收件人" prop="config.to">
+            <el-input v-model="cfg.to" placeholder="多个邮箱用逗号分隔" type="textarea" :rows="2" />
           </el-form-item>
         </template>
       </el-form>
@@ -230,7 +233,13 @@ function openEdit(row: NotificationChannel) {
   form.channel_type = row.channel_type; form.name = row.name; form.enabled = row.enabled ?? false
   Object.keys(cfg).forEach(k => delete cfg[k])
   if (row.config_json) {
-    try { Object.assign(cfg, JSON.parse(row.config_json)) } catch { /* ignore */ }
+    try {
+      const parsed = JSON.parse(row.config_json)
+      if (parsed.to && Array.isArray(parsed.to)) {
+        parsed.to = parsed.to.join(', ')
+      }
+      Object.assign(cfg, parsed)
+    } catch { /* ignore */ }
   }
   dialogVisible.value = true
 }
@@ -244,7 +253,12 @@ async function handleSave() {
   if (!valid) return
   saving.value = true
   try {
-    const payload = { ...form, config_json: JSON.stringify(cfg) }
+    const saveCfg = { ...cfg }
+    if (saveCfg.to && typeof saveCfg.to === 'string') {
+      saveCfg.to = saveCfg.to.split(/[,，]\s*/).filter(Boolean)
+    }
+    saveCfg.enabled = form.enabled ?? true
+    const payload = { ...form, config_json: JSON.stringify(saveCfg) }
     if (editingId.value) {
       await updateNotification(editingId.value, payload)
       ElMessage.success('更新成功')
@@ -260,7 +274,15 @@ async function handleSave() {
 
 async function toggleEnabled(row: NotificationChannel) {
   try {
-    await updateNotification(row.id!, { enabled: row.enabled } as any)
+    let cfg: any = {}
+    if (row.config_json) {
+      try { cfg = JSON.parse(row.config_json) } catch {}
+    }
+    cfg.enabled = row.enabled
+    await updateNotification(row.id!, {
+      enabled: row.enabled,
+      config_json: JSON.stringify(cfg)
+    } as any)
   } catch { ElMessage.error('更新失败') }
 }
 

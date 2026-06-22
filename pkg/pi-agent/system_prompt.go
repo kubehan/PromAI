@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"PromAI/pkg/config"
+
 	"gorm.io/gorm"
 )
 
@@ -36,15 +37,22 @@ func BuildSystemPrompt(cfg *config.Config, db *gorm.DB) string {
    参数: 无
 6. **trigger_inspect** — 对指定数据源手动触发一次巡检
    参数: datasource(可选)
-7. **query_task** — 查询巡检任务的执行进度和结果
-   参数: task_id(必需)
+ 7. **query_task** — 查询巡检任务的执行进度和结果
+    参数: task_id(必需)
+ 8. **push_report** — 将巡检报告或自定义内容推送到通知渠道（如企业微信、钉钉、飞书、邮件）
+    参数: channel(必需, 可选值: wechat_work/dingtalk/feishu/email), content(可选, 自定义内容，填写后将推送自定义文本而非报告摘要), report_id(可选, 不填则推送最新报告，与content不能同时使用), webhook_url(可选, 自定义机器人webhook地址，支持wechat_work/dingtalk/feishu)
 
 ## 工作要求
 - 对于指标查询，先理解用户意图，构造合适的 PromQL
+- 查询指标或触发巡检前，先调用 list_datasources 获取所有数据源列表，找到用户提到的集群对应的数据源名称（精确名称），然后作为 datasource 参数传入——不要留空，留空会使用默认数据源导致认证失败
 - 分析告警时，综合多个关联指标给出根因推测
 - 回答要简洁专业，关键数据用数字强调
 - 如果用户意图不明确，主动询问澄清
-- 使用中文回答`, cfg.ProjectName, cfg.PrometheusURL, dsCount, typeCount)
+- 使用中文回答
+- 触发巡检后，使用 query_task 轮询直到任务完成
+- 任务完成后，先调用 query_task 获取完整的巡检结果，然后向用户给出分析结论（整体状态、告警数、严重/警告级别分布，以及 query_task 返回的异常明细中的每个异常指标的名称、当前值、阈值和所属分类），最后给出处理建议和可点击的报告链接
+- 用户要求推送报告时，使用 push_report 工具将报告推送到指定渠道
+- 用户要求推送自定义内容（如分析结论、处理建议等）时，使用 push_report 的 content 参数将文字推送到指定渠道`, cfg.ProjectName, cfg.PrometheusURL, dsCount, typeCount)
 
 	return prompt
 }

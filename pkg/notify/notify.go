@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"net/smtp"
 	"net/url"
 	"path/filepath"
@@ -26,47 +27,47 @@ import (
 )
 
 type DingtalkConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	Webhook   string `yaml:"webhook"`
-	Secret    string `yaml:"secret"`
-	ReportURL string `yaml:"report_url"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	Webhook   string `yaml:"webhook" json:"webhook"`
+	Secret    string `yaml:"secret" json:"secret"`
+	ReportURL string `yaml:"report_url" json:"report_url"`
 }
 
 type EmailConfig struct {
-	Enabled   bool     `yaml:"enabled"`
-	SMTPHost  string   `yaml:"smtp_host"`
-	SMTPPort  int      `yaml:"smtp_port"`
-	Username  string   `yaml:"username"`
-	Password  string   `yaml:"password"`
-	From      string   `yaml:"from"`
-	To        []string `yaml:"to"`
-	ReportURL string   `yaml:"report_url"`
+	Enabled   bool     `yaml:"enabled" json:"enabled"`
+	SMTPHost  string   `yaml:"smtp_host" json:"smtp_host"`
+	SMTPPort  int      `yaml:"smtp_port" json:"smtp_port"`
+	Username  string   `yaml:"username" json:"username"`
+	Password  string   `yaml:"password" json:"password"`
+	From      string   `yaml:"from" json:"from"`
+	To        []string `yaml:"to" json:"to"`
+	ReportURL string   `yaml:"report_url" json:"report_url"`
 }
 
 type WeChatWorkConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	Webhook   string `yaml:"webhook"`
-	ProxyURL  string `yaml:"proxy_url"`
-	ReportURL string `yaml:"report_url"`
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	Webhook   string `yaml:"webhook" json:"webhook"`
+	ProxyURL  string `yaml:"proxy_url" json:"proxy_url"`
+	ReportURL string `yaml:"report_url" json:"report_url"`
 }
 
 type WeChatAppConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	CorpID    string `yaml:"corpid"`
-	AgentID   int    `yaml:"agentid"`
-	Secret    string `yaml:"secret"`
-	ToUser    string `yaml:"touser"` // 接收人企业微信ID，多个用|分隔，如"user1|user2"，默认"@all"发送给所有人
-	ProxyURL  string `yaml:"proxy_url"`
-	ReportURL string `yaml:"report_url"` // 新增 ReportURL 字段
+	Enabled   bool   `yaml:"enabled" json:"enabled"`
+	CorpID    string `yaml:"corpid" json:"corpid"`
+	AgentID   int    `yaml:"agentid" json:"agentid"`
+	Secret    string `yaml:"secret" json:"secret"`
+	ToUser    string `yaml:"touser" json:"touser"` // 接收人企业微信ID，多个用|分隔，如"user1|user2"，默认"@all"发送给所有人
+	ProxyURL  string `yaml:"proxy_url" json:"proxy_url"`
+	ReportURL string `yaml:"report_url" json:"report_url"` // 新增 ReportURL 字段
 }
 
 type FeishuConfig struct {
-	Enabled    bool   `yaml:"enabled"`
-	Webhook    string `yaml:"webhook"`
-	Secret     string `yaml:"secret"`
-	ReportURL  string `yaml:"report_url"`
-	Timeout    int    `yaml:"timeout"`
-	VerifySign bool   `yaml:"verify_sign"`
+	Enabled    bool   `yaml:"enabled" json:"enabled"`
+	Webhook    string `yaml:"webhook" json:"webhook"`
+	Secret     string `yaml:"secret" json:"secret"`
+	ReportURL  string `yaml:"report_url" json:"report_url"`
+	Timeout    int    `yaml:"timeout" json:"timeout"`
+	VerifySign bool   `yaml:"verify_sign" json:"verify_sign"`
 }
 
 type AlertSummary struct {
@@ -464,7 +465,7 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 	e := email.NewEmail()
 	e.From = config.From
 	e.To = config.To
-	e.Subject = "巡检报告"
+	e.Subject = fmt.Sprintf("%s 巡检报告", Datasource)
 
 	// 生成报告的访问链接
 	reportFileName := filepath.Base(reportPath)
@@ -489,6 +490,48 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 		log.Printf("最终生成的 reportLink = %s", reportLink)
 	}
 
+	// 尝试从context中获取报告数据，用于分类汇总
+	var typeSummaries []TypeAlertSummary
+	if data, ok := ctx.Value("report_data").(report.ReportData); ok {
+		typeSummaries = CalculateTypeAlertSummary(data)
+		log.Printf("从报告数据中计算出分类汇总")
+	} else {
+		log.Printf("未找到报告数据，使用空分类汇总")
+		typeSummaries = []TypeAlertSummary{}
+	}
+
+	// 构建分类汇总HTML
+	typeSummaryHTML := ""
+	for _, summary := range typeSummaries {
+		typeStatus := "✅"
+		typeColor := "#28a745"
+		if summary.TotalMetrics == 0 {
+			typeStatus = "⚪"
+			typeColor = "#6c757d"
+		} else if summary.CriticalCount > 0 {
+			typeStatus = "❌"
+			typeColor = "#dc3545"
+		} else if summary.WarningCount > 0 {
+			typeStatus = "⚠️"
+			typeColor = "#ffc107"
+		}
+		typeSummaryHTML += fmt.Sprintf(`
+                <tr>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6;"><span style="color: %s;">%s</span> <strong>%s</strong></td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center;">%d</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #dc3545;">%d</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #dc3545;">%d</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #ffc107;">%d</td>
+                    <td style="padding: 8px; border-bottom: 1px solid #dee2e6; text-align: center; color: #28a745;">%d</td>
+                </tr>`,
+			typeColor, typeStatus, summary.Type,
+			summary.TotalMetrics,
+			summary.CriticalCount+summary.WarningCount,
+			summary.CriticalCount,
+			summary.WarningCount,
+			summary.NormalCount)
+	}
+
 	// 添加更丰富的邮件内容
 	alertStatus := "✅ 正常"
 	statusColor := "#28a745"
@@ -502,6 +545,25 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 
 	e.HTML = []byte(fmt.Sprintf(`
         <h2 style="color: %s;">🔍 %s 巡检报告已生成 %s</h2>
+        <p><strong>数据源：</strong>%s</p>
+        
+        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
+            <h3 style="color: #495057; margin-top: 0;">📊 分类巡检结果</h3>
+            <table style="border-collapse: collapse; width: 100%%;">
+                <thead>
+                    <tr style="background-color: #e9ecef;">
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: left;">分类</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center;">总数</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center;">异常</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; color: #dc3545;">严重</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; color: #ffc107;">警告</th>
+                        <th style="padding: 8px; border-bottom: 2px solid #dee2e6; text-align: center; color: #28a745;">正常</th>
+                    </tr>
+                </thead>
+                <tbody>%s
+                </tbody>
+            </table>
+        </div>
         
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0;">
             <h3 style="color: #495057; margin-top: 0;">🚨 告警汇总</h3>
@@ -545,6 +607,8 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 		statusColor,
 		projectName,
 		alertStatus,
+		Datasource,
+		typeSummaryHTML,
 		statusColor,
 		alertStatus,
 		alertSummary.TotalMetrics,
@@ -556,10 +620,12 @@ func SendEmailWithContext(ctx context.Context, config EmailConfig, reportPath st
 		reportFileName,
 		reportLink))
 
-	// 添加附件
-	if _, err := e.AttachFile(reportPath); err != nil {
-		log.Printf("添加附件失败: %v", err)
-		return fmt.Errorf("添加附件失败: %v", err)
+	// 添加附件（仅当有报告文件时）
+	if reportPath != "" {
+		if _, err := e.AttachFile(reportPath); err != nil {
+			log.Printf("添加附件失败: %v", err)
+			return fmt.Errorf("添加附件失败: %v", err)
+		}
 	}
 
 	// 发送邮件（使用TLS）
@@ -1100,8 +1166,13 @@ func SendWeChatAppWithContext(ctx context.Context, config WeChatAppConfig, repor
 		reportLink = utils.GetReportURL(r, reportFileName)
 		log.Printf("使用动态URL生成报告链接: %s", reportLink)
 	} else {
-		// 回退到配置的静态URL
-		reportLink = fmt.Sprintf("%s/api/promai/reports/%s", config.ReportURL, reportFileName)
+		// 回退到配置的静态URL，优先使用环境变量 REPORT_URL
+		baseURL := config.ReportURL
+		if envURL := os.Getenv("REPORT_URL"); envURL != "" {
+			baseURL = envURL
+			log.Printf("使用环境变量 REPORT_URL: %s", baseURL)
+		}
+		reportLink = fmt.Sprintf("%s/api/promai/reports/%s", baseURL, reportFileName)
 		log.Printf("使用配置的静态URL生成报告链接: %s", reportLink)
 	}
 
