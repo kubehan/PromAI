@@ -12,9 +12,9 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"net/smtp"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -197,16 +197,16 @@ func SendFeishuWithContext(ctx context.Context, config FeishuConfig, reportPath 
 	typeSummaryText := ""
 	if len(typeSummaries) > 0 {
 		for _, s := range typeSummaries {
-		status := "✅"
-		if s.TotalMetrics == 0 {
-			status = "⚪"
-		} else if s.CriticalCount > 0 {
-			status = "❌"
-		} else if s.WarningCount > 0 {
-			status = "⚠️"
-		}
-		typeSummaryText += fmt.Sprintf("%s%s：总%d个，异常%d个（严重%d，警告%d），正常%d个\n",
-			status, s.Type, s.TotalMetrics, s.CriticalCount+s.WarningCount, s.CriticalCount, s.WarningCount, s.NormalCount)
+			status := "✅"
+			if s.TotalMetrics == 0 {
+				status = "⚪"
+			} else if s.CriticalCount > 0 {
+				status = "❌"
+			} else if s.WarningCount > 0 {
+				status = "⚠️"
+			}
+			typeSummaryText += fmt.Sprintf("%s%s：总%d个，异常%d个（严重%d，警告%d），正常%d个\n",
+				status, s.Type, s.TotalMetrics, s.CriticalCount+s.WarningCount, s.CriticalCount, s.WarningCount, s.NormalCount)
 		}
 	} else {
 		typeSummaryText = "暂无分类数据\n"
@@ -321,11 +321,17 @@ func SendDingtalkWithContext(ctx context.Context, config DingtalkConfig, reportP
 		return nil
 	}
 	log.Printf("开始发送钉钉通知...")
+	if strings.TrimSpace(config.Webhook) == "" {
+		return fmt.Errorf("钉钉 webhook 未配置")
+	}
 
 	// 计算时间戳和签名
-	timestamp := time.Now().UnixMilli()
-	sign := calculateDingtalkSign(timestamp, config.Secret)
-	webhook := fmt.Sprintf("%s&timestamp=%d&sign=%s", config.Webhook, timestamp, sign)
+	webhook := config.Webhook
+	if strings.TrimSpace(config.Secret) != "" {
+		timestamp := time.Now().UnixMilli()
+		sign := calculateDingtalkSign(timestamp, config.Secret)
+		webhook = fmt.Sprintf("%s&timestamp=%d&sign=%s", config.Webhook, timestamp, sign)
+	}
 
 	log.Printf("准备发送请求到 webhook: %s", webhook)
 
@@ -339,8 +345,8 @@ func SendDingtalkWithContext(ctx context.Context, config DingtalkConfig, reportP
 		typeSummaries = []TypeAlertSummary{}
 	}
 
-	// 构建分类巡检结果文本（用钉钉支持的<br/>换行，每个条目单独一行）
-	typeSummaryText := ""
+	// 构建分类巡检结果文本
+	typeSummaryLines := make([]string, 0, len(typeSummaries))
 	if len(typeSummaries) > 0 {
 		for _, summary := range typeSummaries {
 			var typeStatus string
@@ -353,14 +359,14 @@ func SendDingtalkWithContext(ctx context.Context, config DingtalkConfig, reportP
 			} else {
 				typeStatus = "✅" // 正常
 			}
-			// 关键：用<br/>替代\n，适配钉钉Markdown换行
-			typeSummaryText += fmt.Sprintf("%s%s：总%d个，异常%d个（严重%d，警告%d），正常%d个<br/>",
+			typeSummaryLines = append(typeSummaryLines, fmt.Sprintf("- %s%s：总%d个，异常%d个（严重%d，警告%d），正常%d个",
 				typeStatus, summary.Type, summary.TotalMetrics,
-				summary.CriticalCount+summary.WarningCount, summary.CriticalCount, summary.WarningCount, summary.NormalCount)
+				summary.CriticalCount+summary.WarningCount, summary.CriticalCount, summary.WarningCount, summary.NormalCount))
 		}
 	} else {
-		typeSummaryText = "暂无分类数据<br/>"
+		typeSummaryLines = append(typeSummaryLines, "- 暂无分类数据")
 	}
+	typeSummaryText := strings.Join(typeSummaryLines, "\n\n")
 
 	// 生成报告的访问链接
 	reportFileName := filepath.Base(reportPath)
@@ -369,7 +375,7 @@ func SendDingtalkWithContext(ctx context.Context, config DingtalkConfig, reportP
 		reportLink = utils.GetReportURL(r, reportFileName)
 		log.Printf("使用动态URL生成报告链接: %s", reportLink)
 	} else {
-		reportLink = fmt.Sprintf("%s/api/promai/reports/%s", config.ReportURL, reportFileName)
+		reportLink = utils.BuildReportURL(config.ReportURL, reportFileName)
 		log.Printf("使用配置的静态URL生成报告链接: %s", reportLink)
 	}
 
@@ -379,29 +385,28 @@ func SendDingtalkWithContext(ctx context.Context, config DingtalkConfig, reportP
 		alertStatus = "⚠️ 异常"
 	}
 
-	// 构建钉钉专属Markdown模板（移除>缩进，用<br/>换行）
+	// 使用 actionCard 提供稳定的跳转按钮，避免 markdown 链接在钉钉内不可点击
 	messageContent := map[string]interface{}{
-		"msgtype": "markdown",
-		"markdown": map[string]string{
+		"msgtype": "actionCard",
+		"actionCard": map[string]string{
 			"title": "巡检报告",
 			"text": fmt.Sprintf("## 🔍 巡检报告 %s\n\n"+
-				"### ⌚ 巡检时间\n"+
+				"### ⌚ 巡检时间\n\n"+
 				"%s\n\n"+
-				"### 📊 分类巡检结果\n"+
+				"### 📊 分类巡检结果\n\n"+
 				"%s\n\n"+
-				"### 📈 整体统计\n"+
-				"**总指标数**：%d个<br/>"+
-				"**异常指标**：%d个（严重%d个，警告%d个）<br/>"+
-				"**正常指标**：%d个\n\n"+
-				"### 📋 点击查看完整报告\n"+
-				"**文件名**：`%s`<br/>"+
-				"**访问链接**：[点击查看报告](%s)\n\n"+
-				"---\n"+
-				"💡 请登录环境查看完整报告内容<br/>"+
+				"### 📈 整体统计\n\n"+
+				"- 总指标数：%d个\n"+
+				"- 异常指标：%d个（严重%d个，警告%d个）\n"+
+				"- 正常指标：%d个\n\n"+
+				"### 📋 报告信息\n\n"+
+				"- 文件名：`%s`\n"+
+				"- 报告地址：%s\n\n"+
+				"💡 如果按钮无法打开，请复制上面的报告地址到浏览器访问\n\n"+
 				"⏰ 生成时间：%s",
 				alertStatus,
 				time.Now().Format("2006-01-02 15:04:05"),
-				typeSummaryText, // 带<br/>的分类文本
+				typeSummaryText,
 				alertSummary.TotalMetrics,
 				alertSummary.TotalAlerts,
 				alertSummary.CriticalAlerts,
@@ -410,6 +415,9 @@ func SendDingtalkWithContext(ctx context.Context, config DingtalkConfig, reportP
 				reportFileName,
 				reportLink,
 				time.Now().Format("2006-01-02 15:04:05")),
+			"singleTitle":    "查看完整报告",
+			"singleURL":      reportLink,
+			"btnOrientation": "0",
 		},
 	}
 
@@ -437,11 +445,53 @@ func SendDingtalkWithContext(ctx context.Context, config DingtalkConfig, reportP
 	respBody, _ := io.ReadAll(resp.Body)
 	log.Printf("钉钉响应状态码: %d, 响应内容: %s", resp.StatusCode, string(respBody))
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("钉钉发送失败，状态码: %d", resp.StatusCode)
+	if err := ValidateWebhookResponse(webhook, resp.StatusCode, respBody); err != nil {
+		return err
 	}
 
 	log.Printf("钉钉通知发送成功")
+	return nil
+}
+
+func ValidateWebhookResponse(webhook string, statusCode int, respBody []byte) error {
+	if statusCode != http.StatusOK {
+		return fmt.Errorf("推送失败，状态码: %d, 响应: %s", statusCode, string(respBody))
+	}
+
+	parsedURL, err := url.Parse(webhook)
+	if err != nil {
+		return nil
+	}
+
+	host := strings.ToLower(parsedURL.Host)
+	body := strings.TrimSpace(string(respBody))
+	if body == "" {
+		return nil
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(respBody, &payload); err != nil {
+		return nil
+	}
+
+	switch {
+	case strings.Contains(host, "dingtalk.com"):
+		if code, ok := payload["errcode"].(float64); ok && int(code) != 0 {
+			return fmt.Errorf("钉钉发送失败: errcode=%d errmsg=%v", int(code), payload["errmsg"])
+		}
+	case strings.Contains(host, "qyapi.weixin.qq.com"):
+		if code, ok := payload["errcode"].(float64); ok && int(code) != 0 {
+			return fmt.Errorf("企业微信发送失败: errcode=%d errmsg=%v", int(code), payload["errmsg"])
+		}
+	case strings.Contains(host, "open.feishu.cn"):
+		if code, ok := payload["code"].(float64); ok && int(code) != 0 {
+			return fmt.Errorf("飞书发送失败: code=%d msg=%v", int(code), payload["msg"])
+		}
+		if code, ok := payload["StatusCode"].(float64); ok && int(code) != 0 {
+			return fmt.Errorf("飞书发送失败: StatusCode=%d StatusMessage=%v", int(code), payload["StatusMessage"])
+		}
+	}
+
 	return nil
 }
 

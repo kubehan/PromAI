@@ -7,9 +7,16 @@ export interface DataSource {
   is_default?: boolean
   enabled?: boolean
   template_id?: number | null
+  template_ids?: number[]
+  project_name?: string
   notify_channels?: string
   created_at?: string
+  updated_at?: string
   health_status?: string
+  connection_status?: string
+  connection_checked_at?: string | null
+  report_status?: string
+  last_report_at?: string | null
 }
 
 export interface MetricConfig {

@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 )
@@ -87,7 +88,7 @@ func GetServerURL(r *http.Request) string {
 // GetReportURL 获取报告访问URL
 func GetReportURL(r *http.Request, reportFileName string) string {
 	serverURL := GetServerURL(r)
-	return serverURL + "/api/promai/reports/" + reportFileName
+	return strings.TrimRight(serverURL, "/") + "/api/promai/reports/" + url.PathEscape(reportFileName)
 }
 
 // GetServerURLFromContext 从配置中获取服务器URL
@@ -117,4 +118,9 @@ func GetServerURLFromContext(configReportURL string) string {
 
 	return scheme + "://localhost:" + port
 
+}
+
+func BuildReportURL(configReportURL, reportFileName string) string {
+	baseURL := strings.TrimRight(GetServerURLFromContext(configReportURL), "/")
+	return baseURL + "/api/promai/reports/" + url.PathEscape(reportFileName)
 }

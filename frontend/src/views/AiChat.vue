@@ -3,13 +3,14 @@
     <div class="page-header">
       <h2><el-icon><MagicStick /></el-icon> AI 智能助手</h2>
       <div class="header-controls">
-        <p>自然语言查询指标、分析告警、管理系统</p>
+        <p>{{ currentSessionTitle || '自然语言查询指标、分析告警、管理系统' }}</p>
         <div class="model-selector" v-if="modelOptions.length > 0">
           <span class="model-label">当前模型：</span>
           <el-select v-model="currentModel" size="small" style="width: 180px;">
             <el-option v-for="m in modelOptions" :key="m.name" :label="m.name" :value="m.name" />
           </el-select>
         </div>
+        <el-button plain size="small" @click="startNewSession">新建会话</el-button>
       </div>
     </div>
 
@@ -87,12 +88,15 @@
       </div>
 
       <div class="chat-sidebar" v-if="sessions.length > 0">
-        <div class="sidebar-title">历史会话</div>
+        <div class="sidebar-title-row">
+          <div class="sidebar-title">历史会话</div>
+          <el-button text size="small" @click="startNewSession">新建会话</el-button>
+        </div>
         <div v-for="s in sessions" :key="s.id" class="session-item" @click="switchSession(s.id)">
           <el-icon :size="14"><ChatDotRound /></el-icon>
           <div class="session-info">
-            <span class="session-name">{{ s.model_name || shortId(s.id) }}</span>
-            <span class="session-meta">{{ s.msg_count }} 条消息</span>
+            <span class="session-name">{{ s.title || s.model_name || shortId(s.id) }}</span>
+            <span class="session-meta">{{ s.msg_count }} 条消息 · {{ s.model_name || '未命名模型' }}</span>
           </div>
           <el-button text size="small" @click.stop="deleteSession(s.id)">
             <el-icon :size="12"><Close /></el-icon>
@@ -104,7 +108,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import { marked } from 'marked'
 import { getAiSessions, deleteAiSession, getSettings } from '../api'
 
@@ -128,10 +132,17 @@ const inputText = ref('')
 const messages = ref<ChatMessage[]>([])
 const loading = ref(false)
 const sessionId = ref('')
-const sessions = ref<{id: string; created_at: string; updated_at: string; msg_count: number; model_name?: string}[]>([])
+const sessions = ref<{id: string; created_at: string; updated_at: string; msg_count: number; model_name?: string; title?: string}[]>([])
 const currentModel = ref('')
 const modelOptions = ref<{name: string}[]>([])
 const chatRef = ref<HTMLElement | null>(null)
+const currentSessionTitle = computed(() => {
+  const current = sessions.value.find(s => s.id === sessionId.value)
+  if (current?.title) return current.title
+  const firstUserMessage = messages.value.find(m => m.role === 'user')?.content?.trim()
+  if (!firstUserMessage) return ''
+  return firstUserMessage.length > 28 ? firstUserMessage.slice(0, 28) + '...' : firstUserMessage
+})
 
 function shortId(id: string) {
   return id.length > 12 ? id.slice(0, 12) + '...' : id
@@ -229,6 +240,12 @@ function sendSuggestion(text: string) {
   sendMessage()
 }
 
+function startNewSession() {
+  sessionId.value = ''
+  messages.value = []
+  inputText.value = ''
+}
+
 function scrollToBottom() {
   nextTick(() => {
     if (chatRef.value) {
@@ -253,6 +270,9 @@ async function switchSession(id: string) {
     })
     if (!res.ok) throw new Error('加载失败')
     const data = await res.json()
+    if (data.model_name) {
+      currentModel.value = data.model_name
+    }
     for (const m of data.messages) {
       messages.value.push({ role: m.role, content: m.content })
     }
@@ -305,6 +325,12 @@ onMounted(() => {
   gap: 16px;
   min-height: 0;
   overflow: hidden;
+}
+
+.sidebar-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .chat-layout {

@@ -61,6 +61,38 @@
 | 巡检报告 | http://localhost:8091/promai/reports |
 | 触发巡检 | http://localhost:8091/promai/inspection/ |
 
+### Helm 部署
+
+```bash
+helm install promai ./deploy/helm/promai \
+  --set image.repository=promai \
+  --set image.tag=v2.0.3
+```
+
+升级：
+
+```bash
+helm upgrade promai ./deploy/helm/promai \
+  --set image.repository=promai \
+  --set image.tag=v2.0.3
+```
+
+常用配置：
+
+```yaml
+env:
+  reportUrl: "https://promai.example.com"
+bootstrapSql:
+  enabled: true
+  content: |
+    -- 自定义初始化 SQL
+```
+
+说明：
+- `env.reportUrl` 用于生成报告外链，推荐配置成外部可访问地址。
+- `deploy/helm/promai/files/metric_types_seed.sql` 是默认初始化 SQL。
+- 如果需要自定义初始化内容，直接改 `bootstrapSql.content` 或替换 `files/metric_types_seed.sql`。
+
 ## 管理后台功能
 
 | 页面 | 功能 |

@@ -1,6 +1,7 @@
 # ---- Stage 1: Build frontend ----
 FROM node:20-alpine AS frontend-builder
 WORKDIR /build
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 COPY frontend/package*.json ./
 RUN npm ci --prefer-offline --no-audit
 COPY frontend/ .
@@ -8,8 +9,10 @@ RUN npm run build
 
 # ---- Stage 2: Build Go backend ----
 FROM golang:1.25-alpine AS backend-builder
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 RUN apk add --no-cache gcc musl-dev
 WORKDIR /build
+ENV GOPROXY=https://goproxy.cn,direct
 COPY go.mod go.sum ./
 COPY pi-local/ ./pi-local/
 RUN go mod download
@@ -18,10 +21,12 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -a -installsuffix cgo -o PromAI .
 
 # ---- Stage 3: Runtime ----
 FROM alpine:3.21
-RUN apk add --no-cache tzdata ca-certificates
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
+  && apk add --no-cache tzdata ca-certificates curl sqlite
 WORKDIR /app
 COPY --from=backend-builder /build/PromAI .
 COPY --from=frontend-builder /build/dist ./frontend/dist/
+COPY deploy/sql ./deploy/sql/
 COPY templates ./templates/
 COPY config/config.yaml ./config/config.yaml
 RUN mkdir -p /app/data /app/reports

@@ -97,6 +97,9 @@ func main() {
 	if err := database.InitDB(dbPath); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+	if err := database.ImportSQLFileIfNeeded(config); err != nil {
+		log.Fatalf("Failed to import bootstrap SQL: %v", err)
+	}
 	// 从配置文件导入初始数据到数据库
 	if err := database.SeedFromConfig(config); err != nil {
 		log.Printf("Warning: failed to seed database: %v", err)
@@ -327,19 +330,15 @@ func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
 	if config.CronSchedule != "" {
 		_, err := globalScheduler.AddFunc(config.CronSchedule, func() {
 			log.Printf("[Cron] 执行定时巡检任务(配置文件)...")
-			data, err := collector.CollectMetrics()
-			if err != nil {
-				log.Printf("[Cron] 收集指标失败: %v", err)
-				return
+			var dsIDPtr *uint
+			if preferred := resolveConfigScheduleDatasourceID(); preferred != nil {
+				dsID := *preferred
+				dsIDPtr = &dsID
+				log.Printf("[Cron] 配置文件定时巡检将使用数据源 ID=%d", dsID)
+			} else {
+				log.Printf("[Cron] 未找到默认数据源，回退为全局配置巡检")
 			}
-			reportFilePath, err := report.GenerateReport(*data)
-			if err != nil {
-				log.Printf("[Cron] 生成报告失败: %v", err)
-				return
-			}
-			saveReportRecord(data, reportFilePath)
-			sendNotifications(config, reportFilePath, data)
-			log.Printf("[Cron] 定时巡检任务完成: %s", reportFilePath)
+			doSingleInspection(config, collector, database.CronJob{Name: "配置文件定时巡检"}, dsIDPtr)
 		})
 		if err != nil {
 			log.Printf("[Cron] 调度配置文件任务失败: %v", err)
@@ -355,6 +354,22 @@ func startGlobalScheduler(config *config.Config, collector *metrics.Collector) {
 
 	globalScheduler.Start()
 	log.Printf("[Cron] 定时调度器已启动")
+}
+
+func resolveConfigScheduleDatasourceID() *uint {
+	var defaultDS database.DataSource
+	if err := database.DB.Where("enabled = ? AND is_default = ?", true, true).
+		Order("id asc").
+		First(&defaultDS).Error; err == nil {
+		return &defaultDS.ID
+	}
+
+	var enabledSources []database.DataSource
+	database.DB.Where("enabled = ?", true).Order("id asc").Find(&enabledSources)
+	if len(enabledSources) == 1 {
+		return &enabledSources[0].ID
+	}
+	return nil
 }
 
 // executeInspectionWithProgress 带进度更新的巡检执行
@@ -599,6 +614,10 @@ func sendSingleNotification(ch database.NotificationChannel, reportFilePath, dat
 func sendNotificationsWithContext(ctx context.Context, config *config.Config, reportFilePath string, reportData *report.ReportData) {
 	// 计算告警汇总
 	alertSummary := notify.CalculateAlertSummary(*reportData)
+	projectName := config.ProjectName
+	if reportData != nil && strings.TrimSpace(reportData.Project) != "" {
+		projectName = strings.TrimSpace(reportData.Project)
+	}
 
 	log.Printf("告警汇总: 总指标=%d, 异常=%d, 严重=%d, 警告=%d, 正常=%d",
 		alertSummary.TotalMetrics, alertSummary.TotalAlerts, alertSummary.CriticalAlerts,
@@ -606,28 +625,28 @@ func sendNotificationsWithContext(ctx context.Context, config *config.Config, re
 
 	if config.Notifications.Dingtalk.Enabled {
 		log.Printf("发送钉钉消息")
-		if err := notify.SendDingtalkWithContext(ctx, config.Notifications.Dingtalk, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+		if err := notify.SendDingtalkWithContext(ctx, config.Notifications.Dingtalk, reportFilePath, projectName, reportData.Datasource, alertSummary); err != nil {
 			log.Printf("发送钉钉消息失败: %v", err)
 		}
 	}
 
 	if config.Notifications.Email.Enabled {
 		log.Printf("发送邮件")
-		if err := notify.SendEmailWithContext(ctx, config.Notifications.Email, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+		if err := notify.SendEmailWithContext(ctx, config.Notifications.Email, reportFilePath, projectName, reportData.Datasource, alertSummary); err != nil {
 			log.Printf("发送邮件失败: %v", err)
 		}
 	}
 
 	if config.Notifications.WeChatWork.Enabled {
 		log.Printf("发送企业微信消息")
-		if err := notify.SendWeChatWorkWithContext(ctx, config.Notifications.WeChatWork, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+		if err := notify.SendWeChatWorkWithContext(ctx, config.Notifications.WeChatWork, reportFilePath, projectName, reportData.Datasource, alertSummary); err != nil {
 			log.Printf("发送企业微信消息失败: %v", err)
 		}
 	}
 
 	if config.Notifications.Feishu.Enabled {
 		log.Printf("发送飞书消息")
-		if err := notify.SendFeishuWithContext(ctx, config.Notifications.Feishu, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+		if err := notify.SendFeishuWithContext(ctx, config.Notifications.Feishu, reportFilePath, projectName, reportData.Datasource, alertSummary); err != nil {
 			log.Printf("发送飞书消息失败: %v", err)
 		}
 	}
@@ -648,7 +667,7 @@ func sendNotificationsWithContext(ctx context.Context, config *config.Config, re
 			}
 		}
 
-		if err := notify.SendWeChatAppWithContext(ctx, appConfig, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+		if err := notify.SendWeChatAppWithContext(ctx, appConfig, reportFilePath, projectName, reportData.Datasource, alertSummary); err != nil {
 			log.Printf("发送企业微信应用消息失败: %v", err)
 		}
 	}
@@ -667,7 +686,7 @@ func sendNotificationsWithContext(ctx context.Context, config *config.Config, re
 			}
 			log.Printf("[NOTIFICATION] 使用代理地址: %s", proxyURL)
 
-			if err := notify.SendWeChatWorkWithWebhook(ctx, wechatBotKey, proxyURL, reportFilePath, config.ProjectName, reportData.Datasource, alertSummary); err != nil {
+			if err := notify.SendWeChatWorkWithWebhook(ctx, wechatBotKey, proxyURL, reportFilePath, projectName, reportData.Datasource, alertSummary); err != nil {
 				log.Printf("[NOTIFICATION] 发送企业微信消息失败: %v", err)
 			} else {
 				log.Printf("[NOTIFICATION] 企业微信通知发送成功")
@@ -1174,9 +1193,15 @@ func doSingleInspection(cfg *config.Config, collector *metrics.Collector, job da
 		}
 
 		// 先检查连通性，不可用则立即终止
+		checkTime := time.Now()
 		hcCtx, hcCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		if err := client.HealthCheck(hcCtx); err != nil {
 			hcCancel()
+			database.DB.Model(&database.DataSource{}).Where("id = ?", ds.ID).Updates(map[string]interface{}{
+				"connection_status":     "unknown",
+				"connection_checked_at": &checkTime,
+			})
+			invalidateDSCache()
 			log.Printf("[Cron] 数据源 %s 不可用: %v，跳过巡检", ds.Name, err)
 			database.DB.Create(&database.InspectRecord{
 				TaskID: taskID, Status: "failed", DatasourceID: &dsID,
@@ -1186,29 +1211,14 @@ func doSingleInspection(cfg *config.Config, collector *metrics.Collector, job da
 			return false
 		}
 		hcCancel()
+		database.DB.Model(&database.DataSource{}).Where("id = ?", ds.ID).Updates(map[string]interface{}{
+			"connection_status":     "online",
+			"connection_checked_at": &checkTime,
+		})
+		invalidateDSCache()
 
-		activeCfg := cfg
-		if ds.TemplateID != nil {
-			var links []database.InspectionTemplateMetric
-			database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
-			if len(links) > 0 {
-				cfgIDs := make([]uint, len(links))
-				for i, l := range links {
-					cfgIDs[i] = l.MetricConfigID
-				}
-				var tmplConfigs []database.MetricConfig
-				database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
-				for i := range tmplConfigs {
-					var override database.TemplateMetricOverride
-					if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
-						override.Apply(&tmplConfigs[i])
-					}
-				}
-				if len(tmplConfigs) > 0 {
-					activeCfg = buildFilteredConfig(cfg, tmplConfigs)
-				}
-			}
-		}
+		database.NormalizeDataSourceTemplateFields(&ds)
+		activeCfg := buildRuntimeMetricConfig(cfg, &ds, nil)
 
 		database.DB.Create(&database.InspectRecord{
 			TaskID: taskID, Status: "running", DatasourceID: &dsID,
@@ -1372,17 +1382,28 @@ func saveReportRecord(data *report.ReportData, reportPath string) {
 		dsID = &dsRecord.ID
 	}
 	database.DB.Create(&database.ReportRecord{
-		Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
+		Title: func() string {
+			title := strings.TrimSpace(data.Project)
+			if title == "" {
+				title = "巡检报告"
+			}
+			return fmt.Sprintf("%s - %s", title, time.Now().Format("2006-01-02 15:04"))
+		}(),
 		DatasourceID:   dsID,
 		DatasourceName: data.Datasource,
 		FilePath:       reportPath,
-		FileSize:       func() int64 { if info != nil { return info.Size() }; return 0 }(),
-		TotalMetrics:   totalMetrics,
-		AlertCount:     alertCount,
-		CriticalCount:  criticalCount,
-		WarningCount:   warningCount,
-		Status:         status,
-		MetricsJSON:    buildHealthSnapshot(data),
+		FileSize: func() int64 {
+			if info != nil {
+				return info.Size()
+			}
+			return 0
+		}(),
+		TotalMetrics:  totalMetrics,
+		AlertCount:    alertCount,
+		CriticalCount: criticalCount,
+		WarningCount:  warningCount,
+		Status:        status,
+		MetricsJSON:   buildHealthSnapshot(data),
 	})
 }
 

@@ -212,8 +212,24 @@ func (h *AgentHandler) getOrCreateSession(sessionID, modelName string) (*agent.A
 				return sd.agent, sessionID
 			}
 		}
+		if restored := h.restoreSessionLocked(sessionID, modelName); restored != nil {
+			return restored, sessionID
+		}
 	}
 
+	ag, resolvedModelName := h.newAgent(modelName)
+	if ag == nil {
+		return nil, ""
+	}
+
+	newID := fmt.Sprintf("sess_%d", time.Now().UnixNano())
+	h.sessions[newID] = &sessionData{agent: ag, modelName: resolvedModelName}
+
+	log.Printf("[PiAgent] 创建会话 %s (模型: %s)", newID, resolvedModelName)
+	return ag, newID
+}
+
+func (h *AgentHandler) newAgent(modelName string) (*agent.Agent, string) {
 	mc := h.getDefaultModel()
 	if modelName != "" {
 		if m := h.getModel(modelName); m != nil {
@@ -271,12 +287,62 @@ func (h *AgentHandler) getOrCreateSession(sessionID, modelName string) (*agent.A
 	ag.SetSystemPrompt(systemPrompt)
 	ag.SetThinkingLevel(level)
 	ag.SetTools(h.tools)
+	return ag, mc.Name
+}
 
-	newID := fmt.Sprintf("sess_%d", time.Now().UnixNano())
-	h.sessions[newID] = &sessionData{agent: ag, modelName: mc.Name}
+func (h *AgentHandler) restoreSessionLocked(sessionID, modelName string) *agent.Agent {
+	var session database.AiSession
+	if err := h.db.Where("id = ?", sessionID).First(&session).Error; err != nil {
+		return nil
+	}
 
-	log.Printf("[PiAgent] 创建会话 %s (模型: %s)", newID, mc.Name)
-	return ag, newID
+	resumeModelName := strings.TrimSpace(modelName)
+	if resumeModelName == "" {
+		resumeModelName = strings.TrimSpace(session.ModelName)
+	}
+
+	ag, resolvedModelName := h.newAgent(resumeModelName)
+	if ag == nil {
+		return nil
+	}
+
+	var messages []database.AiMessage
+	h.db.Where("session_id = ?", sessionID).Order("created_at asc, id asc").Find(&messages)
+	for _, m := range messages {
+		switch m.Role {
+		case "user":
+			ag.AppendMessage(ai.NewUserMessage(m.Content))
+		case "assistant":
+			msg := ai.NewAssistantMessage(ai.ApiOpenAICompletions, ai.ProviderOpenAI, resolvedModelName)
+			msg.Content = append(msg.Content, ai.NewTextContentBlock(m.Content))
+			ag.AppendMessage(msg)
+		}
+	}
+
+	h.sessions[sessionID] = &sessionData{agent: ag, modelName: resolvedModelName}
+	log.Printf("[PiAgent] 恢复历史会话 %s (模型: %s, 消息数: %d)", sessionID, resolvedModelName, len(messages))
+	return ag
+}
+
+func (h *AgentHandler) buildSessionTitle(sessionID string) string {
+	var firstUserMessage database.AiMessage
+	if err := h.db.Where("session_id = ? AND role = ?", sessionID, "user").Order("created_at asc").First(&firstUserMessage).Error; err != nil {
+		return ""
+	}
+	return compactSessionTitle(firstUserMessage.Content, 28)
+}
+
+func compactSessionTitle(text string, limit int) string {
+	text = strings.TrimSpace(strings.ReplaceAll(text, "\n", " "))
+	text = strings.Join(strings.Fields(text), " ")
+	if text == "" {
+		return ""
+	}
+	runes := []rune(text)
+	if limit <= 0 || len(runes) <= limit {
+		return text
+	}
+	return string(runes[:limit]) + "..."
 }
 
 func (h *AgentHandler) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -319,9 +385,18 @@ func (h *AgentHandler) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	// Ensure session record exists in DB
 	h.db.Where("id = ?", sessionID).First(&database.AiSession{})
+	modelLabel := req.ModelName
+	if modelLabel == "" {
+		if sd, ok := h.sessions[sessionID]; ok {
+			modelLabel = sd.modelName
+		}
+	}
+	if modelLabel == "" && h.getDefaultModel() != nil {
+		modelLabel = h.getDefaultModel().Name
+	}
 	h.db.Create(&database.AiSession{
 		ID:        sessionID,
-		ModelName: h.getDefaultModel().Name,
+		ModelName: modelLabel,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	})
@@ -411,6 +486,7 @@ func (h *AgentHandler) handleSessions(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: s.UpdatedAt,
 			MsgCount:  count,
 			ModelName: s.ModelName,
+			Title:     h.buildSessionTitle(s.ID),
 		})
 	}
 
@@ -442,6 +518,7 @@ func (h *AgentHandler) handleSessionByID(w http.ResponseWriter, r *http.Request)
 				CreatedAt: session.CreatedAt,
 				UpdatedAt: session.UpdatedAt,
 				ModelName: session.ModelName,
+				Title:     h.buildSessionTitle(session.ID),
 			},
 		}
 		detail.MsgCount = int64(len(messages))

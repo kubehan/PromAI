@@ -7,18 +7,25 @@ import (
 )
 
 type DataSource struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
-	Name           string    `gorm:"uniqueIndex;size:100;not null" json:"name"`
-	URL            string    `gorm:"size:500;not null" json:"url"`
-	Username       string    `gorm:"size:100" json:"username"`
-	Password       string    `gorm:"size:100" json:"password"`
-	IsDefault      bool      `gorm:"default:false" json:"is_default"`
-	Enabled        bool      `gorm:"default:true" json:"enabled"`
-	TemplateID     *uint     `json:"template_id"`
-	NotifyChannels string    `gorm:"type:text" json:"notify_channels"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	HealthStatus   string    `gorm:"-" json:"health_status"`
+	ID                  uint       `gorm:"primaryKey" json:"id"`
+	Name                string     `gorm:"uniqueIndex;size:100;not null" json:"name"`
+	URL                 string     `gorm:"size:500;not null" json:"url"`
+	Username            string     `gorm:"size:100" json:"username"`
+	Password            string     `gorm:"size:100" json:"password"`
+	IsDefault           bool       `gorm:"default:false" json:"is_default"`
+	Enabled             bool       `gorm:"default:true" json:"enabled"`
+	TemplateID          *uint      `json:"template_id"`
+	TemplateIDsRaw      string     `gorm:"column:template_ids;type:text" json:"-"`
+	TemplateIDs         []uint     `gorm:"-" json:"template_ids,omitempty"`
+	ProjectName         string     `gorm:"size:200" json:"project_name"`
+	ConnectionStatus    string     `gorm:"size:50" json:"connection_status"`
+	ConnectionCheckedAt *time.Time `json:"connection_checked_at,omitempty"`
+	NotifyChannels      string     `gorm:"type:text" json:"notify_channels"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	HealthStatus        string     `gorm:"-" json:"health_status"`
+	ReportStatus        string     `gorm:"-" json:"report_status,omitempty"`
+	LastReportAt        *time.Time `gorm:"-" json:"last_report_at,omitempty"`
 }
 
 type MetricType struct {
@@ -31,18 +38,18 @@ type MetricType struct {
 }
 
 type MetricConfig struct {
-	ID              uint   `gorm:"primaryKey" json:"id"`
-	MetricTypeID    uint   `gorm:"not null;index" json:"metric_type_id"`
-	DatasourceID    *uint  `gorm:"index" json:"datasource_id"`
-	Name            string `gorm:"size:200;not null" json:"name"`
-	Description     string `gorm:"size:500" json:"description"`
-	Query           string `gorm:"type:text;not null" json:"query"`
-	Threshold       float64 `json:"threshold"`
-	ThresholdType   string `gorm:"size:50;default:greater" json:"threshold_type"`
-	ThresholdStatus string `gorm:"size:50;default:critical" json:"threshold_status"`
-	Unit            string `gorm:"size:50" json:"unit"`
-	LabelsJSON      string `gorm:"type:text" json:"labels_json"`
-	SortOrder       int    `gorm:"default:0" json:"sort_order"`
+	ID              uint      `gorm:"primaryKey" json:"id"`
+	MetricTypeID    uint      `gorm:"not null;index" json:"metric_type_id"`
+	DatasourceID    *uint     `gorm:"index" json:"datasource_id"`
+	Name            string    `gorm:"size:200;not null" json:"name"`
+	Description     string    `gorm:"size:500" json:"description"`
+	Query           string    `gorm:"type:text;not null" json:"query"`
+	Threshold       float64   `json:"threshold"`
+	ThresholdType   string    `gorm:"size:50;default:greater" json:"threshold_type"`
+	ThresholdStatus string    `gorm:"size:50;default:critical" json:"threshold_status"`
+	Unit            string    `gorm:"size:50" json:"unit"`
+	LabelsJSON      string    `gorm:"type:text" json:"labels_json"`
+	SortOrder       int       `gorm:"default:0" json:"sort_order"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
@@ -58,35 +65,35 @@ type NotificationChannel struct {
 }
 
 type CronJob struct {
-	ID              uint       `gorm:"primaryKey" json:"id"`
-	Name            string     `gorm:"size:200;not null" json:"name"`
-	Schedule        string     `gorm:"size:100;not null" json:"schedule"`
-	DatasourceID    *uint      `json:"datasource_id"`               // 旧版单数据源（向后兼容）
-	DatasourceIDs   string     `gorm:"type:text" json:"datasource_ids"`     // 多数据源 JSON 数组
-	AllDatasources  bool       `json:"all_datasources"`                      // 全部数据源
-	Enabled         bool       `gorm:"default:true" json:"enabled"`
-	NotifyChannels  string     `gorm:"type:text" json:"notify_channels"`
-	LastRunAt       *time.Time `json:"last_run_at"`
-	LastStatus      string     `gorm:"size:50" json:"last_status"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID             uint       `gorm:"primaryKey" json:"id"`
+	Name           string     `gorm:"size:200;not null" json:"name"`
+	Schedule       string     `gorm:"size:100;not null" json:"schedule"`
+	DatasourceID   *uint      `json:"datasource_id"`                   // 旧版单数据源（向后兼容）
+	DatasourceIDs  string     `gorm:"type:text" json:"datasource_ids"` // 多数据源 JSON 数组
+	AllDatasources bool       `json:"all_datasources"`                 // 全部数据源
+	Enabled        bool       `gorm:"default:true" json:"enabled"`
+	NotifyChannels string     `gorm:"type:text" json:"notify_channels"`
+	LastRunAt      *time.Time `json:"last_run_at"`
+	LastStatus     string     `gorm:"size:50" json:"last_status"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 type ReportRecord struct {
-	ID              uint      `gorm:"primaryKey" json:"id"`
-	Title           string    `gorm:"size:200" json:"title"`
-	DatasourceID    *uint     `json:"datasource_id"`
-	DatasourceName  string    `gorm:"size:200" json:"datasource_name"`
-	FilePath        string    `gorm:"size:500" json:"file_path"`
-	FileSize        int64     `json:"file_size"`
-	TotalMetrics    int       `json:"total_metrics"`
-	AlertCount      int       `json:"alert_count"`
-	CriticalCount   int       `json:"critical_count"`
-	WarningCount    int       `json:"warning_count"`
-	Status          string    `gorm:"size:50" json:"status"`
-	Duration        string    `gorm:"size:50" json:"duration"`
-	MetricsJSON     string    `gorm:"type:text" json:"metrics_json"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	Title          string    `gorm:"size:200" json:"title"`
+	DatasourceID   *uint     `json:"datasource_id"`
+	DatasourceName string    `gorm:"size:200" json:"datasource_name"`
+	FilePath       string    `gorm:"size:500" json:"file_path"`
+	FileSize       int64     `json:"file_size"`
+	TotalMetrics   int       `json:"total_metrics"`
+	AlertCount     int       `json:"alert_count"`
+	CriticalCount  int       `json:"critical_count"`
+	WarningCount   int       `json:"warning_count"`
+	Status         string    `gorm:"size:50" json:"status"`
+	Duration       string    `gorm:"size:50" json:"duration"`
+	MetricsJSON    string    `gorm:"type:text" json:"metrics_json"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type AppSetting struct {
@@ -155,16 +162,16 @@ type SyncSource struct {
 	Name          string    `gorm:"size:200;not null" json:"name"`
 	URL           string    `gorm:"size:500;not null" json:"url"`
 	Method        string    `gorm:"size:10;default:GET" json:"method"`
-	Headers       string    `gorm:"type:text" json:"headers"`      // JSON object
-	Body          string    `gorm:"type:text" json:"body"`         // request body template
+	Headers       string    `gorm:"type:text" json:"headers"`              // JSON object
+	Body          string    `gorm:"type:text" json:"body"`                 // request body template
 	AuthType      string    `gorm:"size:20;default:none" json:"auth_type"` // none, basic, bearer
 	AuthUsername  string    `gorm:"size:100" json:"auth_username"`
 	AuthPassword  string    `gorm:"size:100" json:"auth_password"`
 	AuthToken     string    `gorm:"size:500" json:"auth_token"`
-	DataPath      string    `gorm:"size:200" json:"data_path"`     // JSON path to data array (e.g. "data.items")
+	DataPath      string    `gorm:"size:200" json:"data_path"` // JSON path to data array (e.g. "data.items")
 	NameField     string    `gorm:"size:100;not null" json:"name_field"`
 	URLField      string    `gorm:"size:100" json:"url_field"`
-	URLTemplate   string    `gorm:"size:500" json:"url_template"`  // e.g. http://{host}:{port}
+	URLTemplate   string    `gorm:"size:500" json:"url_template"` // e.g. http://{host}:{port}
 	UsernameField string    `gorm:"size:100" json:"username_field"`
 	PasswordField string    `gorm:"size:100" json:"password_field"`
 	CronExpr      string    `gorm:"size:50" json:"cron_expr"`

@@ -29,18 +29,18 @@ import (
 )
 
 type InspectTask struct {
-	ID         string `json:"id"`
-	Status     string `json:"status"` // running, completed, failed
-	Message    string `json:"message"`
-	ReportURL  string `json:"report_url,omitempty"`
-	Error      string `json:"error,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID        string    `json:"id"`
+	Status    string    `json:"status"` // running, completed, failed
+	Message   string    `json:"message"`
+	ReportURL string    `json:"report_url,omitempty"`
+	Error     string    `json:"error,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 var (
-	inspectTasks      = make(map[string]*InspectTask)
-	inspectTasksMu    sync.RWMutex
-	taskCounter       int64
+	inspectTasks   = make(map[string]*InspectTask)
+	inspectTasksMu sync.RWMutex
+	taskCounter    int64
 )
 
 func newTaskID() string {
@@ -224,14 +224,58 @@ func loadLatestReports() {
 	log.Printf("已加载 %d 个数据源的最新巡检快照", len(seen))
 }
 
+func populateDatasourceHealthFields(datasources []database.DataSource) {
+	if len(datasources) == 0 {
+		return
+	}
+	urls := make([]string, 0, len(datasources))
+	for _, ds := range datasources {
+		if ds.URL != "" {
+			urls = append(urls, ds.URL)
+		}
+	}
+
+	reportMap := make(map[string]database.ReportRecord, len(datasources))
+	if len(urls) > 0 {
+		var latestRecords []database.ReportRecord
+		database.DB.Where("datasource_name IN ?", urls).Order("created_at desc").Find(&latestRecords)
+		for _, r := range latestRecords {
+			if _, ok := reportMap[r.DatasourceName]; !ok {
+				reportMap[r.DatasourceName] = r
+			}
+		}
+	}
+
+	for i := range datasources {
+		ds := &datasources[i]
+		if getLatestReport(ds.URL) != nil {
+			ds.ReportStatus = "online"
+		} else {
+			ds.ReportStatus = "unknown"
+		}
+		if rec, ok := reportMap[ds.URL]; ok && rec.ID > 0 {
+			t := rec.CreatedAt
+			ds.LastReportAt = &t
+		}
+		if ds.ConnectionStatus == "" {
+			ds.ConnectionStatus = "unknown"
+		}
+		if ds.ReportStatus == "online" || ds.ConnectionStatus == "online" {
+			ds.HealthStatus = "online"
+		} else {
+			ds.HealthStatus = "unknown"
+		}
+	}
+}
+
 type AdminAPI struct {
-	collector       *metrics.Collector
-	config          *config.Config
-	authUser        string
-	authPass        string
-	jwtSecret       string
-	syncCronJobs    map[uint]cron.EntryID
-	syncCronJobsMu  sync.Mutex
+	collector      *metrics.Collector
+	config         *config.Config
+	authUser       string
+	authPass       string
+	jwtSecret      string
+	syncCronJobs   map[uint]cron.EntryID
+	syncCronJobsMu sync.Mutex
 }
 
 func NewAdminAPI(collector *metrics.Collector, cfg *config.Config) *AdminAPI {
@@ -300,6 +344,7 @@ func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/api/promai/metrics/validate", logged(auth(a.handleValidatePromQL)))
 	mux.HandleFunc("/api/promai/templates", logged(auth(a.handleTemplates)))
 	mux.HandleFunc("/api/promai/templates/all", logged(auth(a.handleAllTemplates)))
+	mux.HandleFunc("/api/promai/templates/init", logged(auth(a.handleInitTemplates)))
 	mux.HandleFunc("/api/promai/templates/", logged(auth(a.handleTemplateByID)))
 	mux.HandleFunc("/api/promai/settings", logged(auth(a.handleSettings)))
 	mux.HandleFunc("/api/promai/inspect", logged(auth(a.handleInspect)))
@@ -478,13 +523,9 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 
 		var all []database.DataSource
 		query.Order("is_default desc, enabled desc, name asc").Find(&all)
+		database.NormalizeDataSourcesTemplateFields(all)
 		maskPassword(all)
-
-		for i := range all {
-			if getLatestReport(all[i].URL) != nil {
-				all[i].HealthStatus = "online"
-			}
-		}
+		populateDatasourceHealthFields(all)
 
 		if hs := r.URL.Query().Get("health_status"); hs != "" {
 			filtered := make([]database.DataSource, 0, len(all))
@@ -509,9 +550,9 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 		}
 
 		writeJSON(w, map[string]interface{}{
-			"items": all,
-			"total": total,
-			"page":  page,
+			"items":     all,
+			"total":     total,
+			"page":      page,
 			"page_size": pageSize,
 		})
 	case "POST":
@@ -524,18 +565,23 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "名称和URL不能为空")
 			return
 		}
+		database.NormalizeDataSourceTemplateFields(&d)
 		d.Enabled = true
+		d.TemplateIDsRaw = database.EncodeTemplateIDs(d.TemplateIDs)
+		d.TemplateID = database.PrimaryTemplateID(d.TemplateIDs)
 		database.DB.Create(&d)
 		invalidateDSCache()
 		log.Printf("[Admin] 创建数据源: id=%d name=%s url=%s", d.ID, d.Name, d.URL)
 		w.WriteHeader(201)
 		d.Password = ""
+		database.NormalizeDataSourceTemplateFields(&d)
 		writeJSON(w, d)
 	case "PATCH":
 		var req struct {
 			IDs            []uint `json:"ids"`
 			Enabled        *bool  `json:"enabled,omitempty"`
 			TemplateID     *uint  `json:"template_id,omitempty"`
+			TemplateIDs    []uint `json:"template_ids,omitempty"`
 			NotifyChannels string `json:"notify_channels"`
 			Username       string `json:"username"`
 			Password       string `json:"password"`
@@ -559,11 +605,14 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 				log.Printf("[Admin] 数据源 %v 启用状态 -> %v", req.IDs, *req.Enabled)
 			}
 		case "set-template":
-			if req.TemplateID != nil {
-				database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("template_id", *req.TemplateID)
-			} else {
-				database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("template_id", nil)
+			templateIDs := req.TemplateIDs
+			if len(templateIDs) == 0 && req.TemplateID != nil && *req.TemplateID > 0 {
+				templateIDs = []uint{*req.TemplateID}
 			}
+			database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Updates(map[string]interface{}{
+				"template_id":  database.PrimaryTemplateID(templateIDs),
+				"template_ids": database.EncodeTemplateIDs(templateIDs),
+			})
 		case "set-notify":
 			database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("notify_channels", req.NotifyChannels)
 		case "apply-template":
@@ -572,7 +621,10 @@ func (a *AdminAPI) handleDataSources(w http.ResponseWriter, r *http.Request) {
 				writeError(w, 500, "全局模板不存在")
 				return
 			}
-			database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Update("template_id", globalTmpl.ID)
+			database.DB.Model(&database.DataSource{}).Where("id IN ?", req.IDs).Updates(map[string]interface{}{
+				"template_id":  globalTmpl.ID,
+				"template_ids": database.EncodeTemplateIDs([]uint{globalTmpl.ID}),
+			})
 		case "inspect":
 			var dss []database.DataSource
 			database.DB.Find(&dss, "id IN ?", req.IDs)
@@ -625,11 +677,7 @@ func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) 
 		dsCacheMu.RUnlock()
 		result := make([]database.DataSource, len(cached))
 		copy(result, cached)
-		for i := range result {
-			if getLatestReport(result[i].URL) != nil {
-				result[i].HealthStatus = "online"
-			}
-		}
+		populateDatasourceHealthFields(result)
 		w.Header().Set("X-Cache", "HIT")
 		writeJSON(w, result)
 		return
@@ -640,12 +688,9 @@ func (a *AdminAPI) handleAllDataSources(w http.ResponseWriter, r *http.Request) 
 	database.DB.Model(&database.DataSource{}).
 		Order("is_default desc, enabled desc, name asc").
 		Find(&ds)
+	database.NormalizeDataSourcesTemplateFields(ds)
 	maskPassword(ds)
-	for i := range ds {
-		if getLatestReport(ds[i].URL) != nil {
-			ds[i].HealthStatus = "online"
-		}
-	}
+	populateDatasourceHealthFields(ds)
 
 	dsCacheMu.Lock()
 	dsCache = ds
@@ -677,7 +722,11 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 			writeError(w, 404, "数据源不存在")
 			return
 		}
+		database.NormalizeDataSourceTemplateFields(&d)
 		d.Password = ""
+		items := []database.DataSource{d}
+		populateDatasourceHealthFields(items)
+		d = items[0]
 		writeJSON(w, d)
 	case "PUT":
 		var d database.DataSource
@@ -694,6 +743,11 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 		delete(upd, "created_at")
 		delete(upd, "updated_at")
 		delete(upd, "health_status")
+		delete(upd, "report_status")
+		delete(upd, "last_report_at")
+		delete(upd, "connection_status")
+		delete(upd, "connection_checked_at")
+		delete(upd, "template_ids_raw")
 		if pw, ok := upd["password"]; ok {
 			if pw == nil {
 				delete(upd, "password")
@@ -701,10 +755,22 @@ func (a *AdminAPI) handleDataSourceByID(w http.ResponseWriter, r *http.Request) 
 				delete(upd, "password")
 			}
 		}
+		templateIDs := extractTemplateIDsFromPayload(upd["template_ids"])
+		_, hasTemplateID := upd["template_id"]
+		if len(templateIDs) == 0 {
+			if templateID := extractTemplateIDFromPayload(upd["template_id"]); templateID != nil {
+				templateIDs = []uint{*templateID}
+			}
+		}
+		if _, ok := upd["template_ids"]; ok || hasTemplateID {
+			upd["template_ids"] = database.EncodeTemplateIDs(templateIDs)
+			upd["template_id"] = database.PrimaryTemplateID(templateIDs)
+		}
 		database.DB.Model(&d).Updates(upd)
 		database.DB.First(&d, id)
 		invalidateDSCache()
 		log.Printf("[Admin] 更新数据源: id=%d name=%s", id, d.Name)
+		database.NormalizeDataSourceTemplateFields(&d)
 		d.Password = ""
 		writeJSON(w, d)
 	case "DELETE":
@@ -790,8 +856,11 @@ func (a *AdminAPI) handleApplyTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 设置数据源的 template_id 为全局模板
-	database.DB.Model(&ds).Update("template_id", globalTmpl.ID)
+	database.DB.Model(&ds).Updates(map[string]interface{}{
+		"template_id":  globalTmpl.ID,
+		"template_ids": database.EncodeTemplateIDs([]uint{globalTmpl.ID}),
+	})
+	invalidateDSCache()
 
 	var count int64
 	database.DB.Model(&database.InspectionTemplateMetric{}).Where("template_id = ?", globalTmpl.ID).Count(&count)
@@ -1072,42 +1141,39 @@ func (a *AdminAPI) handleMetricTypes(w http.ResponseWriter, r *http.Request) {
 	case "GET":
 		filterDS := r.URL.Query().Get("datasource_id")
 
-		// 如果按数据源筛选，检查数据源是否绑定了巡检模板
-		var templateConfigIDs []uint
-		var tmplID *uint
+		var mTypes []database.MetricType
+		database.DB.Order("sort_order asc, id asc").Find(&mTypes)
+
+		configMap := make(map[uint][]database.MetricConfig)
 		if filterDS != "" {
 			var ds database.DataSource
-			if database.DB.First(&ds, filterDS).Error == nil && ds.TemplateID != nil {
-				tmplID = ds.TemplateID
-				var links []database.InspectionTemplateMetric
-				database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
-				for _, l := range links {
-					templateConfigIDs = append(templateConfigIDs, l.MetricConfigID)
+			if database.DB.First(&ds, filterDS).Error == nil {
+				database.NormalizeDataSourceTemplateFields(&ds)
+				configs, err := loadEffectiveMetricConfigs(&ds)
+				if err != nil {
+					writeError(w, 500, fmt.Sprintf("加载数据源指标失败: %v", err))
+					return
 				}
+				for _, cfg := range configs {
+					configMap[cfg.MetricTypeID] = append(configMap[cfg.MetricTypeID], cfg)
+				}
+			}
+		} else {
+			for i := range mTypes {
+				var configs []database.MetricConfig
+				database.DB.Where("metric_type_id = ?", mTypes[i].ID).
+					Order("sort_order asc, id asc").
+					Find(&configs)
+				configMap[mTypes[i].ID] = configs
 			}
 		}
 
-		var mTypes []database.MetricType
-		database.DB.Order("sort_order asc, id asc").Find(&mTypes)
 		for i := range mTypes {
-			configs := []database.MetricConfig{}
-			q := database.DB.Where("metric_type_id = ?", mTypes[i].ID)
-			if len(templateConfigIDs) > 0 {
-				q = q.Where("id IN ?", templateConfigIDs)
-			} else if filterDS != "" {
-				q = q.Where("(datasource_id IS NULL OR datasource_id = ?)", filterDS)
+			if configs, ok := configMap[mTypes[i].ID]; ok {
+				mTypes[i].Configs = configs
+			} else {
+				mTypes[i].Configs = []database.MetricConfig{}
 			}
-			q.Order("sort_order asc").Find(&configs)
-			// 合并模板 override（如果有）
-			if tmplID != nil {
-				for j := range configs {
-					var override database.TemplateMetricOverride
-					if database.DB.Where("template_id = ? AND metric_config_id = ?", *tmplID, configs[j].ID).First(&override).Error == nil {
-						override.Apply(&configs[j])
-					}
-				}
-			}
-			mTypes[i].Configs = configs
 		}
 		writeJSON(w, mTypes)
 	case "POST":
@@ -1284,11 +1350,11 @@ func (a *AdminAPI) handleValidatePromQL(w http.ResponseWriter, r *http.Request) 
 		}
 
 		writeJSON(w, map[string]interface{}{
-			"valid":     true,
-			"type":      "vector",
-			"labels":    labels,
-			"count":     len(samples),
-			"samples":   samples[:min(len(samples), 10)],
+			"valid":   true,
+			"type":    "vector",
+			"labels":  labels,
+			"count":   len(samples),
+			"samples": samples[:min(len(samples), 10)],
 		})
 	case model.Matrix:
 		writeJSON(w, map[string]interface{}{
@@ -1353,11 +1419,21 @@ func (a *AdminAPI) handleSettings(w http.ResponseWriter, r *http.Request) {
 			tokens, hasT := m["ai_max_tokens"]
 			if hasP || hasM || hasB || hasK || hasL || hasT {
 				mc := config.AIModelConfig{Name: "default"}
-				if hasP { mc.Provider = provider }
-				if hasM { mc.Model = model }
-				if hasB { mc.BaseURL = baseURL }
-				if hasL { mc.ThinkingLevel = level }
-				if hasT { fmt.Sscanf(tokens, "%d", &mc.MaxTokens) }
+				if hasP {
+					mc.Provider = provider
+				}
+				if hasM {
+					mc.Model = model
+				}
+				if hasB {
+					mc.BaseURL = baseURL
+				}
+				if hasL {
+					mc.ThinkingLevel = level
+				}
+				if hasT {
+					fmt.Sscanf(tokens, "%d", &mc.MaxTokens)
+				}
 				if b, _ := json.Marshal([]config.AIModelConfig{mc}); b != nil {
 					m["ai_models"] = string(b)
 				}
@@ -1371,80 +1447,80 @@ func (a *AdminAPI) handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 400, "请求体格式错误")
 			return
 		}
-	for k, v := range updates {
-		if k == "ai_models" {
-			// 解析、加密 API Key、写回 DB
-			var models []config.AIModelConfig
-			if err := json.Unmarshal([]byte(v), &models); err != nil {
-				writeError(w, 400, "ai_models 格式错误")
-				return
-			}
-			// 加载旧的 models 以保留未修改的 Key
-			var oldRaw string
-			var oldSetting database.AppSetting
-			if database.DB.Where("key = ?", "ai_models").First(&oldSetting).Error == nil {
-				oldRaw = oldSetting.Value
-			}
-			var oldModels []config.AIModelConfig
-			json.Unmarshal([]byte(oldRaw), &oldModels)
-			oldMap := make(map[string]string)
-			for _, om := range oldModels {
-				oldMap[om.Name] = om.APIKey
-			}
-			for i := range models {
-				if models[i].APIKey == "" || models[i].APIKey == "********" {
-					// 保持已有值（加密或明文）
-					if oldKey, ok := oldMap[models[i].Name]; ok {
-						models[i].APIKey = oldKey
-					} else {
-						models[i].APIKey = ""
-					}
-				} else {
-					encrypted, err := piagent.EncryptAPIKey(models[i].APIKey, a.jwtSecret)
-					if err != nil {
-						writeError(w, 500, "加密 API Key 失败")
-						return
-					}
-					models[i].APIKey = "enc:" + encrypted
+		for k, v := range updates {
+			if k == "ai_models" {
+				// 解析、加密 API Key、写回 DB
+				var models []config.AIModelConfig
+				if err := json.Unmarshal([]byte(v), &models); err != nil {
+					writeError(w, 400, "ai_models 格式错误")
+					return
 				}
+				// 加载旧的 models 以保留未修改的 Key
+				var oldRaw string
+				var oldSetting database.AppSetting
+				if database.DB.Where("key = ?", "ai_models").First(&oldSetting).Error == nil {
+					oldRaw = oldSetting.Value
+				}
+				var oldModels []config.AIModelConfig
+				json.Unmarshal([]byte(oldRaw), &oldModels)
+				oldMap := make(map[string]string)
+				for _, om := range oldModels {
+					oldMap[om.Name] = om.APIKey
+				}
+				for i := range models {
+					if models[i].APIKey == "" || models[i].APIKey == "********" {
+						// 保持已有值（加密或明文）
+						if oldKey, ok := oldMap[models[i].Name]; ok {
+							models[i].APIKey = oldKey
+						} else {
+							models[i].APIKey = ""
+						}
+					} else {
+						encrypted, err := piagent.EncryptAPIKey(models[i].APIKey, a.jwtSecret)
+						if err != nil {
+							writeError(w, 500, "加密 API Key 失败")
+							return
+						}
+						models[i].APIKey = "enc:" + encrypted
+					}
+				}
+				encBytes, _ := json.Marshal(models)
+				v = string(encBytes)
+			} else if k == "ai_api_key" {
+				if v == "" || v == "********" {
+					continue
+				}
+				encrypted, err := piagent.EncryptAPIKey(v, a.jwtSecret)
+				if err != nil {
+					writeError(w, 500, "加密 API Key 失败")
+					return
+				}
+				v = "enc:" + encrypted
 			}
-			encBytes, _ := json.Marshal(models)
-			v = string(encBytes)
-		} else if k == "ai_api_key" {
-			if v == "" || v == "********" {
-				continue
+			var s database.AppSetting
+			if database.DB.Where("key = ?", k).First(&s).Error != nil {
+				database.DB.Create(&database.AppSetting{Key: k, Value: v})
+			} else {
+				database.DB.Model(&s).Update("value", v)
 			}
-			encrypted, err := piagent.EncryptAPIKey(v, a.jwtSecret)
-			if err != nil {
-				writeError(w, 500, "加密 API Key 失败")
-				return
+			// 同步到内存中的配置
+			if k == "cron_schedule" && a.config != nil {
+				a.config.CronSchedule = v
 			}
-			v = "enc:" + encrypted
+			a.syncAIConfigSetting(k, v)
 		}
-		var s database.AppSetting
-		if database.DB.Where("key = ?", k).First(&s).Error != nil {
-			database.DB.Create(&database.AppSetting{Key: k, Value: v})
-		} else {
-			database.DB.Model(&s).Update("value", v)
+		// 如果更新了定时调度，重启调度器
+		if _, ok := updates["cron_schedule"]; ok {
+			log.Printf("[Admin] 更新定时调度: %s", updates["cron_schedule"])
+			startGlobalScheduler(a.config, a.collector)
 		}
-		// 同步到内存中的配置
-		if k == "cron_schedule" && a.config != nil {
-			a.config.CronSchedule = v
+		if _, ok := updates["ai_enabled"]; ok {
+			log.Printf("[Admin] AI 助手启用状态: %s", updates["ai_enabled"])
 		}
-		a.syncAIConfigSetting(k, v)
-	}
-	// 如果更新了定时调度，重启调度器
-	if _, ok := updates["cron_schedule"]; ok {
-		log.Printf("[Admin] 更新定时调度: %s", updates["cron_schedule"])
-		startGlobalScheduler(a.config, a.collector)
-	}
-	if _, ok := updates["ai_enabled"]; ok {
-		log.Printf("[Admin] AI 助手启用状态: %s", updates["ai_enabled"])
-	}
-	if _, ok := updates["ai_models"]; ok {
-		log.Printf("[Admin] AI 模型配置已更新")
-	}
-	writeJSON(w, updates)
+		if _, ok := updates["ai_models"]; ok {
+			log.Printf("[Admin] AI 模型配置已更新")
+		}
+		writeJSON(w, updates)
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
@@ -1555,16 +1631,10 @@ func (a *AdminAPI) handleInspect(w http.ResponseWriter, r *http.Request) {
 	promUser := a.config.PrometheusUsername
 	promPass := a.config.PrometheusPassword
 
-	if req.DatasourceURL != "" {
-		promURL = req.DatasourceURL
-	} else if req.DatasourceID > 0 {
-		var ds database.DataSource
-		if database.DB.First(&ds, req.DatasourceID).Error == nil {
-			promURL = ds.URL
-			promUser = ds.Username
-			promPass = ds.Password
-		}
-	}
+	ds, promURLResolved, promUserResolved, promPassResolved := resolveDatasourceConnection(a.config, req.DatasourceID, req.DatasourceURL)
+	promURL = promURLResolved
+	promUser = promUserResolved
+	promPass = promPassResolved
 
 	taskID := newTaskID()
 	log.Printf("[Admin] 触发巡检: datasource_id=%d url=%s task_id=%s", req.DatasourceID, promURL, taskID)
@@ -1579,16 +1649,18 @@ func (a *AdminAPI) handleInspect(w http.ResponseWriter, r *http.Request) {
 	inspectTasksMu.Unlock()
 
 	dsName := promURL
-	if req.DatasourceID > 0 {
-		var ds database.DataSource
-		if database.DB.First(&ds, req.DatasourceID).Error == nil {
-			dsName = ds.Name
-		}
+	if ds != nil {
+		dsName = ds.Name
 	}
 	database.DB.Create(&database.InspectRecord{
-		TaskID:         taskID,
-		Status:         "running",
-		DatasourceID:   func() *uint { if req.DatasourceID > 0 { return &req.DatasourceID }; return nil }(),
+		TaskID: taskID,
+		Status: "running",
+		DatasourceID: func() *uint {
+			if req.DatasourceID > 0 {
+				return &req.DatasourceID
+			}
+			return nil
+		}(),
 		DatasourceName: dsName,
 		Message:        "巡检任务已创建，正在执行...",
 		StartedAt:      time.Now(),
@@ -1612,6 +1684,7 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 }) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
+	runtimeDS, _, _, _ := resolveDatasourceConnection(a.config, req.DatasourceID, req.DatasourceURL)
 
 	done := make(chan struct{})
 	var runErr error
@@ -1620,6 +1693,7 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 
 	go func() {
 		defer close(done)
+		checkTime := time.Now()
 
 		client, err := prometheus.NewClient(promURL, promUser, promPass)
 		if err != nil {
@@ -1631,49 +1705,34 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 		hcCtx, hcCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		if err := client.HealthCheck(hcCtx); err != nil {
 			hcCancel()
+			if runtimeDS != nil {
+				database.DB.Model(&database.DataSource{}).Where("id = ?", runtimeDS.ID).Updates(map[string]interface{}{
+					"connection_status":     "unknown",
+					"connection_checked_at": &checkTime,
+				})
+				invalidateDSCache()
+			}
 			runErr = fmt.Errorf("数据源 %s 不可用: %v", promURL, err)
 			return
 		}
 		hcCancel()
+		if runtimeDS != nil {
+			database.DB.Model(&database.DataSource{}).Where("id = ?", runtimeDS.ID).Updates(map[string]interface{}{
+				"connection_status":     "online",
+				"connection_checked_at": &checkTime,
+			})
+			invalidateDSCache()
+		}
 
 		activeConfig := a.config
 		if len(req.MetricConfigIDs) > 0 {
 			var selectedConfigs []database.MetricConfig
 			database.DB.Where("id IN ?", req.MetricConfigIDs).Find(&selectedConfigs)
 			if len(selectedConfigs) > 0 {
-				activeConfig = buildFilteredConfig(activeConfig, selectedConfigs)
+				activeConfig = buildRuntimeMetricConfig(activeConfig, runtimeDS, selectedConfigs)
 			}
-		} else if req.DatasourceID > 0 {
-			var ds database.DataSource
-			if database.DB.First(&ds, req.DatasourceID).Error == nil {
-				if ds.TemplateID != nil {
-					var links []database.InspectionTemplateMetric
-					database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
-					if len(links) > 0 {
-						cfgIDs := make([]uint, len(links))
-						for i, l := range links {
-							cfgIDs[i] = l.MetricConfigID
-						}
-						var tmplConfigs []database.MetricConfig
-						database.DB.Where("id IN ?", cfgIDs).Find(&tmplConfigs)
-						for i := range tmplConfigs {
-							var override database.TemplateMetricOverride
-							if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, tmplConfigs[i].ID).First(&override).Error == nil {
-								override.Apply(&tmplConfigs[i])
-							}
-						}
-						if len(tmplConfigs) > 0 {
-							activeConfig = buildFilteredConfig(activeConfig, tmplConfigs)
-						}
-					}
-				} else {
-					var dsConfigs []database.MetricConfig
-					database.DB.Where("(datasource_id IS NULL OR datasource_id = ?) AND metric_type_id IS NOT NULL", req.DatasourceID).Find(&dsConfigs)
-					if len(dsConfigs) > 0 {
-						activeConfig = buildFilteredConfig(activeConfig, dsConfigs)
-					}
-				}
-			}
+		} else if runtimeDS != nil {
+			activeConfig = buildRuntimeMetricConfig(activeConfig, runtimeDS, nil)
 		}
 
 		dataCollector := metrics.NewCollectorWithURL(client.API, activeConfig, promURL)
@@ -1697,7 +1756,11 @@ func (a *AdminAPI) runInspect(task *InspectTask, promURL, promUser, promPass str
 			if a.config.Notifications.WeChatWork.ProxyURL != "" {
 				proxyURL = a.config.Notifications.WeChatWork.ProxyURL
 			}
-			notify.SendWeChatWorkWithWebhook(context.Background(), req.WechatBotKey, proxyURL, reportPath, a.config.ProjectName, promURL, alertSummary)
+			projectName := data.Project
+			if projectName == "" {
+				projectName = a.config.ProjectName
+			}
+			notify.SendWeChatWorkWithWebhook(context.Background(), req.WechatBotKey, proxyURL, reportPath, projectName, promURL, alertSummary)
 		}
 
 		if req.DatasourceID > 0 {
@@ -1855,39 +1918,62 @@ func (a *AdminAPI) handleInspectRecords(w http.ResponseWriter, r *http.Request) 
 
 // buildFilteredConfig builds a config.Config from a filtered set of MetricConfig rows
 func buildFilteredConfig(base *config.Config, selectedConfigs []database.MetricConfig) *config.Config {
-	typeMap := make(map[uint][]database.MetricConfig)
-	for _, c := range selectedConfigs {
-		typeMap[c.MetricTypeID] = append(typeMap[c.MetricTypeID], c)
-	}
-	var filteredTypes []config.MetricType
-	for mtID, configs := range typeMap {
-		var mt database.MetricType
-		if database.DB.First(&mt, mtID).Error != nil {
-			continue
-		}
-		mtCfg := config.MetricType{Type: mt.TypeName}
-		for _, c := range configs {
-			var labels map[string]string
-			if c.LabelsJSON != "" {
-				json.Unmarshal([]byte(c.LabelsJSON), &labels)
+	return buildRuntimeMetricConfig(base, nil, selectedConfigs)
+}
+
+func extractTemplateIDsFromPayload(raw any) []uint {
+	switch v := raw.(type) {
+	case nil:
+		return nil
+	case []uint:
+		return v
+	case []any:
+		ids := make([]uint, 0, len(v))
+		for _, item := range v {
+			switch n := item.(type) {
+			case float64:
+				if n > 0 {
+					ids = append(ids, uint(n))
+				}
+			case int:
+				if n > 0 {
+					ids = append(ids, uint(n))
+				}
 			}
-			mtCfg.Metrics = append(mtCfg.Metrics, config.MetricConfig{
-				Name:            c.Name,
-				Description:     c.Description,
-				Query:           c.Query,
-				Threshold:       c.Threshold,
-				Unit:            c.Unit,
-				Labels:          labels,
-				ThresholdType:   c.ThresholdType,
-				ThresholdStatus: c.ThresholdStatus,
-			})
 		}
-		filteredTypes = append(filteredTypes, mtCfg)
+		return ids
+	case string:
+		return database.ParseTemplateIDs(v)
+	default:
+		return nil
 	}
-	cfg := &config.Config{}
-	*cfg = *base
-	cfg.MetricTypes = filteredTypes
-	return cfg
+}
+
+func extractTemplateIDFromPayload(raw any) *uint {
+	switch v := raw.(type) {
+	case nil:
+		return nil
+	case float64:
+		if v <= 0 {
+			return nil
+		}
+		id := uint(v)
+		return &id
+	case int:
+		if v <= 0 {
+			return nil
+		}
+		id := uint(v)
+		return &id
+	case uint:
+		if v == 0 {
+			return nil
+		}
+		id := v
+		return &id
+	default:
+		return nil
+	}
 }
 
 func (a *AdminAPI) handleBindMetrics(w http.ResponseWriter, r *http.Request) {
@@ -1995,6 +2081,21 @@ func (a *AdminAPI) handleAllTemplates(w http.ResponseWriter, r *http.Request) {
 		results = append(results, result{InspectionTemplate: t, MetricCount: int(count)})
 	}
 	writeJSON(w, results)
+}
+
+func (a *AdminAPI) handleInitTemplates(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	if err := database.InitializeTemplatesFromMetricTypes(); err != nil {
+		writeError(w, 500, fmt.Sprintf("初始化模板失败: %v", err))
+		return
+	}
+	writeJSON(w, map[string]interface{}{
+		"success": true,
+		"message": "模板初始化完成",
+	})
 }
 
 func (a *AdminAPI) handleTemplateByID(w http.ResponseWriter, r *http.Request) {
@@ -2221,20 +2322,7 @@ func (a *AdminAPI) handleTemplateInspect(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Build prometheus URL
-	promURL := a.config.PrometheusURL
-	promUser := a.config.PrometheusUsername
-	promPass := a.config.PrometheusPassword
-	if req.DatasourceURL != "" {
-		promURL = req.DatasourceURL
-	} else if req.DatasourceID > 0 {
-		var ds database.DataSource
-		if database.DB.First(&ds, req.DatasourceID).Error == nil {
-			promURL = ds.URL
-			promUser = ds.Username
-			promPass = ds.Password
-		}
-	}
+	ds, promURL, promUser, promPass := resolveDatasourceConnection(a.config, req.DatasourceID, req.DatasourceURL)
 
 	client, err := prometheus.NewClient(promURL, promUser, promPass)
 	if err != nil {
@@ -2251,7 +2339,7 @@ func (a *AdminAPI) handleTemplateInspect(w http.ResponseWriter, r *http.Request)
 	}
 	hcCancel()
 
-	activeConfig := buildFilteredConfig(a.config, selectedConfigs)
+	activeConfig := buildRuntimeMetricConfig(a.config, ds, selectedConfigs)
 	dataCollector := metrics.NewCollectorWithURL(client.API, activeConfig, promURL)
 	data, err := dataCollector.CollectMetrics()
 	if err != nil {
@@ -2302,11 +2390,11 @@ func (a *AdminAPI) handleTestNotification(w http.ResponseWriter, r *http.Request
 	}
 
 	testSummary := notify.AlertSummary{
-		TotalMetrics:  3,
-		TotalAlerts:   1,
+		TotalMetrics:   3,
+		TotalAlerts:    1,
 		CriticalAlerts: 0,
-		WarningAlerts: 1,
-		NormalMetrics: 2,
+		WarningAlerts:  1,
+		NormalMetrics:  2,
 	}
 
 	switch nc.ChannelType {
@@ -2366,12 +2454,24 @@ func (a *AdminAPI) handleTestDatasource(w http.ResponseWriter, r *http.Request) 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := client.HealthCheck(ctx); err != nil {
+		now := time.Now()
+		database.DB.Model(&ds).Updates(map[string]interface{}{
+			"connection_status":     "unknown",
+			"connection_checked_at": &now,
+		})
+		invalidateDSCache()
 		writeJSON(w, map[string]interface{}{
 			"success": false,
 			"message": fmt.Sprintf("连接失败: %v", err),
 		})
 		return
 	}
+	now := time.Now()
+	database.DB.Model(&ds).Updates(map[string]interface{}{
+		"connection_status":     "online",
+		"connection_checked_at": &now,
+	})
+	invalidateDSCache()
 	writeJSON(w, map[string]interface{}{
 		"success": true,
 		"message": "连接成功",
@@ -2389,36 +2489,21 @@ func (a *AdminAPI) handleDashboardStats(w http.ResponseWriter, r *http.Request) 
 	database.DB.Order("created_at desc").Limit(5).Find(&recentReports)
 
 	writeJSON(w, map[string]interface{}{
-		"total_datasources":  dsCount,
-		"total_cronjobs":     cronCount,
-		"total_reports":      reportCount,
+		"total_datasources":   dsCount,
+		"total_cronjobs":      cronCount,
+		"total_reports":       reportCount,
 		"total_notifications": notifCount,
-		"recent_reports":     recentReports,
+		"recent_reports":      recentReports,
 	})
 }
 
 func (a *AdminAPI) getDatasourceMetricConfigs(ds database.DataSource) []database.MetricConfig {
-	if ds.TemplateID != nil {
-		var links []database.InspectionTemplateMetric
-		database.DB.Where("template_id = ?", *ds.TemplateID).Find(&links)
-		if len(links) > 0 {
-			cfgIDs := make([]uint, len(links))
-			for i, l := range links {
-				cfgIDs[i] = l.MetricConfigID
-			}
-			var configs []database.MetricConfig
-			database.DB.Where("id IN ?", cfgIDs).Find(&configs)
-			for i := range configs {
-				var override database.TemplateMetricOverride
-				if database.DB.Where("template_id = ? AND metric_config_id = ?", *ds.TemplateID, configs[i].ID).First(&override).Error == nil {
-					override.Apply(&configs[i])
-				}
-			}
-			return configs
-		}
+	database.NormalizeDataSourceTemplateFields(&ds)
+	configs, err := loadEffectiveMetricConfigs(&ds)
+	if err != nil {
+		log.Printf("[Admin] 加载数据源 %s 指标失败: %v", ds.Name, err)
+		return nil
 	}
-	var configs []database.MetricConfig
-	database.DB.Where("(datasource_id IS NULL OR datasource_id = ?) AND metric_type_id IS NOT NULL", ds.ID).Find(&configs)
 	return configs
 }
 
@@ -2491,17 +2576,22 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 
 		snapshot := getLatestReport(ds.URL)
 		if snapshot == nil {
-		lastReportURL := ""
-		if lastReport.ID > 0 && lastReport.FilePath != "" {
-			lastReportURL = "/api/promai/reports/" + filepath.Base(lastReport.FilePath)
-		}
-		results = append(results, DatasourceHealth{
-			Datasource:    ds,
-			Metrics:       []HealthMetric{},
-			LastReportAt:  func() *time.Time { if lastReport.ID > 0 { return &lastReport.CreatedAt }; return nil }(),
-			LastReportURL: lastReportURL,
-			TypeSummaries: []TypeSummaryItem{},
-		})
+			lastReportURL := ""
+			if lastReport.ID > 0 && lastReport.FilePath != "" {
+				lastReportURL = "/api/promai/reports/" + filepath.Base(lastReport.FilePath)
+			}
+			results = append(results, DatasourceHealth{
+				Datasource: ds,
+				Metrics:    []HealthMetric{},
+				LastReportAt: func() *time.Time {
+					if lastReport.ID > 0 {
+						return &lastReport.CreatedAt
+					}
+					return nil
+				}(),
+				LastReportURL: lastReportURL,
+				TypeSummaries: []TypeSummaryItem{},
+			})
 			continue
 		}
 
@@ -2563,7 +2653,12 @@ func (a *AdminAPI) handleDashboardHealth(w http.ResponseWriter, r *http.Request)
 			WarningCount:  snapshot.WarningCount,
 			NormalCount:   snapshot.TotalMetrics - alerts,
 			HealthScore:   healthScore,
-			LastReportAt:  func() *time.Time { if lastReport.ID > 0 { return &lastReport.CreatedAt }; return nil }(),
+			LastReportAt: func() *time.Time {
+				if lastReport.ID > 0 {
+					return &lastReport.CreatedAt
+				}
+				return nil
+			}(),
 			LastReportURL: lastReportURL,
 			Metrics:       metrics,
 			TypeSummaries: typeSummaries,

@@ -63,9 +63,10 @@
         <template v-if="batchMode === 'template'">
           <el-form label-width="100px">
             <el-form-item label="巡检模板">
-              <el-select v-model="batchTemplateId" placeholder="不绑定模板" clearable filterable style="width: 100%;">
+              <el-select v-model="batchTemplateIds" multiple placeholder="不绑定模板" clearable filterable style="width: 100%;">
                 <el-option v-for="t in templates" :key="t.id" :label="t.name + ' (' + t.metric_count + ' 指标)'" :value="t.id" />
               </el-select>
+              <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 4px;">可绑定多个模板，按选择顺序合并，后面的模板会覆盖前面同名指标的配置</div>
             </el-form-item>
           </el-form>
         </template>
@@ -121,14 +122,19 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="健康状态" width="90" align="center">
+        <el-table-column label="健康状态" width="180" align="center">
           <template #default="{ row }">
-            <span v-if="row.health_status === 'online'" style="display: flex; align-items: center; justify-content: center; gap: 4px; color: #10b981; font-size: 13px;">
-              <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px rgba(16,185,129,0.5);"></span>在线
-            </span>
-            <span v-else style="display: flex; align-items: center; justify-content: center; gap: 4px; color: var(--text-tertiary); font-size: 13px;">
-              <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--text-tertiary);"></span>未知
-            </span>
+            <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+              <span :style="healthTextStyle(row.health_status)" style="display: flex; align-items: center; gap: 4px; font-size: 13px;">
+                <span :style="healthDotStyle(row.health_status)"></span>{{ healthLabel(row.health_status) }}
+              </span>
+              <span style="font-size: 11px; color: var(--text-tertiary);">
+                连通: {{ healthLabel(row.connection_status) }}<span v-if="row.connection_checked_at"> · {{ dayjs(row.connection_checked_at).format('MM-DD HH:mm') }}</span>
+              </span>
+              <span style="font-size: 11px; color: var(--text-tertiary);">
+                巡检: {{ healthLabel(row.report_status) }}<span v-if="row.last_report_at"> · {{ dayjs(row.last_report_at).format('MM-DD HH:mm') }}</span>
+              </span>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="username" label="用户名" width="100">
@@ -137,10 +143,16 @@
             <span v-else style="color: var(--text-tertiary);">-</span>
           </template>
         </el-table-column>
-        <el-table-column label="巡检模板" width="150">
+        <el-table-column label="巡检模板" min-width="220">
           <template #default="{ row }">
-            <span v-if="row.template_id" style="color: var(--text-secondary); font-size: 13px;">{{ templateName(row.template_id) }}</span>
+            <span v-if="normalizeTemplateIds(row).length" style="color: var(--text-secondary); font-size: 13px;">{{ templateNames(normalizeTemplateIds(row)) }}</span>
             <span v-else style="color: var(--text-tertiary); font-size: 13px;">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="项目名称" width="150">
+          <template #default="{ row }">
+            <span v-if="row.project_name" style="color: var(--text-secondary); font-size: 13px;">{{ row.project_name }}</span>
+            <span v-else style="color: var(--text-tertiary); font-size: 13px;">跟随系统设置</span>
           </template>
         </el-table-column>
         <el-table-column label="通知渠道" width="170">
@@ -200,11 +212,14 @@
         <el-form-item label="密码">
           <el-input v-model="form.password" type="password" placeholder="可选" show-password />
         </el-form-item>
+        <el-form-item label="项目名称">
+          <el-input v-model="form.project_name" placeholder="留空则跟随系统设置" />
+        </el-form-item>
         <el-form-item label="巡检模板">
-          <el-select v-model="form.template_id" placeholder="不绑定模板（使用指标列表中的配置）" clearable filterable style="width: 100%;">
+          <el-select v-model="form.template_ids" multiple placeholder="不绑定模板（使用指标列表中的配置）" clearable filterable style="width: 100%;">
             <el-option v-for="t in templates" :key="t.id" :label="t.name + ' (' + t.metric_count + ' 指标)'" :value="t.id" />
           </el-select>
-          <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">绑定的模板在巡检时优先使用，未绑定时使用「导入全局指标」生成的配置</div>
+          <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">可绑定多个模板，按选择顺序合并，后面的模板会覆盖前面同名指标的配置</div>
         </el-form-item>
         <el-form-item label="通知渠道">
           <el-select v-model="selectedChannels" multiple placeholder="不发送通知" clearable filterable style="width: 100%;">
@@ -420,7 +435,7 @@ const importVisible = ref(false)
 const editingId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const yamlContent = ref('')
-const form = ref<DataSource>({ name: '', url: '', username: '', password: '' })
+const form = ref<DataSource>({ name: '', url: '', username: '', password: '', template_ids: [], project_name: '' })
 const selectedChannels = ref<number[]>([])
 const rules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
@@ -437,7 +452,7 @@ const filterHealth = ref('')
 const selectedIds = ref<number[]>([])
 const batchDialogVisible = ref(false)
 const batchMode = ref<'template' | 'notify' | 'creds'>('template')
-const batchTemplateId = ref<number | null>(null)
+const batchTemplateIds = ref<number[]>([])
 const batchNotifyChannels = ref<number[]>([])
 const batchUsername = ref('')
 const batchPassword = ref('')
@@ -573,22 +588,29 @@ function channelNames(json: string) {
   } catch { return '' }
 }
 
-function templateName(id: number | null | undefined) {
-  if (!id) return ''
-  const t = templates.value.find(x => x.id === id)
-  return t ? t.name : `ID: ${id}`
+function normalizeTemplateIds(ds: Partial<DataSource>) {
+  if (Array.isArray(ds.template_ids) && ds.template_ids.length > 0) return ds.template_ids
+  if (ds.template_id) return [ds.template_id]
+  return []
+}
+
+function templateNames(ids: number[]) {
+  return ids.map(id => {
+    const t = templates.value.find(x => x.id === id)
+    return t ? t.name : `ID: ${id}`
+  }).join(' + ')
 }
 
 function openCreate() {
   editingId.value = null
-  form.value = { name: '', url: '', username: '', password: '' }
+  form.value = { name: '', url: '', username: '', password: '', template_ids: [], project_name: '' }
   selectedChannels.value = []
   dialogVisible.value = true
 }
 
 function openEdit(row: DataSource) {
   editingId.value = row.id!
-  form.value = { ...row, password: '' }
+  form.value = { ...row, password: '', template_ids: [...normalizeTemplateIds(row)] }
   selectedChannels.value = row.notify_channels ? JSON.parse(row.notify_channels) : []
   dialogVisible.value = true
 }
@@ -600,6 +622,8 @@ async function handleSave() {
   try {
     const payload = {
       ...form.value,
+      template_ids: normalizeTemplateIds(form.value),
+      template_id: normalizeTemplateIds(form.value)[0] ?? null,
       notify_channels: selectedChannels.value.length ? JSON.stringify(selectedChannels.value) : '',
     }
     if (editingId.value) {
@@ -624,8 +648,30 @@ async function testConnectivity(row: DataSource) {
     } else {
       ElMessage.error(res.data.message || '连接失败')
     }
+    await fetchData()
   } catch (e: any) {
     ElMessage.error(e.message)
+    await fetchData()
+  }
+}
+
+function healthLabel(status?: string) {
+  return status === 'online' ? '在线' : '未知'
+}
+
+function healthTextStyle(status?: string) {
+  return {
+    color: status === 'online' ? '#10b981' : 'var(--text-tertiary)',
+  }
+}
+
+function healthDotStyle(status?: string) {
+  return {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    background: status === 'online' ? '#10b981' : 'var(--text-tertiary)',
+    boxShadow: status === 'online' ? '0 0 6px rgba(16,185,129,0.5)' : 'none',
   }
 }
 
@@ -718,7 +764,7 @@ const batchDialogTitle = ref('')
 const batchSaveLabel = ref('')
 function openBatchDialog(mode: 'template' | 'notify' | 'creds') {
   batchMode.value = mode
-  batchTemplateId.value = null
+  batchTemplateIds.value = []
   batchNotifyChannels.value = []
   batchUsername.value = ''
   batchPassword.value = ''
@@ -736,8 +782,8 @@ async function handleBatchSave() {
   batchSaving.value = true
   try {
     if (batchMode.value === 'template') {
-      await batchSetTemplate(selectedIds.value, batchTemplateId.value)
-      ElMessage.success(`已${batchTemplateId.value ? '绑定' : '解绑'}模板`)
+      await batchSetTemplate(selectedIds.value, batchTemplateIds.value)
+      ElMessage.success(batchTemplateIds.value.length ? '模板绑定已更新' : '模板已解绑')
     } else if (batchMode.value === 'notify') {
       const notifyStr = batchNotifyChannels.value.length ? JSON.stringify(batchNotifyChannels.value) : ''
       await batchSetNotify(selectedIds.value, notifyStr)

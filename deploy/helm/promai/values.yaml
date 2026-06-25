@@ -1,0 +1,102 @@
+replicaCount: 1
+
+image:
+  repository: promai
+  tag: v2.0.2
+  pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8091
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: ""
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    memory: 64Mi
+    cpu: 50m
+  limits:
+    memory: 256Mi
+    cpu: 200m
+
+persistence:
+  enabled: true
+  existingClaim: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 5Gi
+  storageClassName: local-path
+
+env:
+  timezone: Asia/Shanghai
+  prometheusUrl: http://prometheus.monitor.svc.cluster.local:9090
+  # 仅在根据当前请求动态拼接外部访问地址时，补充外部端口。
+  # 如果外部访问本身就是标准端口 80/443，通常不需要改它。
+  externalPort: "80"
+  # 报告对外访问的完整基础地址，优先级高于 externalPort。
+  # 例如: https://promai.example.com
+  reportUrl: ""
+  dbPath: /app/data/promai.db
+
+bootstrapSql:
+  enabled: true
+  existingConfigMap: ""
+  filePath: /app/bootstrap/metric_types_seed.sql
+  content: ""
+
+config:
+  content: |
+    # 如果这里配置了 metric_types，PromAI 启动时会优先使用 config.yaml，不会执行 SQL 初始化。
+    # 如果这里不配置 metric_types，且 bootstrapSql.enabled=true，则会执行 SQL 初始化。
+    prometheus_url: "http://prometheus-k8s.monitoring.svc.cluster.local:9090"
+    project_name: "PromAI"
+    cron_schedule: "00 08,17 * * *"
+    auth:
+      username: "admin"
+      password: "promai2024"
+      jwt_secret: "promai-jwt-secret-change-in-production"
+    report_cleanup:
+      enabled: true
+      max_age: 7
+      cron_schedule: "0 0 * * *"
+    notifications:
+      dingtalk:
+        enabled: false
+        webhook: ""
+        secret: ""
+        report_url: ""
+      wechat_work:
+        enabled: false
+        webhook: ""
+        proxy_url: ""
+        report_url: ""
+      email:
+        enabled: false
+
+livenessProbe:
+  httpGet:
+    path: /api/promai
+    port: 8091
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+readinessProbe:
+  httpGet:
+    path: /api/promai
+    port: 8091
+  initialDelaySeconds: 5
+  periodSeconds: 5

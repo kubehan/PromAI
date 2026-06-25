@@ -18,6 +18,7 @@ type SessionInfo struct {
 	UpdatedAt time.Time `json:"updated_at"`
 	MsgCount  int64     `json:"msg_count"`
 	ModelName string    `json:"model_name,omitempty"`
+	Title     string    `json:"title,omitempty"`
 }
 
 type SessionDetail struct {

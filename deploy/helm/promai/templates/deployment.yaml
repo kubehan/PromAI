@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "promai.fullname" . }}
+  labels:
+    {{- include "promai.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "promai.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "promai.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: promai
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          env:
+            - name: PROMAI_DB_PATH
+              value: {{ .Values.env.dbPath | quote }}
+            - name: PROMAI_IMPORT_SQL_ON_START
+              value: {{ ternary "true" "false" .Values.bootstrapSql.enabled | quote }}
+            - name: PROMAI_IMPORT_SQL_FILE
+              value: {{ .Values.bootstrapSql.filePath | quote }}
+            - name: PROMETHEUS_URL
+              value: {{ .Values.env.prometheusUrl | quote }}
+            - name: TZ
+              value: {{ .Values.env.timezone | quote }}
+            - name: EXTERNAL_PORT
+              value: {{ .Values.env.externalPort | quote }}
+            - name: REPORT_URL
+              value: {{ .Values.env.reportUrl | quote }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config
+            {{- if .Values.bootstrapSql.enabled }}
+            - name: bootstrap-sql
+              mountPath: /app/bootstrap
+              readOnly: true
+            {{- end }}
+            - name: data
+              mountPath: /app/data
+            - name: data
+              subPath: reports
+              mountPath: /app/reports
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "promai.configMapName" . }}
+        {{- if .Values.bootstrapSql.enabled }}
+        - name: bootstrap-sql
+          configMap:
+            name: {{ include "promai.bootstrapSqlMountedConfigMapName" . }}
+        {{- end }}
+        - name: data
+          {{- if or .Values.persistence.enabled .Values.persistence.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ include "promai.pvcName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

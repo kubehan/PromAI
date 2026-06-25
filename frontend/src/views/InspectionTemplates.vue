@@ -10,6 +10,7 @@
         <h3><el-icon :size="16" :color="getCssVar('--cyan')"><List /></el-icon> 模板列表</h3>
         <div style="display: flex; gap: 8px; align-items: center;">
           <el-input v-model="keyword" placeholder="搜索模板名称" clearable style="width: 200px;" @keyup.enter="fetchData" @clear="fetchData" />
+          <el-button plain :loading="initing" @click="handleInitTemplates">初始化模板</el-button>
           <el-button type="primary" @click="openCreate"><el-icon><Plus /></el-icon> 新建模板</el-button>
         </div>
       </div>
@@ -244,7 +245,7 @@ import { ref, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { FormInstance } from 'element-plus'
-import { getTemplates, createTemplate, updateTemplate, deleteTemplate, getTemplate, getTemplateMetrics, setTemplateMetrics, getMetricTypes, saveTemplateMetricOverride } from '../api'
+import { getTemplates, createTemplate, updateTemplate, deleteTemplate, getTemplate, getTemplateMetrics, setTemplateMetrics, getMetricTypes, saveTemplateMetricOverride, initTemplates } from '../api'
 import type { MetricType } from '../types'
 
 function getCssVar(name: string): string {
@@ -253,6 +254,7 @@ function getCssVar(name: string): string {
 
 const loading = ref(false)
 const saving = ref(false)
+const initing = ref(false)
 const metricsLoading = ref(false)
 const savingMetrics = ref(false)
 const templates = ref<any[]>([])
@@ -310,6 +312,19 @@ async function handleSave() {
     await fetchData()
   } catch (e: any) { ElMessage.error(e.message) }
   finally { saving.value = false }
+}
+
+async function handleInitTemplates() {
+  initing.value = true
+  try {
+    const res = await initTemplates()
+    ElMessage.success(res.data.message || '模板初始化完成')
+    await fetchData()
+  } catch (e: any) {
+    ElMessage.error(e.message)
+  } finally {
+    initing.value = false
+  }
 }
 
 async function handleMore(row: any, cmd: string) {

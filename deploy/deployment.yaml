@@ -35,7 +35,7 @@ spec:
             type: ''
       containers:
         - name: promai
-          image: 'kubehan/promai:latest'
+          image: promai:v2.0.0 
           ports:
             - name: tcp-8091
               containerPort: 8091
@@ -43,9 +43,11 @@ spec:
           env:
             - name: EXTERNAL_PORT
               value: '80'
+            - name: REPORT_URL
+              value: 'https://your-promai.example.com'
             - name: PROMETHEUS_URL
               value: >-
-                http://prometheus-k8s.kubesphere-monitoring-system.svc.cluster.local:9090
+                http://prometheus.monitor.svc.cluster.local:30900
           resources:
             limits:
               cpu: 20m

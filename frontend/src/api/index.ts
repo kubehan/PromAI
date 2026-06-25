@@ -49,7 +49,12 @@ export const updateDataSource = (id: number, d: Partial<DataSource>) => api.put<
 export const deleteDataSource = (id: number) => api.delete(`/datasources/${id}`)
 export const batchDeleteDataSources = (ids: number[]) => api.patch('/datasources', { ids, action: 'delete' })
 export const batchToggleDataSources = (ids: number[], enabled: boolean) => api.patch('/datasources', { ids, action: 'toggle', enabled })
-export const batchSetTemplate = (ids: number[], templateId: number | null) => api.patch('/datasources', { ids, action: 'set-template', template_id: templateId })
+export const batchSetTemplate = (ids: number[], templateIds: number[]) => api.patch('/datasources', {
+  ids,
+  action: 'set-template',
+  template_ids: templateIds,
+  template_id: templateIds[0] ?? null,
+})
 export const batchSetNotify = (ids: number[], notifyChannels: string) => api.patch('/datasources', { ids, action: 'set-notify', notify_channels: notifyChannels })
 export const batchApplyTemplate = (ids: number[]) => api.patch('/datasources', { ids, action: 'apply-template' })
 export const batchInspect = (ids: number[]) => api.patch('/datasources', { ids, action: 'inspect' })
@@ -120,6 +125,7 @@ export const getSyncLogs = (id: number) => api.get<SyncLog[]>(`/sync-sources/${i
 export const getTemplates = (params?: { page?: number; page_size?: number; keyword?: string }) =>
   api.get<{ items: any[]; total: number; page: number; page_size: number }>('/templates', { params })
 export const getAllTemplates = () => api.get<any[]>('/templates/all')
+export const initTemplates = () => api.post('/templates/init')
 export const getTemplate = (id: number) => api.get(`/templates/${id}`)
 export const createTemplate = (name: string, description?: string) => api.post('/templates', { name, description })
 export const updateTemplate = (id: number, t: any) => api.put(`/templates/${id}`, t)

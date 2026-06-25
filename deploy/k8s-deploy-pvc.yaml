@@ -14,7 +14,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  # storageClassName: ""  # 按需指定 StorageClass
+  storageClassName: "local-path"  # 按需指定 StorageClass
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -23,10 +23,18 @@ metadata:
   namespace: promai
 data:
   config.yaml: |
-    # 这里请把config.yaml的内容直接写在这里,或者自定义一个config.yaml文件,然后使用kubectl create configmap命令创建ConfigMap
-    prometheus_url: "http://prometheus.monitoring.svc.cluster.local:9090"
+    # 这里请把 config.yaml 的内容直接写在这里，或者自定义一个 config.yaml 文件后再创建 ConfigMap。
+    # 说明：
+    # 1. 如果这里配置了 metric_types，PromAI 启动时会优先使用 config.yaml，不会执行 SQL 初始化。
+    # 2. 如果这里不配置 metric_types，可以通过下方 promai-bootstrap-sql + PROMAI_IMPORT_SQL_ON_START=true 走 SQL 初始化。
+    prometheus_url: "http://prometheus-k8s.monitoring.svc.cluster.local:9090"
     project_name: "PromAI"
     cron_schedule: "00 08,17 * * *"
+    # 管理后台登录认证
+    auth:
+      username: "admin"
+      password: "promai@2026"
+      jwt_secret: "promai-jwt-secret-change-in-production"
     report_cleanup:
       enabled: true
       max_age: 7
@@ -64,19 +72,25 @@ spec:
     spec:
       containers:
       - name: promai
-        image: kubehan/promai:latest
+        image: promai:v2.0.2
         ports:
         - containerPort: 8091
           name: http
         env:
         - name: PROMAI_DB_PATH
           value: /app/data/promai.db
+        - name: PROMAI_IMPORT_SQL_ON_START
+          value: "true"
+        - name: PROMAI_IMPORT_SQL_FILE
+          value: /app/deploy/sql/metric_types_seed.sql
         - name: PROMETHEUS_URL
-          value: "http://prometheus.monitoring.svc.cluster.local:9090"
+          value: "http://prometheus.monitor.svc.cluster.local:9090"
         - name: TZ
           value: Asia/Shanghai
         - name: EXTERNAL_PORT
           value: '80'
+        - name: REPORT_URL
+          value: "https://your-promai.example.com"
         volumeMounts:
         - name: config
           mountPath: /app/config
@@ -136,7 +150,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: promai.example.com
+  - host: 
     http:
       paths:
       - path: /

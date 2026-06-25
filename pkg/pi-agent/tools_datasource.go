@@ -6,17 +6,20 @@ import (
 	"log"
 	"strings"
 
-	agent "github.com/jay-y/pi/pkg/ai-agent"
+	"PromAI/pkg/database"
 	"github.com/jay-y/pi/pkg/ai"
+	agent "github.com/jay-y/pi/pkg/ai-agent"
 )
 
 type ListDatasourcesTool struct {
 	db DB
 }
 
-func (t *ListDatasourcesTool) GetName() string         { return "list_datasources" }
-func (t *ListDatasourcesTool) GetLabel() string        { return "列出数据源" }
-func (t *ListDatasourcesTool) GetDescription() string  { return "列出所有数据源及其基本信息" }
+func (t *ListDatasourcesTool) GetName() string  { return "list_datasources" }
+func (t *ListDatasourcesTool) GetLabel() string { return "列出数据源" }
+func (t *ListDatasourcesTool) GetDescription() string {
+	return "列出所有数据源及其基本信息"
+}
 
 func (t *ListDatasourcesTool) GetParameters() map[string]any {
 	return map[string]any{
@@ -46,11 +49,23 @@ func (t *ListDatasourcesTool) Execute(ctx context.Context, params map[string]any
 			if ds.IsDefault {
 				def = " [默认]"
 			}
-			tmpl := ""
-			if ds.TemplateID != nil {
-				tmpl = fmt.Sprintf(" [模板ID: %d]", *ds.TemplateID)
+			templateIDs := database.ParseTemplateIDs(ds.TemplateIDsRaw)
+			if len(templateIDs) == 0 && ds.TemplateID != nil {
+				templateIDs = []uint{*ds.TemplateID}
 			}
-			lines = append(lines, fmt.Sprintf("  • %s%s — %s %s%s", ds.Name, def, ds.URL, status, tmpl))
+			tmpl := ""
+			if len(templateIDs) > 0 {
+				parts := make([]string, 0, len(templateIDs))
+				for _, id := range templateIDs {
+					parts = append(parts, fmt.Sprintf("%d", id))
+				}
+				tmpl = fmt.Sprintf(" [模板IDs: %s]", strings.Join(parts, ", "))
+			}
+			project := ""
+			if ds.ProjectName != "" {
+				project = fmt.Sprintf(" [项目: %s]", ds.ProjectName)
+			}
+			lines = append(lines, fmt.Sprintf("  • %s%s — %s %s%s%s", ds.Name, def, ds.URL, status, tmpl, project))
 		}
 	}
 
@@ -83,6 +98,8 @@ type DataSource struct {
 	IsDefault      bool   `json:"is_default"`
 	Enabled        bool   `json:"enabled"`
 	TemplateID     *uint  `json:"template_id"`
+	TemplateIDsRaw string `gorm:"column:template_ids" json:"-"`
+	ProjectName    string `json:"project_name"`
 	NotifyChannels string `json:"notify_channels"`
 }
 

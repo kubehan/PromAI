@@ -18,11 +18,12 @@ import (
 	"time"
 
 	"PromAI/pkg/config"
+	"PromAI/pkg/database"
 	"PromAI/pkg/notify"
 	"PromAI/pkg/report"
 
-	agent "github.com/jay-y/pi/pkg/ai-agent"
 	"github.com/jay-y/pi/pkg/ai"
+	agent "github.com/jay-y/pi/pkg/ai-agent"
 	gomail "github.com/jordan-wright/email"
 )
 
@@ -35,9 +36,11 @@ func NewPushReportTool(cfg *config.Config, db DB) *PushReportTool {
 	return &PushReportTool{cfg: cfg, db: db}
 }
 
-func (t *PushReportTool) GetName() string        { return "push_report" }
-func (t *PushReportTool) GetLabel() string        { return "推送报告" }
-func (t *PushReportTool) GetDescription() string  { return "将巡检报告或自定义内容推送到通知渠道（企业微信/钉钉/飞书/邮件）" }
+func (t *PushReportTool) GetName() string  { return "push_report" }
+func (t *PushReportTool) GetLabel() string { return "推送报告" }
+func (t *PushReportTool) GetDescription() string {
+	return "将巡检报告或自定义内容推送到通知渠道（企业微信/钉钉/飞书/邮件）"
+}
 
 func (t *PushReportTool) GetParameters() map[string]any {
 	return map[string]any{
@@ -110,6 +113,8 @@ func (t *PushReportTool) Execute(ctx context.Context, params map[string]any, onU
 	var err error
 	switch channel {
 	case "wechat_work":
+		cfg := t.loadWeChatWorkConfig()
+		cfg.Enabled = true
 		if webhookURL != "" {
 			proxyURL := ""
 			if strings.HasPrefix(webhookURL, "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=") {
@@ -119,14 +124,29 @@ func (t *PushReportTool) Execute(ctx context.Context, params map[string]any, onU
 				err = fmt.Errorf("企业微信 webhook 地址格式不正确，应以 https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key= 开头")
 			}
 		} else {
-			err = notify.SendWeChatWorkWithContext(ctx, t.cfg.Notifications.WeChatWork, record.FilePath, projectName, record.DatasourceName, summary)
+			err = notify.SendWeChatWorkWithContext(ctx, cfg, record.FilePath, projectName, record.DatasourceName, summary)
 		}
 	case "dingtalk":
-		err = notify.SendDingtalkWithContext(ctx, t.cfg.Notifications.Dingtalk, record.FilePath, projectName, record.DatasourceName, summary)
+		cfg := t.loadDingtalkConfig()
+		cfg.Enabled = true
+		if webhookURL != "" {
+			cfg.Webhook = webhookURL
+			cfg.Secret = ""
+		}
+		err = notify.SendDingtalkWithContext(ctx, cfg, record.FilePath, projectName, record.DatasourceName, summary)
 	case "feishu":
-		err = notify.SendFeishuWithContext(ctx, t.cfg.Notifications.Feishu, record.FilePath, projectName, record.DatasourceName, summary)
+		cfg := t.loadFeishuConfig()
+		cfg.Enabled = true
+		if webhookURL != "" {
+			cfg.Webhook = webhookURL
+			cfg.Secret = ""
+			cfg.VerifySign = false
+		}
+		err = notify.SendFeishuWithContext(ctx, cfg, record.FilePath, projectName, record.DatasourceName, summary)
 	case "email":
-		err = notify.SendEmailWithContext(ctx, t.cfg.Notifications.Email, record.FilePath, projectName, record.DatasourceName, summary)
+		cfg := t.loadEmailConfig()
+		cfg.Enabled = true
+		err = notify.SendEmailWithContext(ctx, cfg, record.FilePath, projectName, record.DatasourceName, summary)
 	default:
 		return &agent.AgentToolResult{
 			Content: []ai.ContentBlock{ai.NewTextContentBlock(fmt.Sprintf("不支持的渠道: %s，可选: wechat_work, dingtalk, feishu, email", channel))},
@@ -154,12 +174,8 @@ func (t *PushReportTool) withReportDataFromSnapshot(ctx context.Context, record 
 	if err := json.Unmarshal([]byte(record.MetricsJSON), &snapshot); err != nil {
 		return ctx
 	}
-	tsRaw, ok := snapshot["type_summaries"]
-	if !ok {
-		return ctx
-	}
-	tsMap, ok := tsRaw.(map[string]any)
-	if !ok || len(tsMap) == 0 {
+	tsMap := buildTypeSummaryMap(snapshot)
+	if len(tsMap) == 0 {
 		return ctx
 	}
 	metricGroups := make(map[string]*report.MetricGroup)
@@ -187,6 +203,89 @@ func (t *PushReportTool) withReportDataFromSnapshot(ctx context.Context, record 
 	return ctx
 }
 
+func buildTypeSummaryMap(snapshot map[string]any) map[string]any {
+	if tsRaw, ok := snapshot["type_summaries"]; ok {
+		if tsMap, ok := tsRaw.(map[string]any); ok && len(tsMap) > 0 {
+			return tsMap
+		}
+		if tsList, ok := tsRaw.([]any); ok && len(tsList) > 0 {
+			converted := make(map[string]any, len(tsList))
+			for _, item := range tsList {
+				row, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				typeName, _ := row["type_name"].(string)
+				if strings.TrimSpace(typeName) == "" {
+					typeName, _ = row["type"].(string)
+				}
+				if strings.TrimSpace(typeName) == "" {
+					continue
+				}
+				converted[typeName] = map[string]any{
+					"critical": row["critical_count"],
+					"warning":  row["warning_count"],
+					"normal":   row["normal_count"],
+				}
+			}
+			if len(converted) > 0 {
+				return converted
+			}
+		}
+	}
+
+	metricsRaw, ok := snapshot["metrics"]
+	if !ok {
+		return nil
+	}
+	metricsList, ok := metricsRaw.([]any)
+	if !ok || len(metricsList) == 0 {
+		return nil
+	}
+
+	converted := make(map[string]map[string]float64)
+	for _, item := range metricsList {
+		row, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		typeName, _ := row["type_name"].(string)
+		if strings.TrimSpace(typeName) == "" {
+			continue
+		}
+		if _, exists := converted[typeName]; !exists {
+			converted[typeName] = map[string]float64{
+				"critical": 0,
+				"warning":  0,
+				"normal":   0,
+			}
+		}
+		status, _ := row["status"].(string)
+		switch status {
+		case "critical":
+			converted[typeName]["critical"]++
+		case "warning":
+			converted[typeName]["warning"]++
+		default:
+			converted[typeName]["normal"]++
+		}
+	}
+
+	if len(converted) == 0 {
+		return nil
+	}
+
+	result := make(map[string]any, len(converted))
+	for typeName, counts := range converted {
+		result[typeName] = map[string]any{
+			"critical": counts["critical"],
+			"warning":  counts["warning"],
+			"normal":   counts["normal"],
+		}
+	}
+	return result
+}
+
 func getFloat(m map[string]any, key string) float64 {
 	if v, ok := m[key]; ok {
 		if f, ok := v.(float64); ok {
@@ -194,6 +293,74 @@ func getFloat(m map[string]any, key string) float64 {
 		}
 	}
 	return 0
+}
+
+func (t *PushReportTool) loadNotificationChannel(channelType string) *database.NotificationChannel {
+	var channel database.NotificationChannel
+	if t.db.Model(&database.NotificationChannel{}).Where("channel_type = ?", channelType).First(&channel).Error() != nil {
+		return nil
+	}
+	return &channel
+}
+
+func (t *PushReportTool) loadDingtalkConfig() notify.DingtalkConfig {
+	cfg := t.cfg.Notifications.Dingtalk
+	channel := t.loadNotificationChannel("dingtalk")
+	if channel == nil || channel.ConfigJSON == "" {
+		return cfg
+	}
+	var dbCfg notify.DingtalkConfig
+	if err := json.Unmarshal([]byte(channel.ConfigJSON), &dbCfg); err != nil {
+		log.Printf("[PiAgent] 解析钉钉通知配置失败: %v", err)
+		return cfg
+	}
+	dbCfg.Enabled = channel.Enabled
+	return dbCfg
+}
+
+func (t *PushReportTool) loadWeChatWorkConfig() notify.WeChatWorkConfig {
+	cfg := t.cfg.Notifications.WeChatWork
+	channel := t.loadNotificationChannel("wechat_work")
+	if channel == nil || channel.ConfigJSON == "" {
+		return cfg
+	}
+	var dbCfg notify.WeChatWorkConfig
+	if err := json.Unmarshal([]byte(channel.ConfigJSON), &dbCfg); err != nil {
+		log.Printf("[PiAgent] 解析企业微信通知配置失败: %v", err)
+		return cfg
+	}
+	dbCfg.Enabled = channel.Enabled
+	return dbCfg
+}
+
+func (t *PushReportTool) loadFeishuConfig() notify.FeishuConfig {
+	cfg := t.cfg.Notifications.Feishu
+	channel := t.loadNotificationChannel("feishu")
+	if channel == nil || channel.ConfigJSON == "" {
+		return cfg
+	}
+	var dbCfg notify.FeishuConfig
+	if err := json.Unmarshal([]byte(channel.ConfigJSON), &dbCfg); err != nil {
+		log.Printf("[PiAgent] 解析飞书通知配置失败: %v", err)
+		return cfg
+	}
+	dbCfg.Enabled = channel.Enabled
+	return dbCfg
+}
+
+func (t *PushReportTool) loadEmailConfig() notify.EmailConfig {
+	cfg := t.cfg.Notifications.Email
+	channel := t.loadNotificationChannel("email")
+	if channel == nil || channel.ConfigJSON == "" {
+		return cfg
+	}
+	var dbCfg notify.EmailConfig
+	if err := json.Unmarshal([]byte(channel.ConfigJSON), &dbCfg); err != nil {
+		log.Printf("[PiAgent] 解析邮件通知配置失败: %v", err)
+		return cfg
+	}
+	dbCfg.Enabled = channel.Enabled
+	return dbCfg
 }
 
 func (t *PushReportTool) pushCustomContent(ctx context.Context, channel, webhookURL, content string) (*agent.AgentToolResult, error) {
@@ -220,7 +387,7 @@ func (t *PushReportTool) pushCustomContent(ctx context.Context, channel, webhook
 func (t *PushReportTool) pushWeChatWorkCustom(projectName, webhookURL, content string) (*agent.AgentToolResult, error) {
 	webhook := webhookURL
 	if webhook == "" {
-		webhook = t.cfg.Notifications.WeChatWork.Webhook
+		webhook = t.loadWeChatWorkConfig().Webhook
 	}
 	if webhook == "" {
 		return &agent.AgentToolResult{Content: []ai.ContentBlock{ai.NewTextContentBlock("系统未配置企业微信 webhook")}}, nil
@@ -235,7 +402,7 @@ func (t *PushReportTool) pushWeChatWorkCustom(projectName, webhookURL, content s
 }
 
 func (t *PushReportTool) pushDingtalkCustom(projectName, webhookURL, content string) (*agent.AgentToolResult, error) {
-	cfg := t.cfg.Notifications.Dingtalk
+	cfg := t.loadDingtalkConfig()
 	webhook := webhookURL
 	if webhook == "" {
 		webhook = cfg.Webhook
@@ -259,7 +426,7 @@ func (t *PushReportTool) pushDingtalkCustom(projectName, webhookURL, content str
 }
 
 func (t *PushReportTool) pushFeishuCustom(projectName, webhookURL, content string) (*agent.AgentToolResult, error) {
-	cfg := t.cfg.Notifications.Feishu
+	cfg := t.loadFeishuConfig()
 	webhook := webhookURL
 	if webhook == "" {
 		webhook = cfg.Webhook
@@ -326,8 +493,8 @@ func sendWebhookPOST(webhook string, msg map[string]any) (*agent.AgentToolResult
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return &agent.AgentToolResult{Content: []ai.ContentBlock{ai.NewTextContentBlock(fmt.Sprintf("推送失败，状态码: %d, 响应: %s", resp.StatusCode, string(body)))}}, nil
+	if err := notify.ValidateWebhookResponse(webhook, resp.StatusCode, body); err != nil {
+		return &agent.AgentToolResult{Content: []ai.ContentBlock{ai.NewTextContentBlock(fmt.Sprintf("推送失败: %v", err))}}, nil
 	}
 	return &agent.AgentToolResult{Content: []ai.ContentBlock{ai.NewTextContentBlock("✅ 自定义内容推送成功")}}, nil
 }

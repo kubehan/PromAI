@@ -14,8 +14,8 @@ import (
 	"PromAI/pkg/metrics"
 	"PromAI/pkg/prometheus"
 	"PromAI/pkg/report"
-	agent "github.com/jay-y/pi/pkg/ai-agent"
 	"github.com/jay-y/pi/pkg/ai"
+	agent "github.com/jay-y/pi/pkg/ai-agent"
 )
 
 type InspectTaskItem struct {
@@ -62,9 +62,11 @@ func NewTriggerInspectTool(cfg *config.Config, collector *metrics.Collector, db 
 	}
 }
 
-func (t *TriggerInspectTool) GetName() string         { return "trigger_inspect" }
-func (t *TriggerInspectTool) GetLabel() string        { return "触发巡检" }
-func (t *TriggerInspectTool) GetDescription() string  { return "对指定数据源手动触发一次巡检" }
+func (t *TriggerInspectTool) GetName() string  { return "trigger_inspect" }
+func (t *TriggerInspectTool) GetLabel() string { return "触发巡检" }
+func (t *TriggerInspectTool) GetDescription() string {
+	return "对指定数据源手动触发一次巡检"
+}
 
 func (t *TriggerInspectTool) GetParameters() map[string]any {
 	return map[string]any{
@@ -82,34 +84,21 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 	dsParam, _ := params["datasource"].(string)
 	log.Printf("[PiAgent] 工具调用: trigger_inspect datasource=%s", dsParam)
 
-	promURL := t.config.PrometheusURL
-	promUser := t.config.PrometheusUsername
-	promPass := t.config.PrometheusPassword
-
-	dsName := promURL
-	if dsParam != "" {
-		if strings.HasPrefix(dsParam, "http://") || strings.HasPrefix(dsParam, "https://") {
-			promURL = dsParam
-			dsName = dsParam
-		} else {
-			// 精确匹配: name 不区分大小写
-			var ds DataSource
-			if t.db.Model(&DataSource{}).Where("enabled = ? AND LOWER(name) = LOWER(?)", true, dsParam).First(&ds).Error() == nil {
-				promURL = ds.URL
-				promUser = ds.Username
-				promPass = ds.Password
-				dsName = ds.Name
-			} else {
-				// 模糊匹配: 子串包含
-				like := "%" + dsParam + "%"
-				if t.db.Model(&DataSource{}).Where("enabled = ? AND name LIKE ?", true, like).First(&ds).Error() == nil {
-					promURL = ds.URL
-					promUser = ds.Username
-					promPass = ds.Password
-					dsName = ds.Name
-				}
-			}
+	ds, promURL, promUser, promPass, dsName := resolveToolDatasource(t.config, t.db, dsParam)
+	runtimeCfg, err := buildToolRuntimeMetricConfig(t.config, t.db, ds)
+	if err != nil {
+		return &agent.AgentToolResult{
+			Content: []ai.ContentBlock{ai.NewTextContentBlock(fmt.Sprintf("加载数据源巡检配置失败: %v", err))},
+		}, nil
+	}
+	if len(runtimeCfg.MetricTypes) == 0 {
+		target := dsName
+		if ds != nil {
+			target = ds.Name
 		}
+		return &agent.AgentToolResult{
+			Content: []ai.ContentBlock{ai.NewTextContentBlock(fmt.Sprintf("数据源 %s 未配置巡检模板或指标，无法执行巡检", target))},
+		}, nil
 	}
 
 	client, err := prometheus.NewClient(promURL, promUser, promPass)
@@ -143,8 +132,14 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 	// 创建持久化巡检记录
 	now := time.Now()
 	t.db.Create(&InspectRecord{
-		TaskID:         taskID,
-		Status:         "running",
+		TaskID: taskID,
+		Status: "running",
+		DatasourceID: func() *uint {
+			if ds != nil {
+				return &ds.ID
+			}
+			return nil
+		}(),
 		DatasourceName: dsName,
 		Message:        "正在执行巡检...",
 		StartedAt:      now,
@@ -152,7 +147,7 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 	})
 
 	go func() {
-		dataCollector := metrics.NewCollectorWithURL(client.API, t.config, promURL)
+		dataCollector := metrics.NewCollectorWithURL(client.API, runtimeCfg, promURL)
 		data, err := dataCollector.CollectMetrics()
 		if err != nil {
 			t.tasksMu.Lock()
@@ -216,12 +211,12 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 							}
 						}
 						detail := map[string]any{
-							"type":     typeName,
-							"name":     m.Name,
-							"value":    m.Value,
-							"unit":     m.Unit,
-							"status":   m.Status,
-							"labels":   labels,
+							"type":   typeName,
+							"name":   m.Name,
+							"value":  m.Value,
+							"unit":   m.Unit,
+							"status": m.Status,
+							"labels": labels,
 						}
 						if m.ThresholdType != "" {
 							detail["threshold"] = m.Threshold
@@ -248,17 +243,21 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 		}
 
 		snapshot := map[string]any{
-			"datasource_name":   data.Datasource,
-			"total_metrics":     totalMetrics,
-			"critical_count":    criticalCount,
-			"warning_count":     warningCount,
-			"abnormal_details":  abnormalDetails,
-			"type_summaries":    typeSummaries,
+			"datasource_name":  data.Datasource,
+			"total_metrics":    totalMetrics,
+			"critical_count":   criticalCount,
+			"warning_count":    warningCount,
+			"abnormal_details": abnormalDetails,
+			"type_summaries":   typeSummaries,
 		}
 		metricsJSON, _ := json.Marshal(snapshot)
 
-		t.db.Create(&ReportRecord{
-			Title:          fmt.Sprintf("巡检报告 - %s", time.Now().Format("2006-01-02 15:04")),
+		titlePrefix := runtimeCfg.ProjectName
+		if titlePrefix == "" {
+			titlePrefix = "巡检报告"
+		}
+		record := ReportRecord{
+			Title:          fmt.Sprintf("%s - %s", titlePrefix, time.Now().Format("2006-01-02 15:04")),
 			DatasourceName: data.Datasource,
 			FilePath:       reportPath,
 			FileSize:       fileSize,
@@ -269,7 +268,11 @@ func (t *TriggerInspectTool) Execute(ctx context.Context, params map[string]any,
 			Status:         status,
 			MetricsJSON:    string(metricsJSON),
 			CreatedAt:      time.Now(),
-		})
+		}
+		if ds != nil {
+			record.DatasourceID = &ds.ID
+		}
+		t.db.Create(&record)
 
 		reportURL := "/api/promai/reports/" + reportPath[len("reports/"):]
 		t.tasksMu.Lock()
@@ -294,9 +297,9 @@ type QueryTaskTool struct {
 	parent *TriggerInspectTool
 }
 
-func (t *QueryTaskTool) GetName() string         { return "query_task" }
-func (t *QueryTaskTool) GetLabel() string        { return "查询任务" }
-func (t *QueryTaskTool) GetDescription() string  { return "查询巡检任务的执行进度和结果" }
+func (t *QueryTaskTool) GetName() string        { return "query_task" }
+func (t *QueryTaskTool) GetLabel() string       { return "查询任务" }
+func (t *QueryTaskTool) GetDescription() string { return "查询巡检任务的执行进度和结果" }
 
 func (t *QueryTaskTool) GetParameters() map[string]any {
 	return map[string]any{
