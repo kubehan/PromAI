@@ -115,6 +115,12 @@ export const deleteCronJob = (id: number) => api.delete(`/cronjobs/${id}`)
 export const getReports = (params?: { page?: number; page_size?: number; keyword?: string; status?: string }) =>
   api.get<{ items: ReportRecord[]; total: number; page: number; page_size: number }>('/report-records', { params })
 export const deleteReport = (id: number) => api.delete(`/report-records/${id}`)
+export const getReportContent = (id: number) =>
+  api.get<{ content: string }>(`/report-records/${id}/content`)
+export const saveReportContent = (id: number, content: string) =>
+  api.put<{ ok: string }>(`/report-records/${id}/content`, { content })
+export const exportReportFile = (id: number, format: 'md' | 'docx') =>
+  api.get(`/report-records/${id}/export?format=${format}`, { responseType: 'blob' })
 
 // Metrics
 export const getMetricTypes = (datasourceId?: number) => api.get<MetricType[]>('/metrics/types', { params: datasourceId ? { datasource_id: datasourceId } : {} })

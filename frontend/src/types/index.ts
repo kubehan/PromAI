@@ -83,6 +83,7 @@ export interface ReportRecord {
   warning_count: number
   status: string
   duration?: string
+  content?: string
   created_at?: string
 }
 

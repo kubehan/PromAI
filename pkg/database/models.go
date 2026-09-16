@@ -93,6 +93,7 @@ type ReportRecord struct {
 	Status         string    `gorm:"size:50" json:"status"`
 	Duration       string    `gorm:"size:50" json:"duration"`
 	MetricsJSON    string    `gorm:"type:text" json:"metrics_json"`
+	Content        string    `gorm:"type:text" json:"content"` // 在线编辑的报告 Markdown 内容（为空时自动生成）
 	CreatedAt      time.Time `json:"created_at"`
 }
 

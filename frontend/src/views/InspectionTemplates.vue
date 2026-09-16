@@ -107,7 +107,7 @@
             </div>
             <div style="padding-left: 28px;">
               <el-checkbox-group v-model="selectedConfigIds">
-                <el-checkbox v-for="cfg in mt.configs || []" :key="cfg.id" :label="cfg.id" style="margin-bottom: 2px;">
+                <el-checkbox v-for="cfg in mt.configs || []" :key="cfg.id" :value="cfg.id" style="margin-bottom: 2px;">
                   <span style="font-size: 13px;">{{ cfg.name }}</span>
                 </el-checkbox>
               </el-checkbox-group>

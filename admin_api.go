@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -1146,24 +1147,170 @@ func (a *AdminAPI) handleReports(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *AdminAPI) handleReportByID(w http.ResponseWriter, r *http.Request) {
-	id, err := getLastPathID(r.URL.Path)
+	path := strings.TrimSuffix(r.URL.Path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		writeError(w, 400, "无效的报告路径")
+		return
+	}
+	last := parts[len(parts)-1]
+	idStr := parts[len(parts)-2]
+	id, err := strconv.ParseUint(idStr, 10, 64)
 	if err != nil {
-		writeError(w, 400, err.Error())
+		writeError(w, 400, "无效的报告ID")
+		return
+	}
+
+	switch last {
+	case "content":
+		a.handleReportContent(w, r, uint(id))
+	case "export":
+		a.handleReportExport(w, r, uint(id))
+	default:
+		a.handleReportDelete(w, r, uint(id))
+	}
+}
+
+func (a *AdminAPI) handleReportDelete(w http.ResponseWriter, r *http.Request, id uint) {
+	if r.Method != "DELETE" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var rec database.ReportRecord
+	if database.DB.First(&rec, id).Error != nil {
+		writeError(w, 404, "报告不存在")
+		return
+	}
+	os.Remove(rec.FilePath)
+	database.DB.Delete(&database.ReportRecord{}, id)
+	w.WriteHeader(204)
+}
+
+func buildExportReport(rec database.ReportRecord) (report.ExportReport, error) {
+	exp := report.ExportReport{
+		Title:      rec.Title,
+		Datasource: rec.DatasourceName,
+		CreatedAt:  rec.CreatedAt,
+		Status:     rec.Status,
+		Content:    rec.Content,
+	}
+	if rec.MetricsJSON != "" {
+		var snap DatasourceHealthSnapshot
+		if err := json.Unmarshal([]byte(rec.MetricsJSON), &snap); err != nil {
+			return exp, fmt.Errorf("解析报告指标数据失败: %w", err)
+		}
+		for _, m := range snap.Metrics {
+			exp.Metrics = append(exp.Metrics, report.ExportMetric{
+				MetricName:    m.MetricName,
+				TypeName:      m.TypeName,
+				Status:        m.Status,
+				Value:         m.Value,
+				Unit:          m.Unit,
+				Threshold:     m.Threshold,
+				ThresholdType: m.ThresholdType,
+				Labels:        m.Labels,
+			})
+		}
+	}
+	return exp, nil
+}
+
+func (a *AdminAPI) handleReportContent(w http.ResponseWriter, r *http.Request, id uint) {
+	var rec database.ReportRecord
+	if database.DB.First(&rec, id).Error != nil {
+		writeError(w, 404, "报告不存在")
 		return
 	}
 	switch r.Method {
-	case "DELETE":
-		var rec database.ReportRecord
-		if database.DB.First(&rec, id).Error != nil {
-			writeError(w, 404, "报告不存在")
+	case "GET":
+		content := rec.Content
+		if strings.TrimSpace(content) == "" {
+			exp, err := buildExportReport(rec)
+			if err != nil {
+				writeError(w, 500, err.Error())
+				return
+			}
+			content = report.GenerateDefaultMarkdown(exp)
+		}
+		writeJSON(w, map[string]string{"content": content})
+	case "PUT":
+		var req struct {
+			Content string `json:"content"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, 400, "请求体格式错误")
 			return
 		}
-		os.Remove(rec.FilePath)
-		database.DB.Delete(&database.ReportRecord{}, id)
-		w.WriteHeader(204)
+		if err := database.DB.Model(&rec).Update("content", req.Content).Error; err != nil {
+			writeError(w, 500, fmt.Sprintf("保存报告内容失败: %v", err))
+			return
+		}
+		writeJSON(w, map[string]string{"ok": "saved"})
 	default:
 		writeError(w, 405, "不支持的请求方法")
 	}
+}
+
+func (a *AdminAPI) handleReportExport(w http.ResponseWriter, r *http.Request, id uint) {
+	if r.Method != "GET" {
+		writeError(w, 405, "不支持的请求方法")
+		return
+	}
+	var rec database.ReportRecord
+	if database.DB.First(&rec, id).Error != nil {
+		writeError(w, 404, "报告不存在")
+		return
+	}
+	exp, err := buildExportReport(rec)
+	if err != nil {
+		writeError(w, 500, err.Error())
+		return
+	}
+
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "md"
+	}
+	baseName := strings.TrimSuffix(filepath.Base(rec.FilePath), filepath.Ext(rec.FilePath))
+	if baseName == "" || baseName == "." {
+		baseName = fmt.Sprintf("inspection_report_%d", rec.ID)
+	}
+
+	switch format {
+	case "docx", "word":
+		markdown := report.BuildMarkdown(exp)
+		tmpDir, err := os.MkdirTemp("", "promai-export-*")
+		if err != nil {
+			writeError(w, 500, "创建临时目录失败")
+			return
+		}
+		defer os.RemoveAll(tmpDir)
+		outPath := filepath.Join(tmpDir, baseName+".docx")
+		if err := report.MarkdownToDocx(markdown, outPath); err != nil {
+			writeError(w, 500, fmt.Sprintf("生成 Word 文档失败: %v", err))
+			return
+		}
+		downloadFile(w, outPath, baseName+".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+	case "md", "markdown":
+		markdown := report.BuildMarkdown(exp)
+		w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.md", url.PathEscape(baseName)))
+		w.Write([]byte(markdown))
+	default:
+		writeError(w, 400, "不支持的导出格式，支持 md / docx")
+	}
+}
+
+func downloadFile(w http.ResponseWriter, path, filename, contentType string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		writeError(w, 500, "读取导出文件失败")
+		return
+	}
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", url.PathEscape(filename)))
+	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+	w.Write(data)
 }
 
 func (a *AdminAPI) handleMetricTypes(w http.ResponseWriter, r *http.Request) {
