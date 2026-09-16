@@ -1309,8 +1309,10 @@ func downloadFile(w http.ResponseWriter, path, filename, contentType string) {
 	}
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", url.PathEscape(filename)))
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
-	w.Write(data)
+	// 不显式设置 Content-Length：gzip 中间件会压缩 body，显式长度会导致响应截断（浏览器 Network Error）
+	if _, err := w.Write(data); err != nil {
+		log.Printf("写入导出文件响应失败: %v", err)
+	}
 }
 
 func (a *AdminAPI) handleMetricTypes(w http.ResponseWriter, r *http.Request) {

@@ -224,22 +224,59 @@ func gzipMiddleware(next http.Handler) http.Handler {
 			return
 		}
 		gw := gzip.NewWriter(w)
-		defer gw.Close()
-		w.Header().Set("Content-Encoding", "gzip")
-		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, gw: gw}, r)
+		gzr := &gzipResponseWriter{ResponseWriter: w, gw: gw}
+		next.ServeHTTP(gzr, r)
+		if gzr.enabled {
+			gw.Close()
+		}
 	})
 }
 
 type gzipResponseWriter struct {
 	http.ResponseWriter
-	gw *gzip.Writer
+	gw      *gzip.Writer
+	enabled bool
+	decided bool
+}
+
+// decide 在第一次写入/写头时决定是否启用 gzip：
+// 文件下载(Content-Disposition: attachment)跳过压缩，避免 Go 依据未压缩长度
+// 设置 Content-Length 与实际 gzip 传输体不一致，导致浏览器 "Network Error"。
+func (grw *gzipResponseWriter) decide() {
+	if grw.decided {
+		return
+	}
+	grw.decided = true
+	if strings.Contains(strings.ToLower(grw.Header().Get("Content-Disposition")), "attachment") {
+		grw.enabled = false
+		return
+	}
+	grw.enabled = true
+	grw.Header().Set("Content-Encoding", "gzip")
 }
 
 func (grw *gzipResponseWriter) Write(b []byte) (int, error) {
+	grw.decide()
+	if !grw.enabled {
+		return grw.ResponseWriter.Write(b)
+	}
 	return grw.gw.Write(b)
 }
 
+func (grw *gzipResponseWriter) WriteHeader(status int) {
+	grw.decide()
+	grw.ResponseWriter.WriteHeader(status)
+}
+
 func (grw *gzipResponseWriter) Flush() {
+	grw.decide()
+	if !grw.enabled {
+		if f, ok := grw.ResponseWriter.(http.Flusher); ok {
+			f.Flush()
+		}
+		return
+	}
+	grw.gw.Flush()
 	if f, ok := grw.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
