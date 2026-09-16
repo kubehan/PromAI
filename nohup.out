@@ -1,0 +1,51 @@
+2026/09/16 11:44:12 使用配置文件中的 Prometheus URL: http://prometheus-k8s.monitoring.svc.cluster.local:9090
+2026/09/16 11:44:12 数据库初始化成功: promai.db (WAL on)
+2026/09/16 11:44:12 配置数据已同步到数据库
+2026/09/16 11:44:12 已加载 1 个数据源的最新巡检快照
+2026/09/16 11:44:12   前端构建产物已加载 (frontend/dist)
+2026/09/16 11:44:12 [AdminAPI] Skills 路由已注册: manifest/stats/skills/skills/
+2026/09/16 11:44:12 [AdminAPI] 管理接口已注册
+2026/09/16 11:44:12 [PiAgent] 已加载 11 个 Skill 指令包
+2026/09/16 11:44:12 [PiAgent] AI Agent 路由已注册 (1 个模型配置)
+2026/09/16 11:44:12 [Cron] 已调度配置文件任务: 00 08,17 * * *
+2026/09/16 11:44:12 [Cron] 定时调度器已启动
+2026/09/16 11:44:12 [Alerting] state: recovered 14 active alert instances from DB
+2026/09/16 11:44:12 [Alerting] dispatcher: 重置 1 个分组的 next_notify_at 为当前时间
+2026/09/16 11:44:12 [Alerting] dispatcher 已启动 (buffer=8192)
+2026/09/16 11:44:12 [Alerting] evaluator 已启动 (workers=256, base_interval=15s, per-ds=4, adaptive=true)
+2026/09/16 11:44:12 [Alerting] 子系统启动成功
+2026/09/16 11:44:12 报告清理定时任务已启动，执行周期: 0 0 * * *
+2026/09/16 11:44:12 ==========================================
+2026/09/16 11:44:12 PromAI 系统监控平台启动成功！
+2026/09/16 11:44:12 ==========================================
+2026/09/16 11:44:12 服务端口: :8091
+2026/09/16 11:44:12 
+2026/09/16 11:44:12 访问地址:
+2026/09/16 11:44:12   首页: http://localhost:8091/api/promai
+2026/09/16 11:44:12   管理后台: http://localhost:8091/api/promai/admin
+2026/09/16 11:44:12   巡检进度: http://localhost:8091/api/promai/progress
+2026/09/16 11:44:12   历史报告: http://localhost:8091/api/promai/reports/history
+2026/09/16 11:44:12 
+2026/09/16 11:44:12 API接口:
+2026/09/16 11:44:12   生成报告: GET http://localhost:8091/api/promai/getreport
+2026/09/16 11:44:12   报告列表: GET http://localhost:8091/api/promai/reports/list
+2026/09/16 11:44:12   状态页面: GET http://localhost:8091/api/promai/status
+2026/09/16 11:44:12   静态文件: http://localhost:8091/api/promai/reports/
+2026/09/16 11:44:12 
+2026/09/16 11:44:12 数据源配置:
+2026/09/16 11:44:12   默认数据源: http://prometheus-k8s.monitoring.svc.cluster.local:9090
+2026/09/16 11:44:12   额外数据源:
+2026/09/16 11:44:12     - cluster1: http://prometheus.k8s.monitoring.kubehan.cn
+2026/09/16 11:44:12     - cluster2: http://prometheus.monitoring.kubehan.cn
+2026/09/16 11:44:12     - test-cluster: http://prometheus.monitoring.kubehan.cn
+2026/09/16 11:44:12 
+2026/09/16 11:44:12 定时任务:
+2026/09/16 11:44:12   巡检任务: 00 08,17 * * *
+2026/09/16 11:44:12   报告清理: 0 0 * * *
+2026/09/16 11:44:12 
+2026/09/16 11:44:12 通知配置:
+2026/09/16 11:44:12   企业微信: 已启用
+2026/09/16 11:44:12 ==========================================
+2026/09/16 11:44:12 服务器正在运行...
+2026/09/16 11:44:12 Failed to start server: listen tcp :8091: bind: address already in use
+exit status 1

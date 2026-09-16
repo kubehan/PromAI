@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
@@ -206,17 +206,15 @@ const editingContent = ref('')
 const saving = ref(false)
 const currentEditing = ref<ReportRecord | null>(null)
 
-const renderPreview = ref('')
+const renderPreview = computed(() => marked.parse(editingContent.value) as string)
 
 async function editReport(row: ReportRecord) {
   currentEditing.value = row
   editVisible.value = true
   editingContent.value = '加载中...'
-  renderPreview.value = ''
   try {
     const res = await getReportContent(row.id!)
     editingContent.value = res.data.content
-    renderPreview.value = marked.parse(editingContent.value) as string
   } catch (e: any) {
     editVisible.value = false
     ElMessage.error(e.message)
@@ -226,7 +224,6 @@ async function editReport(row: ReportRecord) {
 function editClosed() {
   currentEditing.value = null
   editingContent.value = ''
-  renderPreview.value = ''
 }
 
 async function saveReport() {
