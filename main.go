@@ -223,6 +223,12 @@ func gzipMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// 跳过 Range 请求：http.FileServer 对 Range 响应会设置原始区间的
+		// Content-Length，与 gzip 压缩体不一致，且无法对压缩流做字节区间服务
+		if r.Header.Get("Range") != "" {
+			next.ServeHTTP(w, r)
+			return
+		}
 		gw := gzip.NewWriter(w)
 		gzr := &gzipResponseWriter{ResponseWriter: w, gw: gw}
 		next.ServeHTTP(gzr, r)
@@ -253,6 +259,10 @@ func (grw *gzipResponseWriter) decide() {
 	}
 	grw.enabled = true
 	grw.Header().Set("Content-Encoding", "gzip")
+	// 启用 gzip 后必须去掉 Content-Length：http.ServeFile/FileServer 写入的是
+	// 未压缩长度，若保留会导致响应按错误长度截断，浏览器报
+	// ERR_INCOMPLETE_CHUNKED_ENCODING。去掉后由 http 层按压缩后长度走 chunked。
+	grw.Header().Del("Content-Length")
 }
 
 func (grw *gzipResponseWriter) Write(b []byte) (int, error) {
