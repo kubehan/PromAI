@@ -6,7 +6,9 @@ prometheus_password: "admin"  # 无鉴权可不填
 auth:
   username: "admin"
   password: "promai2024"
-  jwt_secret: "promai-jwt-secret-change-in-production"
+  # JWT 签名密钥必须通过环境变量 PROMAI_JWT_SECRET 提供，不能使用公开的默认值。
+  # 生成方式: openssl rand -base64 32
+  # 未配置或使用弱密钥时程序将拒绝启动。
 
 # 多数据源配置
 data_sources:

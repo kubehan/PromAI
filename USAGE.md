@@ -98,7 +98,7 @@ project_name: "巡检报告"
 auth:
   username: "admin"
   password: "admin123"
-  jwt_secret: "your-secret-key"
+  # JWT 签名密钥必须通过环境变量 PROMAI_JWT_SECRET 提供，不要写入配置文件。
 
 # 定时巡检任务 (Cron 表达式)
 # 示例：每天 08:00 和 17:00 执行
@@ -110,6 +110,11 @@ report_cleanup:
   max_age: 7    # 保留最近 7 天的报告
   cron_schedule: "0 0 * * *"  # 每天凌晨清理
 ```
+
+> **安全要求**：`PROMAI_JWT_SECRET` 必须是至少 32 位的唯一随机值，建议使用
+> `openssl rand -base64 32` 生成，并通过 Secret Manager / Kubernetes Secret 注入。
+> 未配置、使用公开默认值或长度不足时，程序会拒绝启动。旋转该密钥会使已签发的登录令牌失效，
+> 并导致已加密保存的 AI API Key 无法解密，需要重新配置。
 
 ### 多数据源配置
 

@@ -51,6 +51,14 @@ env:
   # 例如: https://promai.example.com
   reportUrl: ""
   dbPath: /app/data/promai.db
+  # JWT 签名密钥（至少 32 位唯一随机值）。推荐通过已有 Secret 注入：
+  #   kubectl -n <namespace> create secret generic promai-auth \
+  #     --from-literal=jwt-secret="$(openssl rand -base64 32)"
+  # 然后设置 jwtSecretSecretName: promai-auth（可选自定义 key）。
+  # 也可以直接用 --set env.jwtSecret=... 传入，但不要提交到版本库。
+  jwtSecret: ""
+  jwtSecretSecretName: ""
+  jwtSecretSecretKey: jwt-secret
 
 bootstrapSql:
   enabled: true
@@ -68,7 +76,7 @@ config:
     auth:
       username: "admin"
       password: "promai2024"
-      jwt_secret: "promai-jwt-secret-change-in-production"
+      # JWT 签名密钥通过 PROMAI_JWT_SECRET 环境变量注入，不要写入 ConfigMap。
     report_cleanup:
       enabled: true
       max_age: 7

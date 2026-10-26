@@ -34,6 +34,45 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const minJWTSecretLength = 32
+
+// insecureJWTSecrets 是曾经公开发布或文档中作为示例的密钥，禁止继续使用。
+var insecureJWTSecrets = map[string]struct{}{
+	"promai-jwt-secret-change-in-production": {},
+	"promai-default-secret":                  {},
+	"change-me-in-production":                {},
+	"your-secret-key":                        {},
+}
+
+// validateJWTSecret 拒绝空值、已公开的默认值以及长度不足的弱密钥。
+func validateJWTSecret(secret string) error {
+	secret = strings.TrimSpace(secret)
+	if secret == "" {
+		return fmt.Errorf("未配置 JWT 签名密钥：请设置环境变量 PROMAI_JWT_SECRET，至少 %d 位的唯一随机值（例如 openssl rand -base64 32）", minJWTSecretLength)
+	}
+	if _, insecure := insecureJWTSecrets[secret]; insecure {
+		return fmt.Errorf("JWT 签名密钥使用了已公开的默认/示例值，请生成唯一的随机密钥（例如 openssl rand -base64 32）")
+	}
+	if len(secret) < minJWTSecretLength {
+		return fmt.Errorf("JWT 签名密钥长度不足：至少需要 %d 位", minJWTSecretLength)
+	}
+	return nil
+}
+
+// resolveJWTSecret 从环境变量或配置文件解析 JWT 签名密钥。
+// 验证失败时应用应拒绝启动。
+func resolveJWTSecret(cfg *config.Config) error {
+	secret := strings.TrimSpace(os.Getenv("PROMAI_JWT_SECRET"))
+	if secret == "" {
+		secret = strings.TrimSpace(cfg.Auth.JWTSecret)
+	}
+	if err := validateJWTSecret(secret); err != nil {
+		return err
+	}
+	cfg.Auth.JWTSecret = secret
+	return nil
+}
+
 // loadConfig 加载配置文件
 func loadConfig(path string) (*config.Config, error) {
 	data, err := os.ReadFile(path) // 读取配置文件
@@ -53,6 +92,9 @@ func loadConfig(path string) (*config.Config, error) {
 		config.PrometheusPassword = os.Getenv("PROMETHEUS_PASSWORD")
 	} else {
 		log.Printf("使用配置文件中的 Prometheus URL: %s", config.PrometheusURL)
+	}
+	if err := resolveJWTSecret(&config); err != nil {
+		return nil, err
 	}
 	return &config, nil // 返回配置结构体
 }

@@ -26,6 +26,14 @@ spec:
         ports:
         - containerPort: 8091
         env:
+        # 首次部署前创建密钥（至少 32 位随机值）:
+        # kubectl -n promai create secret generic promai-auth \
+        #   --from-literal=jwt-secret="$(openssl rand -base64 32)"
+        - name: PROMAI_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: promai-auth
+              key: jwt-secret
         - name: PROMETHEUS_URL
           value: "http://prometheus.k8s.bruneihealth.kubehan.cn"
         - name: PROMETHEUS_USERNAME

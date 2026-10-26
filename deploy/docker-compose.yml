@@ -6,6 +6,9 @@ services:
     restart: unless-stopped
     ports:
       - "8091:8091"
+    environment:
+      # 必须设置为至少 32 位的唯一随机值，例如: openssl rand -base64 32
+      PROMAI_JWT_SECRET: ${PROMAI_JWT_SECRET:?set PROMAI_JWT_SECRET to a unique random value of at least 32 characters}
     volumes:
       - ./data/promai.db:/app/promai.db:rw
       - ./reports:/app/reports

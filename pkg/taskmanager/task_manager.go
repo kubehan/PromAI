@@ -3,6 +3,7 @@ package taskmanager
 import (
 	"context"
 	"log"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -71,7 +72,7 @@ func (tm *TaskManager) CreateTask(name, datasource string) *InspectionTask {
 	defer tm.mu.Unlock()
 
 	tm.nextID++
-	id := "task_" + time.Now().Format("20060102_150405") + "_" + string(tm.nextID)
+	id := "task_" + time.Now().Format("20060102_150405") + "_" + strconv.Itoa(tm.nextID)
 
 	ctx, cancel := context.WithCancel(context.Background())
 

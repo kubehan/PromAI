@@ -34,7 +34,7 @@ data:
     auth:
       username: "admin"
       password: "promai@2026"
-      jwt_secret: "promai-jwt-secret-change-in-production"
+      # JWT 签名密钥通过下方 PROMAI_JWT_SECRET 环境变量注入，不要写入 ConfigMap。
     report_cleanup:
       enabled: true
       max_age: 7
@@ -77,6 +77,14 @@ spec:
         - containerPort: 8091
           name: http
         env:
+        # 首次部署前创建密钥（至少 32 位随机值）:
+        # kubectl -n promai create secret generic promai-auth \
+        #   --from-literal=jwt-secret="$(openssl rand -base64 32)"
+        - name: PROMAI_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: promai-auth
+              key: jwt-secret
         - name: PROMAI_DB_PATH
           value: /app/data/promai.db
         - name: PROMAI_IMPORT_SQL_ON_START

@@ -36,6 +36,16 @@ spec:
               value: {{ .Values.env.externalPort | quote }}
             - name: REPORT_URL
               value: {{ .Values.env.reportUrl | quote }}
+            {{- if .Values.env.jwtSecretSecretName }}
+            - name: PROMAI_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.env.jwtSecretSecretName | quote }}
+                  key: {{ .Values.env.jwtSecretSecretKey | default "jwt-secret" | quote }}
+            {{- else if .Values.env.jwtSecret }}
+            - name: PROMAI_JWT_SECRET
+              value: {{ .Values.env.jwtSecret | quote }}
+            {{- end }}
           volumeMounts:
             - name: config
               mountPath: /app/config

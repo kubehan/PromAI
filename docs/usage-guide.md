@@ -309,9 +309,13 @@ docker run -d \
 | `PROMETHEUS_URL` | 默认 Prometheus 地址 |
 | `PROMETHEUS_BASIC_AUTH_USER` | Basic Auth 用户名 |
 | `PROMETHEUS_BASIC_AUTH_PASS` | Basic Auth 密码 |
-| `DB_PATH` | SQLite 数据库路径 |
+| `PROMAI_DB_PATH` | SQLite 数据库路径 |
 | `EXTERNAL_PORT` | 外部访问端口 |
-| `JWT_SECRET` | JWT 签名密钥 |
+| `PROMAI_JWT_SECRET` | JWT 签名密钥（必填，至少 32 位唯一随机值） |
+
+> `PROMAI_JWT_SECRET` 未配置或仍使用公开默认值时，应用会拒绝启动。可使用
+> `openssl rand -base64 32` 生成，并通过 Secret Manager / Kubernetes Secret 注入。
+> 旋转密钥会使已签发的令牌失效，并导致已加密保存的 AI API Key 无法解密，需要重新配置。
 
 ---
 

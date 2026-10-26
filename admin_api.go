@@ -17,11 +17,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"PromAI/pkg/alerting/notifier"
 	"PromAI/pkg/config"
 	"PromAI/pkg/database"
 	"PromAI/pkg/metrics"
 	"PromAI/pkg/notify"
-	"PromAI/pkg/alerting/notifier"
 	piagent "PromAI/pkg/pi-agent"
 	"PromAI/pkg/prometheus"
 	"PromAI/pkg/report"
@@ -293,9 +293,6 @@ func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, db *gorm.DB) 
 	if envPass := os.Getenv("PROMAI_AUTH_PASSWORD"); envPass != "" {
 		authPass = envPass
 	}
-	if envSecret := os.Getenv("PROMAI_JWT_SECRET"); envSecret != "" {
-		jwtSecret = envSecret
-	}
 
 	if authUser == "" {
 		authUser = "admin"
@@ -303,8 +300,9 @@ func NewAdminAPI(collector *metrics.Collector, cfg *config.Config, db *gorm.DB) 
 	if authPass == "" {
 		authPass = "admin"
 	}
-	if jwtSecret == "" {
-		jwtSecret = "promai-default-secret"
+	if err := validateJWTSecret(jwtSecret); err != nil {
+		log.Printf("[Auth] JWT 签名密钥配置无效，认证接口将拒绝服务: %v", err)
+		jwtSecret = ""
 	}
 
 	return &AdminAPI{
@@ -393,6 +391,11 @@ func (a *AdminAPI) RegisterHandlers(mux *http.ServeMux) {
 // authMiddleware 验证 JWT Token
 func (a *AdminAPI) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if a.jwtSecret == "" {
+			log.Printf("[Auth] JWT 签名密钥未配置，拒绝认证请求")
+			writeError(w, 500, "服务端认证配置错误")
+			return
+		}
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			log.Printf("[Auth] Token 缺失: %s %s", r.Method, r.URL.Path)
@@ -437,6 +440,11 @@ func (a *AdminAPI) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if req.Username != a.authUser || req.Password != a.authPass {
 		log.Printf("[Auth] 登录失败: %s (密码错误)", req.Username)
 		writeError(w, 401, "用户名或密码错误")
+		return
+	}
+	if a.jwtSecret == "" {
+		log.Printf("[Auth] JWT 签名密钥未配置，拒绝生成令牌")
+		writeError(w, 500, "服务端认证配置错误")
 		return
 	}
 	token, err := generateToken(req.Username, a.jwtSecret)
