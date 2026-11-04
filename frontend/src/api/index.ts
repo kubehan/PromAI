@@ -4,7 +4,8 @@ import type {
   DataSource, MetricType, MetricConfig,
   NotificationChannel, CronJob, ReportRecord,
   InspectRecord, InspectRequest, DashboardStats,
-  SyncSource, SyncLog, AiSkill
+  SyncSource, SyncLog, AiSkill,
+  Host, HostCommand, HostExecLog
 } from '../types'
 
 const api = axios.create({
@@ -275,3 +276,31 @@ export const updateAISkill = (name: string, s: AiSkill) => api.post(`/ai/skills/
 export const deleteAISkill = (name: string) => api.delete(`/ai/skills/${name}`)
 
 export default api
+
+
+// ===== 主机管理 / Web 终端 =====
+export const getHosts = (params?: { keyword?: string; env?: string; group?: string }) =>
+  api.get<{ items: Host[]; total: number }>('/hosts', { params })
+export const getHost = (id: number) => api.get<Host>(`/hosts/${id}`)
+export const createHost = (h: Host) => api.post<Host>('/hosts', h)
+export const updateHost = (id: number, h: Host) => api.put<Host>(`/hosts/${id}`, h)
+export const deleteHost = (id: number) => api.delete(`/hosts/${id}`)
+export const testHost = (id: number) => api.post<{ success: boolean; message: string; duration_ms: number }>(`/hosts/${id}/test`)
+export const execHostCommand = (id: number, command: string, timeoutSec = 60) =>
+  api.post<{ success: boolean; output: string; exit_code: number; error?: string; duration_ms: number }>(
+    `/hosts/${id}/exec`, { command, timeout_sec: timeoutSec })
+export const getHostLogs = (id: number, limit = 50) =>
+  api.get<{ items: HostExecLog[]; total: number }>(`/hosts/${id}/logs`, { params: { limit } })
+
+export const getHostCommands = (id: number) =>
+  api.get<{ items: HostCommand[]; total: number }>(`/hosts/${id}/commands`)
+export const setHostInitialCommands = (id: number, commands: string[]) =>
+  api.put<{ items: HostCommand[]; total: number }>(`/hosts/${id}/initial-commands`, { commands })
+export const createHostCommand = (id: number, c: HostCommand) =>
+  api.post<HostCommand>(`/hosts/${id}/commands`, c)
+export const updateHostCommand = (id: number, cmdId: number, c: HostCommand) =>
+  api.put<HostCommand>(`/hosts/${id}/commands/${cmdId}`, c)
+export const deleteHostCommand = (id: number, cmdId: number) =>
+  api.delete(`/hosts/${id}/commands/${cmdId}`)
+export const runHostCommand = (id: number, cmdId: number) =>
+  api.post<{ success: boolean; output: string; exit_code: number; error?: string }>(`/hosts/${id}/commands/${cmdId}/run`)

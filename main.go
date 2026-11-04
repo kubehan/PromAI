@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"compress/gzip"
 	"context"
 	"encoding/json"
@@ -8,6 +9,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,6 +21,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"PromAI/pkg/aiagent/manager"
+	aiagentproxy "PromAI/pkg/aiagent/proxy"
 	"PromAI/pkg/config"
 	"PromAI/pkg/database"
 	"PromAI/pkg/metrics"
@@ -150,6 +154,45 @@ func main() {
 	// 从数据库加载历史巡检快照到内存
 	loadLatestReports()
 
+	// 初始化终端API
+	// 初始化 AIOps API
+	initAIOpsAPI()
+	// 初始化 AI Agent
+	var aiAgentProxy *aiagentproxy.Proxy
+	if config.AI.Agent.Enabled {
+		aiAgentMgr := manager.New(config)
+		ctx := context.Background()
+		if err := aiAgentMgr.Start(ctx); err != nil {
+			log.Printf("[AI Agent] 启动失败: %v", err)
+		} else {
+			addr := config.AI.Agent.ListenAddr
+			if addr == "" {
+				addr = "127.0.0.1"
+			}
+			port := config.AI.Agent.ListenPort
+			if port == 0 {
+				port = 4096
+			}
+			log.Printf("[AI Agent] 已启动，监听 %s:%d", addr, port)
+		}
+		aiAgentProxy = aiagentproxy.New(config, aiAgentMgr)
+		http.HandleFunc("/api/ai-agent/health", aiAgentProxy.Health)
+		http.HandleFunc("/api/ai-agent/models", aiAgentProxy.Models)
+		http.HandleFunc("/api/sys-agent/chat", aiAgentProxy.SysChat)
+		http.HandleFunc("/api/ai-agent/sessions", aiAgentProxy.CreateSession)
+		http.HandleFunc("/api/ai-agent/sessions/", func(w http.ResponseWriter, r *http.Request) {
+			if strings.Contains(r.URL.Path, "/messages") {
+				aiAgentProxy.PostMessage(w, r)
+				return
+			}
+			if strings.Contains(r.URL.Path, "/events") {
+				aiAgentProxy.Events(w, r)
+				return
+			}
+			aiAgentProxy.ProxyAny(w, r)
+		})
+		http.HandleFunc("/api/ai-agent/", aiAgentProxy.ProxyAny)
+	}
 	// 创建全局定时调度器
 	globalScheduler = cron.New(cron.WithParser(cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)))
 
@@ -256,12 +299,16 @@ func main() {
 
 func gzipMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
 			next.ServeHTTP(w, r)
 			return
 		}
 		// 跳过流式接口 (AI Chat SSE)
 		if strings.HasPrefix(r.URL.Path, "/api/promai/ai/chat") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -334,6 +381,20 @@ func (grw *gzipResponseWriter) Flush() {
 	}
 }
 
+func (grw *gzipResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hj, ok := grw.ResponseWriter.(http.Hijacker); ok {
+		return hj.Hijack()
+	}
+	return nil, nil, http.ErrNotSupported
+}
+
+func (grw *gzipResponseWriter) CloseNotify() <-chan bool {
+	if cn, ok := grw.ResponseWriter.(http.CloseNotifier); ok {
+		return cn.CloseNotify()
+	}
+	return nil
+}
+
 // 全局定时调度器，由 admin API 动态管理
 var globalScheduler *cron.Cron
 var cronTaskCounter int64
@@ -393,7 +454,12 @@ func setupRoutes(collector *metrics.Collector, config *config.Config) *AdminAPI 
 	adminAPI = NewAdminAPI(collector, config, database.DB)
 	adminAPI.RegisterHandlers(http.DefaultServeMux)
 
+	// 注册主机管理 / Web 终端路由
+	registerHostAPI(http.DefaultServeMux, adminAPI)
+
 	// 注册 AI Agent 路由
+	// 初始化统一命令审查引擎
+
 	aiAgent := piagent.NewAgentHandler(config, collector, database.DB, config.Auth.JWTSecret)
 	aiAgent.RegisterRoutes(http.DefaultServeMux, adminAPI.authMiddleware)
 

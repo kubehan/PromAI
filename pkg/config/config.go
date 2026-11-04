@@ -8,10 +8,25 @@ type AuthConfig struct {
 	JWTSecret  string `yaml:"jwt_secret"`
 }
 
+type AIAgentConfig struct {
+	Enabled           bool   `yaml:"enabled"`
+	Mode              string `yaml:"mode"`
+	BinaryPath        string `yaml:"binary_path"`
+	ListenAddr        string `yaml:"listen_addr"`
+	ListenPort        int    `yaml:"listen_port"`
+	AutoStart         bool   `yaml:"auto_start"`
+	Username          string `yaml:"username"`
+	Password          string `yaml:"password"`
+	HealthCheckInterval int   `yaml:"health_check_interval"`
+	MaxRetries        int    `yaml:"max_retries"`
+	ExtraArgs         []string `yaml:"extra_args"`
+}
+
 type AIConfig struct {
 	Enabled      bool             `yaml:"enabled"`
 	DefaultModel string           `yaml:"default_model"`
 	Models       []AIModelConfig  `yaml:"models"`
+	Agent        AIAgentConfig    `yaml:"agent"`
 }
 
 type AIModelConfig struct {

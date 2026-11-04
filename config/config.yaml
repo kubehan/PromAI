@@ -968,3 +968,20 @@ metric_types:
           instance: "地址"
           job: "服务对应exporter命名"
           service: "服务名"
+
+ai:
+  enabled: true
+  default_model: ""
+  models: []
+  agent:
+    enabled: true
+    mode: embedded
+    binary_path: opencode
+    listen_addr: 127.0.0.1
+    listen_port: 4096
+    auto_start: true
+    username: opencode
+    password: ""
+    health_check_interval: 30
+    max_retries: 3
+    extra_args: []

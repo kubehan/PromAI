@@ -161,3 +161,60 @@ export interface InspectRequest {
   touser?: string
   metric_config_ids?: number[]
 }
+
+// ===== 主机管理 / Web 终端 =====
+export interface HostCommand {
+  id?: number
+  host_id?: number
+  name: string
+  command: string
+  description?: string
+  auto_run?: boolean
+  sort_order?: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface Host {
+  id?: number
+  name: string
+  host_key: string
+  address: string
+  port: number
+  username: string
+  auth_type: 'password' | 'private_key'
+  host_key_fingerprint?: string
+  env?: string
+  group?: string
+  tags_json?: string
+  description?: string
+  enabled?: boolean
+  last_status?: string
+  last_checked_at?: string | null
+  last_error?: string
+  has_password?: boolean
+  has_private_key?: boolean
+  commands?: HostCommand[]
+  created_at?: string
+  updated_at?: string
+  // 仅提交时使用
+  password?: string
+  private_key?: string
+  passphrase?: string
+  clear_password?: boolean
+  clear_private_key?: boolean
+}
+
+export interface HostExecLog {
+  id: number
+  host_id: number
+  host_key: string
+  username: string
+  source: string
+  command: string
+  exit_code: number
+  output: string
+  error: string
+  duration_ms: number
+  created_at: string
+}

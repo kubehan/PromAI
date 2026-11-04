@@ -16,3 +16,9 @@ frontend/dist
 .DS_Store.playwright-cli/
 .playwright-cli/
 .githooks/
+.env.keys
+outputs/
+test-results/
+dist/
+frontend/assets/
+frontend/nohup.out

@@ -135,11 +135,31 @@
               <el-icon><List /></el-icon>
               <span>巡检记录</span>
             </el-menu-item>
-            <el-menu-item index="/user-manual">
-              <el-icon><Reading /></el-icon>
-              <span>使用手册</span>
-            </el-menu-item>
-          </el-menu>
+              <el-menu-item index="/hosts">
+                <el-icon><Connection /></el-icon>
+                <span>主机管理</span>
+              </el-menu-item>
+              <el-menu-item index="/terminal">
+                <el-icon><Monitor /></el-icon>
+                <span>Web 终端</span>
+              </el-menu-item>
+              <el-menu-item index="/aiops/dashboard">
+                <el-icon><DataAnalysis /></el-icon>
+                <span>智能运维</span>
+              </el-menu-item>
+              <el-menu-item index="/aiops/events">
+                <el-icon><Bell /></el-icon>
+                <span>事件中心</span>
+              </el-menu-item>
+              <el-menu-item index="/aiops/incidents">
+                <el-icon><Warning /></el-icon>
+                <span>故障管理</span>
+              </el-menu-item>
+              <el-menu-item index="/user-manual">
+                <el-icon><Reading /></el-icon>
+                <span>使用手册</span>
+              </el-menu-item>
+            </el-menu>
           </div>
 
           <div class="sidebar-footer" v-show="!collapsed">
@@ -186,7 +206,9 @@
           <el-main class="app-main">
             <router-view v-slot="{ Component }">
               <transition name="page-fade" mode="out-in">
-                <component :is="Component" />
+                <keep-alive :include="['HostTerminal']">
+                  <component :is="Component" />
+                </keep-alive>
               </transition>
             </router-view>
           </el-main>

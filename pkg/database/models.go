@@ -253,14 +253,14 @@ type AlertRule struct {
 	TemplateID *uint `gorm:"index" json:"template_id,omitempty"`
 
 	// 自定义 PromQL（SourceType=custom 时使用，metric 时可作为覆盖）
-	Expr            string  `gorm:"type:text" json:"expr"`
-	Threshold       float64 `json:"threshold"`
-	ThresholdType   string  `gorm:"size:20;default:greater" json:"threshold_type"` // gt/ge/lt/le/eq/ne (复用 MetricConfig 的语义)
-	HasThreshold    bool    `json:"has_threshold"`                                 // 是否覆盖指标自带阈值
+	Expr          string  `gorm:"type:text" json:"expr"`
+	Threshold     float64 `json:"threshold"`
+	ThresholdType string  `gorm:"size:20;default:greater" json:"threshold_type"` // gt/ge/lt/le/eq/ne (复用 MetricConfig 的语义)
+	HasThreshold  bool    `json:"has_threshold"`                                 // 是否覆盖指标自带阈值
 
 	// 数据源选择
-	DatasourceIDsRaw     string `gorm:"column:datasource_ids;type:text" json:"-"`
-	DatasourceIDs        []uint `gorm:"-" json:"datasource_ids,omitempty"`
+	DatasourceIDsRaw       string `gorm:"column:datasource_ids;type:text" json:"-"`
+	DatasourceIDs          []uint `gorm:"-" json:"datasource_ids,omitempty"`
 	DatasourceSelectorJSON string `gorm:"column:datasource_selector;type:text" json:"datasource_selector,omitempty"` // {"tag":"prod","project":"core","all":false}
 
 	// 触发判定
@@ -270,7 +270,7 @@ type AlertRule struct {
 	EvalIntervalSec int    `gorm:"default:0" json:"eval_interval_sec"`            // 0=使用全局间隔
 
 	// 通知频率（优先级高于路由配置）
-	RepeatInterval string `gorm:"size:20" json:"repeat_interval"` // 重复通知间隔, e.g. 4h；空=继承路由
+	RepeatInterval string `gorm:"size:20" json:"repeat_interval"`  // 重复通知间隔, e.g. 4h；空=继承路由
 	MaxSendCount   int    `gorm:"default:0" json:"max_send_count"` // 最大发送次数；0=继承路由
 
 	// 元数据
@@ -296,8 +296,8 @@ type AlertInstance struct {
 	ID          uint   `gorm:"primaryKey" json:"id"`
 	Fingerprint string `gorm:"uniqueIndex;size:64;not null" json:"fingerprint"`
 
-	RuleID       uint  `gorm:"index;index:idx_ai_rule_state,priority:1" json:"rule_id"`
-	DatasourceID uint  `gorm:"index;index:idx_ai_ds_state,priority:1" json:"datasource_id"`
+	RuleID       uint `gorm:"index;index:idx_ai_rule_state,priority:1" json:"rule_id"`
+	DatasourceID uint `gorm:"index;index:idx_ai_ds_state,priority:1" json:"datasource_id"`
 
 	LabelsJSON      string `gorm:"type:text" json:"labels_json"`
 	AnnotationsJSON string `gorm:"type:text" json:"annotations_json"`
@@ -308,17 +308,17 @@ type AlertInstance struct {
 	Value     float64 `json:"value"`
 	Threshold float64 `json:"threshold"`
 
-	ActiveAt    time.Time  `json:"active_at"`
-	FiredAt     *time.Time `json:"fired_at,omitempty"`
-	ResolvedAt  *time.Time `json:"resolved_at,omitempty"`
-	LastEvalAt  time.Time  `gorm:"index" json:"last_eval_at"`
+	ActiveAt   time.Time  `json:"active_at"`
+	FiredAt    *time.Time `json:"fired_at,omitempty"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+	LastEvalAt time.Time  `gorm:"index" json:"last_eval_at"`
 
-	GroupKey       string `gorm:"size:64;index" json:"group_key"`
-	SilencedByJSON string `gorm:"type:text" json:"silenced_by_json"`
+	GroupKey        string `gorm:"size:64;index" json:"group_key"`
+	SilencedByJSON  string `gorm:"type:text" json:"silenced_by_json"`
 	InhibitedByJSON string `gorm:"type:text" json:"inhibited_by_json"`
 
-	NotifiedCount   int        `json:"notified_count"`
-	LastNotifiedAt  *time.Time `json:"last_notified_at,omitempty"`
+	NotifiedCount  int        `json:"notified_count"`
+	LastNotifiedAt *time.Time `json:"last_notified_at,omitempty"`
 
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -338,7 +338,7 @@ type AlertHistory struct {
 	Threshold       float64   `json:"threshold"`
 	LabelsJSON      string    `gorm:"type:text" json:"labels_json"`
 	AnnotationsJSON string    `gorm:"type:text" json:"annotations_json"`
-	EventType       string    `gorm:"size:20;index" json:"event_type"` // pending/firing/resolved/silenced/inhibited/notified
+	EventType       string    `gorm:"size:20;index" json:"event_type"`  // pending/firing/resolved/silenced/inhibited/notified
 	NotifyChannels  string    `gorm:"type:text" json:"notify_channels"` // 通知渠道 JSON: [{"id":1,"type":"wechat_work","name":"企业微信"}]
 	NotifyResult    string    `gorm:"size:20" json:"notify_result"`     // 通知结果: success/failed/throttled
 	OccurredAt      time.Time `gorm:"index" json:"occurred_at"`
@@ -372,43 +372,43 @@ type AlertInhibit struct {
 
 // AlertRoute 通知路由（扁平表模拟树）
 type AlertRoute struct {
-	ID                  uint   `gorm:"primaryKey" json:"id"`
-	ParentID            *uint  `gorm:"index" json:"parent_id,omitempty"`
-	Name                string `gorm:"size:200;not null" json:"name"`
-	MatchersJSON        string `gorm:"type:text" json:"matchers_json"`
-	Continue            bool   `gorm:"column:cont" json:"continue"`
-	GroupByJSON         string `gorm:"type:text" json:"group_by_json"`
-	GroupWait           string `gorm:"size:20;default:30s" json:"group_wait"`
-	GroupInterval       string `gorm:"size:20;default:5m" json:"group_interval"`
-	RepeatInterval      string `gorm:"size:20;default:4h" json:"repeat_interval"`
-	ThrottleWindow      string `gorm:"size:20;default:''" json:"throttle_window"`
-	NotifyChannelIDsRaw string `gorm:"column:notify_channel_ids;type:text" json:"-"`
-	NotifyChannelIDs    []uint `gorm:"-" json:"notify_channel_ids,omitempty"`
-	Priority            int    `gorm:"default:0;index" json:"priority"`
-	SendResolved        bool   `gorm:"default:false" json:"send_resolved"`
-	MaxSendCount        int    `gorm:"default:0" json:"max_send_count"`
-	Enabled             bool   `gorm:"default:true" json:"enabled"`
+	ID                  uint      `gorm:"primaryKey" json:"id"`
+	ParentID            *uint     `gorm:"index" json:"parent_id,omitempty"`
+	Name                string    `gorm:"size:200;not null" json:"name"`
+	MatchersJSON        string    `gorm:"type:text" json:"matchers_json"`
+	Continue            bool      `gorm:"column:cont" json:"continue"`
+	GroupByJSON         string    `gorm:"type:text" json:"group_by_json"`
+	GroupWait           string    `gorm:"size:20;default:30s" json:"group_wait"`
+	GroupInterval       string    `gorm:"size:20;default:5m" json:"group_interval"`
+	RepeatInterval      string    `gorm:"size:20;default:4h" json:"repeat_interval"`
+	ThrottleWindow      string    `gorm:"size:20;default:''" json:"throttle_window"`
+	NotifyChannelIDsRaw string    `gorm:"column:notify_channel_ids;type:text" json:"-"`
+	NotifyChannelIDs    []uint    `gorm:"-" json:"notify_channel_ids,omitempty"`
+	Priority            int       `gorm:"default:0;index" json:"priority"`
+	SendResolved        bool      `gorm:"default:false" json:"send_resolved"`
+	MaxSendCount        int       `gorm:"default:0" json:"max_send_count"`
+	Enabled             bool      `gorm:"default:true" json:"enabled"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 // AlertGroup 运行时分组聚合状态
 type AlertGroup struct {
-	ID           uint   `gorm:"primaryKey" json:"id"`
-	GroupKey     string `gorm:"uniqueIndex;size:64;not null" json:"group_key"`
-	RuleID       uint   `gorm:"index" json:"rule_id"`
-	DatasourceID uint   `gorm:"index" json:"datasource_id"`
-	RouteID      uint   `gorm:"index" json:"route_id"`
-	LabelsJSON   string `gorm:"type:text" json:"labels_json"`
-	AlertCount          int        `json:"alert_count"`
-	FirstSeenAt         time.Time  `json:"first_seen_at"`
-	LastNotifiedAt      *time.Time `json:"last_notified_at,omitempty"`
-	NextNotifyAt        *time.Time `gorm:"index" json:"next_notify_at,omitempty"`
+	ID                   uint       `gorm:"primaryKey" json:"id"`
+	GroupKey             string     `gorm:"uniqueIndex;size:64;not null" json:"group_key"`
+	RuleID               uint       `gorm:"index" json:"rule_id"`
+	DatasourceID         uint       `gorm:"index" json:"datasource_id"`
+	RouteID              uint       `gorm:"index" json:"route_id"`
+	LabelsJSON           string     `gorm:"type:text" json:"labels_json"`
+	AlertCount           int        `json:"alert_count"`
+	FirstSeenAt          time.Time  `json:"first_seen_at"`
+	LastNotifiedAt       *time.Time `json:"last_notified_at,omitempty"`
+	NextNotifyAt         *time.Time `gorm:"index" json:"next_notify_at,omitempty"`
 	ResolvedNextNotifyAt *time.Time `json:"resolved_next_notify_at,omitempty"` // 恢复通知批次调度
-	SendCount           int        `gorm:"default:0" json:"send_count"`
-	State               string     `gorm:"size:20;index" json:"state"` // idle/pending/notified
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	SendCount            int        `gorm:"default:0" json:"send_count"`
+	State                string     `gorm:"size:20;index" json:"state"` // idle/pending/notified
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
 }
 
 // AlertNotifyLog 通知发送日志
@@ -422,13 +422,266 @@ type AlertNotifyLog struct {
 	Error       string    `gorm:"size:500" json:"error"`
 	PayloadHash string    `gorm:"size:64;index" json:"payload_hash"`
 	AlertCount  int       `json:"alert_count"`
-	Content     string    `gorm:"type:text" json:"content"`              // 实际发送的内容（markdown）
+	Content     string    `gorm:"type:text" json:"content"` // 实际发送的内容（markdown）
 	SentAt      time.Time `gorm:"index" json:"sent_at"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type TerminalSummary struct {
+	ID              uint       `gorm:"primarykey" json:"id"`
+	SessionID       string     `gorm:"uniqueIndex;size:64" json:"session_id"`
+	UserID          uint       `gorm:"index" json:"user_id"`
+	HostID          uint       `gorm:"index" json:"host_id"`
+	IncidentID      *uint      `gorm:"index" json:"incident_id"`
+	Model           string     `gorm:"size:32" json:"model"`
+	Title           string     `gorm:"size:255" json:"title"`
+	Summary         string     `gorm:"type:text" json:"summary"`
+	CommandsJSON    string     `gorm:"type:text" json:"commands_json"`
+	FindingsJSON    string     `gorm:"type:text" json:"findings_json"`
+	ActionsJSON     string     `gorm:"type:text" json:"actions_json"`
+	RisksJSON       string     `gorm:"type:text" json:"risks_json"`
+	SuggestionsJSON string     `gorm:"type:text" json:"suggestions_json"`
+	RawPrompt       string     `gorm:"type:text" json:"-"`
+	RawResponse     string     `gorm:"type:text" json:"-"`
+	Status          string     `gorm:"size:16" json:"status"`
+	GeneratedAt     *time.Time `json:"generated_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+// ==================== AIOps models ====================
+
+// Event 统一事件
+type Event struct {
+	ID                 uint       `gorm:"primarykey" json:"id"`
+	EventID            string     `gorm:"uniqueIndex;size:64" json:"event_id"`
+	Source             string     `gorm:"index;size:32" json:"source"` // alert/prometheus/manual/other
+	Type               string     `gorm:"index;size:32" json:"type"`
+	Severity           string     `gorm:"index;size:16" json:"severity"`
+	Status             string     `gorm:"index;size:16" json:"status"` // firing/resolved/closed
+	Fingerprint        string     `gorm:"index;size:64" json:"fingerprint"`
+	Title              string     `gorm:"size:255" json:"title"`
+	Summary            string     `gorm:"type:text" json:"summary"`
+	LabelsJSON         string     `gorm:"type:text" json:"labels_json"`
+	AnnotationsJSON    string     `gorm:"type:text" json:"annotations_json"`
+	AlertInstanceID    *uint      `gorm:"index" json:"alert_instance_id,omitempty"`
+	RuleID             *uint      `gorm:"index" json:"rule_id,omitempty"`
+	DatasourceID       *uint      `gorm:"index" json:"datasource_id,omitempty"`
+	IncidentID         *uint      `gorm:"index" json:"incident_id,omitempty"`
+	CorrelationGroupID *uint      `gorm:"index" json:"correlation_group_id,omitempty"`
+	StartsAt           time.Time  `gorm:"index" json:"starts_at"`
+	EndsAt             *time.Time `json:"ends_at,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// Incident 故障单
+type Incident struct {
+	ID                 uint       `gorm:"primarykey" json:"id"`
+	IncidentNo         string     `gorm:"uniqueIndex;size:32" json:"incident_no"`
+	Title              string     `gorm:"size:255" json:"title"`
+	Description        string     `gorm:"type:text" json:"description"`
+	Severity           string     `gorm:"index;size:16" json:"severity"`
+	Status             string     `gorm:"index;size:16" json:"status"` // open/acknowledged/investigating/resolved/closed
+	Priority           string     `gorm:"size:16" json:"priority"`
+	AssigneeID         *uint      `gorm:"index" json:"assignee_id,omitempty"`
+	AssigneeName       string     `gorm:"size:64" json:"assignee_name"`
+	ReporterID         *uint      `gorm:"index" json:"reporter_id,omitempty"`
+	ReporterName       string     `gorm:"size:64" json:"reporter_name"`
+	CorrelationGroupID *uint      `gorm:"index" json:"correlation_group_id,omitempty"`
+	LabelsJSON         string     `gorm:"type:text" json:"labels_json"`
+	StartsAt           time.Time  `gorm:"index" json:"starts_at"`
+	AcknowledgedAt     *time.Time `json:"acknowledged_at,omitempty"`
+	ResolvedAt         *time.Time `json:"resolved_at,omitempty"`
+	ClosedAt           *time.Time `json:"closed_at,omitempty"`
+	MTTASeconds        *int       `json:"mtta_seconds,omitempty"`
+	MTTRSeconds        *int       `json:"mttr_seconds,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// IncidentTimeline 故障时间线（不可变）
+type IncidentTimeline struct {
+	ID         uint      `gorm:"primarykey" json:"id"`
+	IncidentID uint      `gorm:"index" json:"incident_id"`
+	Type       string    `gorm:"index;size:32" json:"type"` // event_created/ack/assign/comment/escalate/ai_rca/runbook/resolve/close
+	ActorID    *uint     `gorm:"index" json:"actor_id,omitempty"`
+	ActorName  string    `gorm:"size:64" json:"actor_name"`
+	Title      string    `gorm:"size:255" json:"title"`
+	Content    string    `gorm:"type:text" json:"content"`
+	MetaJSON   string    `gorm:"type:text" json:"meta_json"`
+	CreatedAt  time.Time `gorm:"index" json:"created_at"`
+}
+
+// IncidentRelation 关联关系
+type IncidentRelation struct {
+	ID          uint      `gorm:"primarykey" json:"id"`
+	IncidentID  uint      `gorm:"index" json:"incident_id"`
+	RelatedType string    `gorm:"index;size:16" json:"related_type"` // event/change/runbook/cmdb
+	RelatedID   uint      `gorm:"index" json:"related_id"`
+	Relation    string    `gorm:"size:32" json:"relation"`
+	MetaJSON    string    `gorm:"type:text" json:"meta_json"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// CorrelationGroup 告警关联组
+type CorrelationGroup struct {
+	ID         uint      `gorm:"primarykey" json:"id"`
+	GroupKey   string    `gorm:"uniqueIndex;size:64" json:"group_key"`
+	Strategy   string    `gorm:"size:32" json:"strategy"`
+	EventCount int       `gorm:"default:0" json:"event_count"`
+	IncidentID *uint     `gorm:"index" json:"incident_id,omitempty"`
+	Status     string    `gorm:"index;size:16" json:"status"` // open/merged/closed
+	LabelsJSON string    `gorm:"type:text" json:"labels_json"`
+	FirstAt    time.Time `json:"first_at"`
+	LastAt     time.Time `json:"last_at"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// CMDBItem 配置项
+type CMDBItem struct {
+	ID        uint      `gorm:"primarykey" json:"id"`
+	CIID      string    `gorm:"uniqueIndex;size:64" json:"ciid"`
+	Name      string    `gorm:"index;size:128" json:"name"`
+	Type      string    `gorm:"index;size:32" json:"type"`
+	Env       string    `gorm:"index;size:16" json:"env"`
+	Cluster   string    `gorm:"index;size:64" json:"cluster"`
+	Owner     string    `gorm:"size:64" json:"owner"`
+	Team      string    `gorm:"size:64" json:"team"`
+	TagsJSON  string    `gorm:"type:text" json:"tags_json"`
+	MetaJSON  string    `gorm:"type:text" json:"meta_json"`
+	Enabled   bool      `gorm:"default:true" json:"enabled"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// TopologyEdge 拓扑依赖
+type TopologyEdge struct {
+	ID        uint      `gorm:"primarykey" json:"id"`
+	FromCIID  string    `gorm:"index;size:64" json:"from_ciid"`
+	ToCIID    string    `gorm:"index;size:64" json:"to_ciid"`
+	Type      string    `gorm:"size:32" json:"type"`
+	Weight    int       `gorm:"default:1" json:"weight"`
+	MetaJSON  string    `gorm:"type:text" json:"meta_json"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// ChangeEvent 变更事件
+type ChangeEvent struct {
+	ID           uint       `gorm:"primarykey" json:"id"`
+	ChangeNo     string     `gorm:"uniqueIndex;size:64" json:"change_no"`
+	Source       string     `gorm:"size:32" json:"source"`
+	Type         string     `gorm:"size:32" json:"type"`
+	Title        string     `gorm:"size:255" json:"title"`
+	Description  string     `gorm:"type:text" json:"description"`
+	Status       string     `gorm:"index;size:16" json:"status"`
+	AffectedJSON string     `gorm:"type:text" json:"affected_json"`
+	StartedAt    time.Time  `gorm:"index" json:"started_at"`
+	FinishedAt   *time.Time `json:"finished_at,omitempty"`
+	IncidentID   *uint      `gorm:"index" json:"incident_id,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+// Runbook 知识库
+type Runbook struct {
+	ID             uint      `gorm:"primarykey" json:"id"`
+	Name           string    `gorm:"index;size:255" json:"name"`
+	Category       string    `gorm:"index;size:64" json:"category"`
+	Content        string    `gorm:"type:text" json:"content"`
+	ApplicableJSON string    `gorm:"type:text" json:"applicable_json"`
+	TagsJSON       string    `gorm:"type:text" json:"tags_json"`
+	UseCount       int       `gorm:"default:0" json:"use_count"`
+	Enabled        bool      `gorm:"default:true" json:"enabled"`
+	CreatedBy      *uint     `json:"created_by,omitempty"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+// TerminalFixCommand 终端命令执行/审批记录
+type TerminalFixCommand struct {
+	ID             uint       `gorm:"primarykey" json:"id"`
+	ReqID          string     `gorm:"uniqueIndex;size:64" json:"req_id"`
+	SessionID      string     `gorm:"index;size:64" json:"session_id"`
+	UserID         uint       `gorm:"index" json:"user_id"`
+	Username       string     `gorm:"size:64" json:"username"`
+	HostID         uint       `gorm:"index" json:"host_id"`
+	HostKey        string     `gorm:"size:64" json:"host_key"`
+	Command        string     `gorm:"type:text" json:"command"`
+	Purpose        string     `gorm:"type:text" json:"purpose"`
+	RiskLevel      string     `gorm:"size:16" json:"risk_level"`
+	ReviewReason   string     `gorm:"type:text" json:"review_reason"`
+	Suggestion     string     `gorm:"type:text" json:"suggestion"`
+	Status         string     `gorm:"index;size:16" json:"status"` // pending/approved/rejected/executed/failed
+	ApproverID     *uint      `json:"approver_id,omitempty"`
+	ApproverName   string     `gorm:"size:64" json:"approver_name"`
+	ApproveRemark  string     `gorm:"type:text" json:"approve_remark"`
+	ExecutedAt     *time.Time `json:"executed_at,omitempty"`
+	ExecutedOutput string     `gorm:"type:text" json:"executed_output"`
+	RejectedAt     *time.Time `json:"rejected_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// ==================== 主机管理 / Web 终端 ====================
+
+// TerminalHost 受管主机（CMDB 主机属性 + SSH 登录配置）
+type TerminalHost struct {
+	ID                 uint       `gorm:"primarykey" json:"id"`
+	Name               string     `gorm:"size:128;index" json:"name"`
+	HostKey            string     `gorm:"uniqueIndex;size:128" json:"host_key"`
+	Address            string     `gorm:"size:255" json:"address"`
+	Port               int        `gorm:"default:22" json:"port"`
+	Username           string     `gorm:"size:128" json:"username"`
+	AuthType           string     `gorm:"size:16;default:password" json:"auth_type"` // password / private_key
+	PasswordEnc        string     `gorm:"type:text" json:"-"`
+	PrivateKeyEnc      string     `gorm:"type:text" json:"-"`
+	PassphraseEnc      string     `gorm:"type:text" json:"-"`
+	HostKeyFingerprint string     `gorm:"size:255" json:"host_key_fingerprint"`
+	Env                string     `gorm:"size:32;index" json:"env"`
+	Group              string     `gorm:"size:64;index" json:"group"`
+	TagsJSON           string     `gorm:"type:text" json:"tags_json"`
+	Description        string     `gorm:"type:text" json:"description"`
+	Enabled            bool       `gorm:"default:true;index" json:"enabled"`
+	LastStatus         string     `gorm:"size:16;index" json:"last_status"` // online / offline / unknown
+	LastCheckedAt      *time.Time `json:"last_checked_at,omitempty"`
+	LastError          string     `gorm:"size:500" json:"last_error"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+}
+
+// TerminalHostCommand 主机自定义命令（登录后可一键执行 / 自动执行）
+type TerminalHostCommand struct {
+	ID          uint      `gorm:"primarykey" json:"id"`
+	HostID      uint      `gorm:"index;not null" json:"host_id"`
+	Name        string    `gorm:"size:128;not null" json:"name"`
+	Command     string    `gorm:"type:text;not null" json:"command"`
+	Description string    `gorm:"type:text" json:"description"`
+	AutoRun     bool      `gorm:"default:false" json:"auto_run"`
+	SortOrder   int       `gorm:"default:0" json:"sort_order"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// TerminalExecLog 主机命令执行审计日志
+type TerminalExecLog struct {
+	ID         uint      `gorm:"primarykey" json:"id"`
+	HostID     uint      `gorm:"index" json:"host_id"`
+	HostKey    string    `gorm:"size:128;index" json:"host_key"`
+	Username   string    `gorm:"size:64" json:"username"`
+	Source     string    `gorm:"size:16" json:"source"` // manual / quick / auto / websocket
+	Command    string    `gorm:"type:text" json:"command"`
+	ExitCode   int       `json:"exit_code"`
+	Output     string    `gorm:"type:text" json:"output"`
+	Error      string    `gorm:"size:500" json:"error"`
+	DurationMS int64     `json:"duration_ms"`
+	CreatedAt  time.Time `gorm:"index" json:"created_at"`
+}
+
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&DataSource{},
 		&MetricType{},
 		&MetricConfig{},
@@ -454,5 +707,31 @@ func AutoMigrate(db *gorm.DB) error {
 		&AlertRoute{},
 		&AlertGroup{},
 		&AlertNotifyLog{},
-	)
+		// AIOps
+		&Event{},
+		&Incident{},
+		&IncidentTimeline{},
+		&IncidentRelation{},
+		&CorrelationGroup{},
+		&CMDBItem{},
+		&TopologyEdge{},
+		&ChangeEvent{},
+		&Runbook{},
+		// 主机管理 / Web 终端
+		&TerminalHost{},
+		&TerminalHostCommand{},
+		&TerminalExecLog{},
+		&TerminalSummary{},
+		&TerminalFixCommand{},
+	); err != nil {
+		return err
+	}
+	// 兼容早期 terminal_hosts 表：旧表使用 host 字段，迁移到 address。
+	var legacyHostColumn int64
+	if err := db.Raw("SELECT count(*) FROM pragma_table_info('terminal_hosts') WHERE name = 'host'").Scan(&legacyHostColumn).Error; err == nil && legacyHostColumn > 0 {
+		if err := db.Exec("UPDATE terminal_hosts SET address = `host` WHERE (address IS NULL OR address = '') AND `host` IS NOT NULL AND `host` <> ''").Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }

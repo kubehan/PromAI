@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/promai/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PromAI 运维监控巡检管理平台</title>
+  <script type="module" crossorigin src="/promai/assets/index-DRvAjxEI.js"></script>
+  <link rel="stylesheet" crossorigin href="/promai/assets/index-DLcvwSmG.css">
+</head>
+  <!-- StarSight Web SDK: 自动采集性能/错误/API/资源/会话/白屏 -->
+  <!-- <script src="/starsight-sdk.js"></script> -->
+  <script src="http://localhost:3001/starsight-sdk.js"></script>
+  <script>
+    StarSight.init({
+      gateway: 'http://127.0.0.1:8090',
+      appId: 'promai-app',
+      service: 'promai-app',
+      serviceVersion: '1.0.0',
+      autoTracePerf: true,
+      jsErrors: true,
+      apiErrors: true,
+      resourceErrors: true,
+      enableSPA: true,
+      sessionTracking: true,
+      rrwebEnabled: true,
+      whiteScreenTracking: true
+    });
+  </script>
+<body>
+  <div id="app"></div>
+</body>
+</html>

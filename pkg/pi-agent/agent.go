@@ -517,8 +517,8 @@ func (h *AgentHandler) handleChat(w http.ResponseWriter, r *http.Request) {
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		writeHTTPError(w, 500, "不支持 SSE 推送")
-		return
+		log.Printf("[PiAgent] 检测到 ResponseWriter 未实现 http.Flusher (type=%T)，使用兼容 Flush 通道", w)
+		flusher = flushCompatibleWriter{w}
 	}
 
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -615,11 +615,8 @@ func (h *AgentHandler) handleChat(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// 危险命令会在工具内阻塞等待人工审批，通过后执行并把结果回喂给模型自动续跑。
 func (h *AgentHandler) handleSessions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "GET" {
-		writeHTTPError(w, 405, "仅支持 GET 方法")
-		return
-	}
 
 	var sessions []database.AiSession
 	h.db.Order("updated_at desc").Find(&sessions)
@@ -822,6 +819,8 @@ func (h *AgentHandler) handleTestModel(w http.ResponseWriter, r *http.Request) {
 	writeHTTPJSON(w, map[string]any{"success": true, "message": responseText})
 }
 
+// 将主机上下文注入系统提示，执行命令时危险命令会阻塞等待人工审批，
+// 审批通过后自动执行并将结果回喂给模型自动续跑。返回累计的助手文本。
 func writeSSE(w http.ResponseWriter, data any) {
 	jsonData, _ := json.Marshal(data)
 	fmt.Fprintf(w, "data: %s\n\n", jsonData)

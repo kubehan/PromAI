@@ -89,6 +89,22 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/Skills.vue'),
     meta: { title: 'Skill 管理', icon: 'Tools' },
   },
+  {
+    path: '/hosts',
+    name: 'Hosts',
+    component: () => import('../views/Hosts.vue'),
+    meta: { title: '主机管理', icon: 'Connection' },
+  },
+  {
+    path: '/terminal',
+    name: 'HostTerminal',
+    component: () => import('../views/HostTerminal.vue'),
+    meta: { title: 'Web 终端', icon: 'Monitor' },
+  },
+  {
+    path: '/ai-terminal',
+    redirect: to => ({ path: '/terminal', query: to.query }),
+  },
   // ===== Alerting =================================================================
   {
     path: '/alerts',
@@ -131,6 +147,66 @@ const routes: RouteRecordRaw[] = [
     name: 'UserManual',
     component: () => import('../views/UserManual.vue'),
     meta: { title: '使用手册', icon: 'Reading' },
+  },
+  {
+    path: '/aiops/dashboard',
+    name: 'AIOpsDashboard',
+    component: () => import('../views/aiops/Dashboard.vue'),
+    meta: { title: 'AIOps 驾驶舱', icon: 'DataLine' },
+  },
+  {
+    path: '/aiops/events',
+    name: 'AIOpsEvents',
+    component: () => import('../views/aiops/Events.vue'),
+    meta: { title: '事件中心', icon: 'Bell' },
+  },
+  {
+    path: '/aiops/incidents',
+    name: 'AIOpsIncidents',
+    component: () => import('../views/aiops/Incidents.vue'),
+    meta: { title: '故障管理', icon: 'Warning' },
+  },
+  {
+    path: '/aiops/incidents/:id',
+    name: 'AIOpsIncidentDetail',
+    component: () => import('../views/aiops/IncidentDetail.vue'),
+    meta: { title: '故障详情', icon: 'Warning' },
+  },
+  {
+    path: '/aiops/topology',
+    name: 'AIOpsTopology',
+    component: () => import('../views/aiops/Topology.vue'),
+    meta: { title: '服务拓扑', icon: 'Share' },
+  },
+  {
+    path: '/aiops/cmdb',
+    name: 'AIOpsCMDB',
+    component: () => import('../views/aiops/CMDB.vue'),
+    meta: { title: 'CMDB', icon: 'List' },
+  },
+  {
+    path: '/aiops/changes',
+    name: 'AIOpsChanges',
+    component: () => import('../views/aiops/Changes.vue'),
+    meta: { title: '变更事件', icon: 'Refresh' },
+  },
+  {
+    path: '/aiops/runbooks',
+    name: 'AIOpsRunbooks',
+    component: () => import('../views/aiops/Runbooks.vue'),
+    meta: { title: '知识库', icon: 'Reading' },
+  },
+  {
+    path: '/aiops/oncall',
+    name: 'AIOpsOnCall',
+    component: () => import('../views/aiops/OnCall.vue'),
+    meta: { title: '值班管理', icon: 'User' },
+  },
+  {
+    path: '/aiops/slo',
+    name: 'AIOpsSLO',
+    component: () => import('../views/aiops/SLO.vue'),
+    meta: { title: 'SLO', icon: 'DataAnalysis' },
   },
 ]
 
