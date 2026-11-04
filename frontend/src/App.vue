@@ -143,6 +143,10 @@
                 <el-icon><Monitor /></el-icon>
                 <span>Web 终端</span>
               </el-menu-item>
+              <el-menu-item v-if="embedEnabled" index="/embedded">
+                <el-icon><Platform /></el-icon>
+                <span>嵌入式页面</span>
+              </el-menu-item>
               <el-menu-item index="/aiops/dashboard">
                 <el-icon><DataAnalysis /></el-icon>
                 <span>智能运维</span>
@@ -225,7 +229,7 @@
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from './composables/useTheme'
-import { getAlertStats } from './api'
+import { getAlertStats, getEmbed } from './api'
 
 const route = useRoute()
 const router = useRouter()
@@ -238,11 +242,16 @@ const username = ref(localStorage.getItem('username') || 'Admin')
 
 const { currentTheme, setTheme, themeOptions } = useTheme()
 const alertFiringCount = ref(0)
+const embedEnabled = ref(false)
 let pollTimer: ReturnType<typeof setInterval> | null = null
 async function pollAlertCount() {
   try { const r = await getAlertStats(); const s = r.data.by_state; alertFiringCount.value = s.find(x => x.State === 'firing')?.Count || 0 } catch {}
 }
-onMounted(() => { pollAlertCount(); pollTimer = setInterval(pollAlertCount, 15000) })
+async function loadEmbedFlag() {
+  if (!localStorage.getItem('token')) { embedEnabled.value = false; return }
+  try { const r = await getEmbed(); embedEnabled.value = !!r.data.enabled } catch { embedEnabled.value = false }
+}
+onMounted(() => { loadEmbedFlag(); pollAlertCount(); pollTimer = setInterval(() => { loadEmbedFlag(); pollAlertCount() }, 15000) })
 onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 
 function toggleCollapse() {

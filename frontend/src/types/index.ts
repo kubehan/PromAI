@@ -218,3 +218,16 @@ export interface HostExecLog {
   duration_ms: number
   created_at: string
 }
+
+export interface EmbedItem {
+  id: string
+  title: string
+  url: string
+  sort: number
+}
+
+export interface EmbedConfig {
+  enabled: boolean
+  title: string
+  items: EmbedItem[]
+}

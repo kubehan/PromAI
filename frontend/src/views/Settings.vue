@@ -70,6 +70,16 @@
     </div>
 
     <div class="form-section">
+      <h3><el-icon :size="16" color="#22d3ee"><Platform /></el-icon> 嵌入式页面</h3>
+      <el-form label-width="160px" style="max-width: 600px;">
+        <el-form-item label="启用嵌入式页面">
+          <el-switch v-model="embedEnabledSwitch" />
+          <span style="font-size:12px; opacity:.6; margin-left:10px;">开启后侧边栏显示「嵌入式页面」菜单，可内嵌 Grafana/Prometheus 等任意 URL</span>
+        </el-form-item>
+      </el-form>
+    </div>
+
+    <div class="form-section">
       <h3><el-icon :size="16" color="#7c3aed"><MagicStick /></el-icon> AI 智能助手配置</h3>
 
       <el-form :model="form" label-width="160px" style="max-width: 600px;">
@@ -159,7 +169,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getSettings, updateSettings, testAiModel } from '../api'
+import { getSettings, updateSettings, testAiModel, getEmbed, saveEmbed } from '../api'
+import type { EmbedConfig } from '../types'
 import { useTheme } from '../composables/useTheme'
 
 function getCssVar(name: string): string {
@@ -190,6 +201,27 @@ const form = ref<Record<string, string>>({
   ai_enabled: 'false', ai_default_model: '',
 })
 const modelList = ref<AIModelForm[]>([])
+
+const embedCfg = ref<EmbedConfig | null>(null)
+const embedEnabledSwitch = computed({
+  get: () => embedCfg.value?.enabled ?? false,
+  set: async (v: boolean) => {
+    if (!embedCfg.value) return
+    embedCfg.value.enabled = v
+    try {
+      const { data } = await saveEmbed(embedCfg.value)
+      embedCfg.value = data
+      ElMessage.success(v ? '已启用「嵌入式页面」' : '已停用「嵌入式页面」')
+    } catch (e: any) { ElMessage.error(e.message || '保存失败') }
+  },
+})
+
+async function fetchEmbed() {
+  try {
+    const { data } = await getEmbed()
+    embedCfg.value = data
+  } catch (e: any) { ElMessage.error(e.message || '加载嵌入式页面配置失败') }
+}
 
 const reportCleanupEnabled = computed({
   get: () => form.value.report_cleanup_enabled === 'true',
@@ -286,7 +318,7 @@ async function handleSave() {
   finally { saving.value = false }
 }
 
-onMounted(fetchData)
+onMounted(() => { fetchData(); fetchEmbed() })
 </script>
 
 <style scoped>

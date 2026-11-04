@@ -5,7 +5,8 @@ import type {
   NotificationChannel, CronJob, ReportRecord,
   InspectRecord, InspectRequest, DashboardStats,
   SyncSource, SyncLog, AiSkill,
-  Host, HostCommand, HostExecLog
+  Host, HostCommand, HostExecLog,
+  EmbedConfig
 } from '../types'
 
 const api = axios.create({
@@ -304,3 +305,5 @@ export const deleteHostCommand = (id: number, cmdId: number) =>
   api.delete(`/hosts/${id}/commands/${cmdId}`)
 export const runHostCommand = (id: number, cmdId: number) =>
   api.post<{ success: boolean; output: string; exit_code: number; error?: string }>(`/hosts/${id}/commands/${cmdId}/run`)
+export const getEmbed = () => api.get<EmbedConfig>('/embed')
+export const saveEmbed = (cfg: EmbedConfig) => api.put<EmbedConfig>('/embed', cfg)

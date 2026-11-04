@@ -102,6 +102,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: 'Web 终端', icon: 'Monitor' },
   },
   {
+    path: '/embedded',
+    name: 'Embedded',
+    component: () => import('../views/Embedded.vue'),
+    meta: { title: '嵌入式页面', icon: 'Monitor' },
+  },
+  {
     path: '/ai-terminal',
     redirect: to => ({ path: '/terminal', query: to.query }),
   },

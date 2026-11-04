@@ -457,6 +457,9 @@ func setupRoutes(collector *metrics.Collector, config *config.Config) *AdminAPI 
 	// 注册主机管理 / Web 终端路由
 	registerHostAPI(http.DefaultServeMux, adminAPI)
 
+	// 注册嵌入式页面（Grafana / Prometheus 等任意 URL 内嵌）路由
+	registerEmbedAPI(http.DefaultServeMux, adminAPI)
+
 	// 注册 AI Agent 路由
 	// 初始化统一命令审查引擎
 
