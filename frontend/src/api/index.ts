@@ -6,7 +6,8 @@ import type {
   InspectRecord, InspectRequest, DashboardStats,
   SyncSource, SyncLog, AiSkill,
   Host, HostCommand, HostExecLog,
-  EmbedConfig
+  EmbedConfig,
+  OpsSession, OpsStep, OpsPlanStep, OpsSessionMessage
 } from '../types'
 
 const api = axios.create({
@@ -307,3 +308,39 @@ export const runHostCommand = (id: number, cmdId: number) =>
   api.post<{ success: boolean; output: string; exit_code: number; error?: string }>(`/hosts/${id}/commands/${cmdId}/run`)
 export const getEmbed = () => api.get<EmbedConfig>('/embed')
 export const saveEmbed = (cfg: EmbedConfig) => api.put<EmbedConfig>('/embed', cfg)
+
+// 自动化运维智能终端
+export const createAiSession = (host_id: number, title: string, incident_id?: number | null) =>
+  api.post<OpsSession>('/ai-terminal/sessions', { host_id, title, incident_id })
+export const listAiSessions = () =>
+  api.get<{ items: OpsSession[]; total: number }>('/ai-terminal/sessions')
+export const getAiSession = (id: number) =>
+  api.get<{ session: OpsSession; steps: OpsStep[]; messages?: OpsSessionMessage[]; host_name: string }>(`/ai-terminal/sessions/${id}`)
+export interface AiPlanResponse {
+  analysis: string
+  done: boolean
+  steps: OpsStep[]
+}
+export const planAiSteps = (id: number, message: string) =>
+  api.post<AiPlanResponse>(`/ai-terminal/sessions/${id}/plan`, { message })
+export const nextAiSteps = (id: number, message: string) =>
+  api.post<AiPlanResponse>(`/ai-terminal/sessions/${id}/next`, { message })
+export const approveAiStep = (id: number, reason?: string) =>
+  api.post<{ id: number; status: string; auto_approved: boolean }>(`/ai-terminal/steps/${id}/approve`, { reason })
+export const recordAiStep = (id: number, output: string, exit_code: number, error?: string) =>
+  api.post<{ id: number; status: string }>(`/ai-terminal/steps/${id}/result`, { output, exit_code, error })
+export const execAiStep = (id: number, approve: boolean, reason?: string) =>
+  api.post<{ id: number; status: string; output: string; exit_code: number; error?: string; duration_ms: number }>(
+    `/ai-terminal/steps/${id}/execute`, { approve, reason })
+export const rejectAiStep = (id: number, reason: string) =>
+  api.post<{ id: number; status: string }>(`/ai-terminal/steps/${id}/reject`, { reason })
+export const getAiTerminalPrompts = () =>
+  api.get<{ system_prompt: string; continue_prompt: string; default_system_prompt: string; default_continue_prompt: string }>(
+    '/ai-terminal/prompts')
+export const createAiSessionShare = (session_id: number, password?: string, expire_h = 24) =>
+  api.post<{ token: string; password_mode: boolean; share_url: string; expires_at: string; markdown_url: string; html_url: string }>(
+    '/ai-terminal/share', { session_id, password, expire_h })
+export const appendAiSessionMessage = (
+  id: number,
+  payload: { role: string; text: string; command?: string; risk?: string; status?: string; exit_code?: number; note?: string; step_id?: number },
+) => api.post(`/ai-terminal/sessions/${id}/messages`, payload)

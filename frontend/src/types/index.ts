@@ -231,3 +231,58 @@ export interface EmbedConfig {
   title: string
   items: EmbedItem[]
 }
+
+// ==== 自动化运维智能终端 ====
+export interface OpsSession {
+  id: number
+  title: string
+  host_id: number
+  host_key: string
+  incident_id?: number | null
+  username: string
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OpsSessionMessage {
+  id: number
+  session_id: number
+  seq: number
+  role: string
+  text: string
+  command?: string
+  risk?: string
+  status?: string
+  exit_code?: number
+  note?: string
+  step_id?: number
+  created_at: string
+  updated_at: string
+}
+
+export interface OpsStep {
+  id: number
+  session_id: number
+  seq: number
+  command: string
+  purpose: string
+  risk_level: 'low' | 'medium' | 'high'
+  status: 'pending' | 'approved' | 'rejected' | 'running' | 'success' | 'failed'
+  output: string
+  error: string
+  exit_code: number
+  approved_by: string
+  reject_reason: string
+  auto_approved: boolean
+  approved_at?: string | null
+  executed_at?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OpsPlanStep {
+  command: string
+  purpose: string
+  risk: string
+}

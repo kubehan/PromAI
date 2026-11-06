@@ -434,16 +434,35 @@ func setupRoutes(collector *metrics.Collector, config *config.Config) *AdminAPI 
 	// 将首页替换为后台登录页面（前端 SPA）
 	if _, err := os.Stat("frontend/dist"); err == nil {
 		distDir := "frontend/dist"
-		http.Handle("/promai/assets/", http.StripPrefix("/promai/", http.FileServer(http.Dir(distDir))))
-		http.Handle("/promai/favicon.svg", http.StripPrefix("/promai/", http.FileServer(http.Dir(distDir))))
+
+		// /promai/assets/ 路径：带 hash 的构建产物，可长期缓存
+		assetFS := http.FileServer(http.Dir(distDir))
+		assetHandler := http.StripPrefix("/promai/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			assetFS.ServeHTTP(w, r)
+		}))
+		http.Handle("/promai/assets/", assetHandler)
+
+		// /promai/favicon.svg：长期缓存
+		http.HandleFunc("/promai/favicon.svg", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+			http.ServeFile(w, r, distDir+"/favicon.svg")
+		})
+
+		// /promai 根路径及 SPA 回退：禁止缓存 index.html
 		http.HandleFunc("/promai", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Cache-Control", "no-cache, max-age=0")
 			http.ServeFile(w, r, distDir+"/index.html")
 		})
 		http.HandleFunc("/promai/", func(w http.ResponseWriter, r *http.Request) {
 			path := distDir + r.URL.Path[len("/promai/"):]
 			if _, err := os.Stat(path); err == nil {
+				// 非 assets 的静态文件（如有）按短期缓存处理
+				w.Header().Set("Cache-Control", "public, max-age=3600")
 				http.ServeFile(w, r, path)
 			} else {
+				// SPA 回退：返回 index.html，禁止缓存
+				w.Header().Set("Cache-Control", "no-cache, max-age=0")
 				http.ServeFile(w, r, distDir+"/index.html")
 			}
 		})
@@ -459,6 +478,9 @@ func setupRoutes(collector *metrics.Collector, config *config.Config) *AdminAPI 
 
 	// 注册嵌入式页面（Grafana / Prometheus 等任意 URL 内嵌）路由
 	registerEmbedAPI(http.DefaultServeMux, adminAPI)
+
+	// 注册自动化运维智能终端路由
+	registerAiTerminalAPI(http.DefaultServeMux, adminAPI)
 
 	// 注册 AI Agent 路由
 	// 初始化统一命令审查引擎

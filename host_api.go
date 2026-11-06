@@ -374,6 +374,18 @@ func (h *HostAPI) updateHostStatus(host *database.TerminalHost, status, lastErr 
 	}).Error
 }
 
+// trySaveHostFingerprint 尝试获取并保存主机 SSH 指纹（TOFU 模式）。
+// 仅在主机未配置指纹时调用，异步执行不影响主流程。
+func (h *HostAPI) trySaveHostFingerprint(host *database.TerminalHost) {
+	fp, err := terminal.FetchHostKeyFingerprint(host.Address, host.Port, 10*time.Second)
+	if err != nil {
+		log.Printf("[Host] TOFU: 获取主机 %s 指纹失败: %v", host.Name, err)
+		return
+	}
+	log.Printf("[Host] TOFU: 主机 %s 指纹已自动保存 %s", host.Name, fp)
+	_ = h.db.Model(host).Update("host_key_fingerprint", fp).Error
+}
+
 func (h *HostAPI) execHost(w http.ResponseWriter, r *http.Request, host *database.TerminalHost) {
 	var req struct {
 		Command    string `json:"command"`
@@ -573,6 +585,11 @@ func (h *HostAPI) handleTerminalWS(w http.ResponseWriter, r *http.Request, hostI
 	}
 	h.updateHostStatus(host, "online", "")
 	defer shell.Close()
+
+	// TOFU: 首次连接自动保存主机指纹
+	if strings.TrimSpace(host.HostKeyFingerprint) == "" {
+		go h.trySaveHostFingerprint(host)
+	}
 
 	writer := &wsJSONWriter{conn: conn}
 	_ = writer.send(map[string]interface{}{

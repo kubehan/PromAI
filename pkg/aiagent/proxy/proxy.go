@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -308,14 +309,17 @@ func callOpenAICompat(mc *config.AIModelConfig, system, user, modelOverride stri
 		req.Header.Set("Authorization", "Bearer "+mc.APIKey)
 	}
 	client := &http.Client{Timeout: 300 * time.Second}
+	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		log.Printf("[AI] 模型请求失败 %s (耗时 %v): %v", base, time.Since(start), err)
+		return "", fmt.Errorf("模型请求失败: %w", err)
 	}
 	defer resp.Body.Close()
 	b, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("模型接口返回 %d: %s", resp.StatusCode, string(b))
+		log.Printf("[AI] 模型接口错误 %s (状态码 %d, 耗时 %v): %s", base, resp.StatusCode, time.Since(start), truncateForLog(string(b), 500))
+		return "", fmt.Errorf("模型接口返回 %d: %s", resp.StatusCode, truncateForLog(string(b), 500))
 	}
 	var out struct {
 		Choices []struct {
@@ -388,4 +392,12 @@ func (p *Proxy) SysChat(w http.ResponseWriter, r *http.Request) {
 		"model":   mc.Name,
 		"engine":  "system",
 	})
+}
+
+// truncateForLog 截断过长文本用于日志输出。
+func truncateForLog(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "...(truncated)"
 }

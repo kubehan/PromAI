@@ -625,6 +625,69 @@ type TerminalFixCommand struct {
 	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
+// OpsSession 自动化运维智能终端：一次排障会话
+type OpsSession struct {
+	ID         uint      `gorm:"primaryKey" json:"id"`
+	Title      string    `gorm:"size:200" json:"title"`
+	HostID     uint      `gorm:"index" json:"host_id"`
+	HostKey    string    `gorm:"size:64;index" json:"host_key"`
+	IncidentID *uint     `json:"incident_id"`
+	Username   string    `gorm:"size:64;index" json:"username"`
+	Status     string    `gorm:"size:16;index;default:running" json:"status"` // running/completed/failed
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// OpsStep 自动化运维智能终端：会话中的命令步骤（含审批状态机）
+type OpsStep struct {
+	ID           uint       `gorm:"primaryKey" json:"id"`
+	SessionID    uint       `gorm:"index;uniqueIndex:idx_session_seq" json:"session_id"`
+	Seq          int        `gorm:"uniqueIndex:idx_session_seq" json:"seq"`
+	Command      string     `gorm:"type:text" json:"command"`
+	Purpose      string     `gorm:"type:text" json:"purpose"`
+	RiskLevel    string     `gorm:"size:16" json:"risk_level"`                   // low/medium/high
+	Status       string     `gorm:"size:16;index;default:pending" json:"status"` // pending/approved/rejected/running/success/failed
+	Output       string     `gorm:"type:text" json:"output"`
+	Error        string     `gorm:"type:text" json:"error"`
+	ExitCode     int        `json:"exit_code"`
+	ApprovedBy   string     `gorm:"size:64" json:"approved_by"`
+	RejectReason string     `gorm:"type:text" json:"reject_reason"`
+	AutoApproved bool       `json:"auto_approved"`
+	ApprovedAt   *time.Time `json:"approved_at"`
+	ExecutedAt   *time.Time `json:"executed_at"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+// OpsSessionMessage 自动化运维会话中的交互消息（用户/AI/命令/结果）
+type OpsSessionMessage struct {
+	ID        uint      `gorm:"primaryKey" json:"id"`
+	SessionID uint      `gorm:"index;uniqueIndex:idx_ops_session_msg_seq" json:"session_id"`
+	Seq       int       `gorm:"uniqueIndex:idx_ops_session_msg_seq" json:"seq"`
+	Role      string    `gorm:"size:24;index" json:"role"`
+	Text      string    `gorm:"type:text" json:"text"`
+	Command   string    `gorm:"type:text" json:"command"`
+	Risk      string    `gorm:"size:16" json:"risk"`
+	Status    string    `gorm:"size:16" json:"status"`
+	ExitCode  int       `json:"exit_code"`
+	Note      string    `gorm:"type:text" json:"note"`
+	StepID    uint      `gorm:"index" json:"step_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// OpsSessionShare 自动化运维会话分享链接（可免密或密码访问）
+type OpsSessionShare struct {
+	ID           uint      `gorm:"primaryKey" json:"id"`
+	SessionID    uint      `gorm:"index" json:"session_id"`
+	Token        string    `gorm:"size:64;uniqueIndex" json:"token"`
+	PasswordHash string    `gorm:"size:128" json:"-"`
+	ExpiresAt    time.Time `gorm:"index" json:"expires_at"`
+	CreatedBy    string    `gorm:"size:64;index" json:"created_by"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 // ==================== 主机管理 / Web 终端 ====================
 
 // TerminalHost 受管主机（CMDB 主机属性 + SSH 登录配置）
@@ -723,6 +786,10 @@ func AutoMigrate(db *gorm.DB) error {
 		&TerminalExecLog{},
 		&TerminalSummary{},
 		&TerminalFixCommand{},
+		&OpsSession{},
+		&OpsStep{},
+		&OpsSessionMessage{},
+		&OpsSessionShare{},
 	); err != nil {
 		return err
 	}

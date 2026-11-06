@@ -160,6 +160,47 @@
       </el-button>
     </div>
 
+    <div class="form-section">
+      <h3><el-icon :size="16" color="#22d3ee"><ChatDotRound /></el-icon> 智能终端提示词</h3>
+      <div class="prompt-desc">
+        控制 Web 终端右侧 AI 助手的规划行为。留空则使用内置默认提示词；保存后对新的 AI 请求立即生效。
+      </div>
+      <el-form :model="form" label-width="160px" style="max-width: 900px;">
+        <el-form-item label="系统提示词">
+          <el-input
+            v-model="form.ai_terminal_system_prompt"
+            type="textarea"
+            :rows="8"
+            placeholder="留空则使用内置默认系统提示词"
+          />
+        </el-form-item>
+        <el-form-item label="续析提示词">
+          <el-input
+            v-model="form.ai_terminal_continue_prompt"
+            type="textarea"
+            :rows="3"
+            placeholder="留空则使用内置默认续析提示词"
+          />
+        </el-form-item>
+        <el-form-item label=" ">
+          <div class="prompt-actions">
+            <el-button type="warning" size="small" plain @click="resetPrompts">恢复默认提示词</el-button>
+            <el-button size="small" text @click="showPromptDefault = !showPromptDefault">
+              {{ showPromptDefault ? '隐藏默认值' : '查看默认值' }}
+            </el-button>
+          </div>
+        </el-form-item>
+        <template v-if="showPromptDefault">
+          <el-form-item label="默认系统提示词">
+            <el-input :model-value="promptDefaults.default_system_prompt" type="textarea" :rows="8" readonly />
+          </el-form-item>
+          <el-form-item label="默认续析提示词">
+            <el-input :model-value="promptDefaults.default_continue_prompt" type="textarea" :rows="3" readonly />
+          </el-form-item>
+        </template>
+      </el-form>
+    </div>
+
     <el-button type="primary" size="large" :loading="saving" @click="handleSave" style="height: 48px; padding: 0 40px; font-size: 15px; margin-left: 160px;">
       <el-icon><Check /></el-icon> 保存设置
     </el-button>
@@ -169,7 +210,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getSettings, updateSettings, testAiModel, getEmbed, saveEmbed } from '../api'
+import { getSettings, updateSettings, testAiModel, getEmbed, saveEmbed, getAiTerminalPrompts } from '../api'
 import type { EmbedConfig } from '../types'
 import { useTheme } from '../composables/useTheme'
 
@@ -199,8 +240,28 @@ const form = ref<Record<string, string>>({
   project_name: '', cron_schedule: '', report_cleanup_cron: '0 0 * * *',
   report_cleanup_enabled: 'true', report_cleanup_max_age: '7',
   ai_enabled: 'false', ai_default_model: '',
+  ai_terminal_system_prompt: '', ai_terminal_continue_prompt: '',
 })
 const modelList = ref<AIModelForm[]>([])
+
+const promptDefaults = ref({
+  system_prompt: '', continue_prompt: '',
+  default_system_prompt: '', default_continue_prompt: '',
+})
+const showPromptDefault = ref(false)
+
+async function fetchPrompts() {
+  try {
+    const { data } = await getAiTerminalPrompts()
+    promptDefaults.value = data
+  } catch { /* ignore */ }
+}
+
+function resetPrompts() {
+  form.value.ai_terminal_system_prompt = promptDefaults.value.default_system_prompt
+  form.value.ai_terminal_continue_prompt = promptDefaults.value.default_continue_prompt
+  ElMessage.success('已填入默认提示词，点击「保存设置」后生效')
+}
 
 const embedCfg = ref<EmbedConfig | null>(null)
 const embedEnabledSwitch = computed({
@@ -309,6 +370,8 @@ async function handleSave() {
       report_cleanup_max_age: form.value.report_cleanup_max_age,
       ai_enabled: form.value.ai_enabled,
       ai_default_model: form.value.ai_default_model,
+      ai_terminal_system_prompt: form.value.ai_terminal_system_prompt || '',
+      ai_terminal_continue_prompt: form.value.ai_terminal_continue_prompt || '',
     }
     payload.ai_models = JSON.stringify(modelList.value)
     await updateSettings(payload)
@@ -318,10 +381,20 @@ async function handleSave() {
   finally { saving.value = false }
 }
 
-onMounted(() => { fetchData(); fetchEmbed() })
+onMounted(() => { fetchData(); fetchEmbed(); fetchPrompts() })
 </script>
 
 <style scoped>
+.prompt-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin: 4px 0 14px;
+}
+.prompt-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .model-card {
   margin-top: 16px;
   padding: 20px;

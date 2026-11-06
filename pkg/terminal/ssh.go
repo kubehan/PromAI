@@ -70,14 +70,19 @@ func hostKeyCallback(expected string) ssh.HostKeyCallback {
 	expected = strings.TrimSpace(expected)
 	expected = strings.TrimPrefix(expected, "SHA256:")
 	if expected == "" {
-		// 与常见终端工具保持一致：未配置指纹时接受主机密钥。
-		return ssh.InsecureIgnoreHostKey()
+		// TOFU 模式：首次连接时接受任意主机密钥，但记录指纹供管理员后续配置。
+		return func(hostname string, _ net.Addr, key ssh.PublicKey) error {
+			sum := sha256.Sum256(key.Marshal())
+			fp := base64.RawStdEncoding.EncodeToString(sum[:])
+			fmt.Printf("⚠️  [SSH] 主机 %s 未配置 HostKey 指纹，接受密钥 SHA256:%s。建议将指纹存入主机配置以启用验证。\n", hostname, fp)
+			return nil
+		}
 	}
-	return func(_ string, _ net.Addr, key ssh.PublicKey) error {
+	return func(hostname string, _ net.Addr, key ssh.PublicKey) error {
 		sum := sha256.Sum256(key.Marshal())
 		got := base64.RawStdEncoding.EncodeToString(sum[:])
 		if subtle.ConstantTimeCompare([]byte(got), []byte(expected)) != 1 {
-			return fmt.Errorf("主机密钥指纹不匹配，期望 %s，实际 SHA256:%s", expected, got)
+			return fmt.Errorf("主机密钥指纹不匹配，期望 SHA256:%s，实际 SHA256:%s", expected, got)
 		}
 		return nil
 	}
@@ -250,4 +255,46 @@ func (s *ShellSession) Close() error {
 		err = s.reader.Close()
 	})
 	return err
+}
+
+// FetchHostKeyFingerprint 连接到主机获取 SSH HostKey 的 SHA256 指纹（不做完整认证）。
+// 用于 TOFU 模式下自动发现主机指纹。
+func FetchHostKeyFingerprint(address string, port int, timeout time.Duration) (string, error) {
+	if port <= 0 {
+		port = 22
+	}
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	addr := net.JoinHostPort(address, strconv.Itoa(port))
+
+	var fingerprint string
+	cfg := &ssh.ClientConfig{
+		User: "nobody",
+		HostKeyCallback: func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			sum := sha256.Sum256(key.Marshal())
+			fingerprint = "SHA256:" + base64.RawStdEncoding.EncodeToString(sum[:])
+			return nil
+		},
+		Auth:    []ssh.AuthMethod{ssh.Password("")},
+		Timeout: timeout,
+	}
+
+	conn, err := net.DialTimeout("tcp", addr, timeout)
+	if err != nil {
+		return "", fmt.Errorf("连接 %s 失败: %w", addr, err)
+	}
+	defer conn.Close()
+
+	// 发起 SSH 握手（认证会失败，但 HostKeyCallback 在认证前就会触发）
+	clientConn, _, _, err := ssh.NewClientConn(conn, addr, cfg)
+	if err != nil {
+		// 认证失败是预期的——只要 HostKeyCallback 被触发即可
+		if fingerprint != "" {
+			return fingerprint, nil
+		}
+		return "", fmt.Errorf("SSH 握手失败: %w", err)
+	}
+	defer clientConn.Close()
+	return fingerprint, nil
 }

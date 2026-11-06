@@ -34,6 +34,58 @@ let term: Terminal | null = null
 let fitAddon: FitAddon | null = null
 let ws: WebSocket | null = null
 let resizeObserver: ResizeObserver | null = null
+
+interface ExecCapture {
+  id: number
+  command: string
+  buffer: string
+  timer: number
+  resolve: (r: { output: string; exitCode: number }) => void
+}
+let capture: ExecCapture | null = null
+let captureSeq = 0
+
+function stripAnsi(text: string) {
+  return text.replace(/\x1b\[[0-9;?]*[A-Za-z]/g, '').replace(/\x1b\][^\x07]*\x07/g, '')
+}
+
+function cleanOutput(raw: string, command: string, marker: string) {
+  const text = stripAnsi(raw).replace(/\r/g, '')
+  const cmd = command.trim()
+  const lines = text.split('\n').filter(line => {
+    const t = line.trim()
+    if (!t) return false
+    if (t.includes(marker)) return false
+    if (t === cmd) return false
+    if (t.endsWith(cmd) && t.length - cmd.length < 80) return false
+    return true
+  })
+  return lines.join('\n').trim()
+}
+
+function handleCapture(data: string) {
+  if (!capture) return
+  capture.buffer += data
+  const marker = `__PROMAI_DONE_${capture.id}__`
+  const m = capture.buffer.match(new RegExp(marker + ':(\\d+)'))
+  if (!m || m.index === undefined) return
+  const current = capture
+  capture = null
+  window.clearTimeout(current.timer)
+  const raw = current.buffer.slice(0, m.index)
+  current.resolve({
+    output: cleanOutput(raw, current.command, marker),
+    exitCode: parseInt(m[1], 10),
+  })
+}
+
+function failCapture(reason: string) {
+  if (!capture) return
+  const current = capture
+  capture = null
+  window.clearTimeout(current.timer)
+  current.resolve({ output: reason, exitCode: -1 })
+}
 function updateStatus(next: typeof status.value, text: string) {
   status.value = next
   statusText.value = text
@@ -62,6 +114,7 @@ function connect() {
       const msg = JSON.parse(evt.data)
       if (msg.type === 'output') {
         term?.write(msg.data || '')
+        handleCapture(msg.data || '')
       } else if (msg.type === 'ready') {
         term?.write(`\r\n\x1b[32m● 已连接 ${msg.host || props.host.name}\x1b[0m\r\n`)
       } else if (msg.type === 'error') {
@@ -79,6 +132,7 @@ function connect() {
     updateStatus('error', 'WebSocket 连接失败')
   }
   ws.onclose = () => {
+    failCapture('终端连接已关闭')
     if (status.value !== 'error') updateStatus('closed', '连接已关闭')
   }
 }
@@ -96,6 +150,43 @@ function sendCommand(command: string) {
   return true
 }
 
+// execCommand 把命令发送到当前交互式终端执行，并捕获输出与退出码。
+function execCommand(command: string, timeoutMs = 120000): Promise<{ output: string; exitCode: number }> {
+  return new Promise((resolve, reject) => {
+    if (ws?.readyState !== WebSocket.OPEN) {
+      reject(new Error('终端尚未连接'))
+      return
+    }
+    if (capture) {
+      reject(new Error('上一个命令仍在执行，请稍候'))
+      return
+    }
+    const cmd = command.trim().replace(/\r?\n/g, '; ')
+    if (!cmd) {
+      reject(new Error('命令为空'))
+      return
+    }
+    captureSeq += 1
+    const id = captureSeq
+    const marker = `__PROMAI_DONE_${id}__`
+    const timer = window.setTimeout(() => {
+      if (capture && capture.id === id) {
+        const current = capture
+        capture = null
+        current.resolve({
+          output: cleanOutput(current.buffer, current.command, marker) + '\n[命令执行超时]',
+          exitCode: -1,
+        })
+      }
+    }, timeoutMs)
+    capture = { id, command: cmd, buffer: '', timer, resolve }
+    // 命令与结束标记分两次写入，避免标记被长命令的回显换行拆断。
+    ws.send(JSON.stringify({ type: 'input', data: cmd + '\n' }))
+    ws.send(JSON.stringify({ type: 'input', data: `printf '\\n${marker}:%s\\n' "$?"\n` }))
+    term?.focus()
+  })
+}
+
 function fit() {
   try {
     fitAddon?.fit()
@@ -107,6 +198,7 @@ function fit() {
 
 function closeSocket() {
   if (ws) {
+    failCapture('终端连接已关闭')
     ws.onclose = null
     ws.close()
     ws = null
@@ -187,7 +279,7 @@ onBeforeUnmount(() => {
   term = null
 })
 
-defineExpose({ sendCommand, fit, connect, status })
+defineExpose({ sendCommand, execCommand, fit, connect, status })
 </script>
 
 <style scoped>
