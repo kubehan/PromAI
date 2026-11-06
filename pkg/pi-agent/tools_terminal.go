@@ -8,22 +8,22 @@ import (
 	"strings"
 	"time"
 
-	agent "github.com/jay-y/pi/pkg/ai-agent"
 	"github.com/jay-y/pi/pkg/ai"
+	agent "github.com/jay-y/pi/pkg/ai-agent"
 	"gorm.io/gorm"
 )
 
 type TerminalTool struct {
-	db          *gorm.DB
-	jwtSecret   string
+	db        *gorm.DB
+	jwtSecret string
 }
 
 func NewTerminalTool(db *gorm.DB, jwtSecret string) *TerminalTool {
 	return &TerminalTool{db: db, jwtSecret: jwtSecret}
 }
 
-func (t *TerminalTool) GetName() string        { return "run_on_host" }
-func (t *TerminalTool) GetLabel() string       { return "主机命令执行" }
+func (t *TerminalTool) GetName() string  { return "run_on_host" }
+func (t *TerminalTool) GetLabel() string { return "主机命令执行" }
 func (t *TerminalTool) GetDescription() string {
 	return "在目标主机上执行单个 Shell 命令并返回输出。" +
 		"用于排查问题、检查状态、执行运维操作。" +

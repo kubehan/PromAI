@@ -17,8 +17,11 @@ import (
 	"PromAI/pkg/aiagent/proxy"
 	"PromAI/pkg/config"
 	"PromAI/pkg/database"
+	piagent "PromAI/pkg/pi-agent"
 	"PromAI/pkg/terminal"
 
+	"github.com/jay-y/pi/pkg/ai"
+	agent "github.com/jay-y/pi/pkg/ai-agent"
 	"gorm.io/gorm"
 )
 
@@ -297,6 +300,129 @@ func (a *AiTerminalAPI) appendMessage(w http.ResponseWriter, r *http.Request, si
 		return
 	}
 	writeJSON(w, msg)
+}
+
+func (a *AiTerminalAPI) handleStream(w http.ResponseWriter, r *http.Request, sid uint) {
+	var req struct {
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, 400, "请求体格式错误")
+		return
+	}
+	msg := strings.TrimSpace(req.Message)
+	if msg == "" {
+		writeError(w, 400, "请输入意图")
+		return
+	}
+
+	var session database.OpsSession
+	if err := a.db.First(&session, sid).Error; err != nil {
+		writeError(w, 404, "会话不存在")
+		return
+	}
+
+	mc := proxy.ResolveAIModel(a.cfg)
+	if mc == nil {
+		writeError(w, 500, "未配置 AI 模型")
+		return
+	}
+
+	ag := agent.NewAgent(agent.AgentOptions{
+		SessionID: fmt.Sprintf("term_%d", sid),
+	})
+
+	ag.SetModel(&ai.BaseModel{
+		ID:            mc.Model,
+		Name:          fmt.Sprintf("%s/%s", mc.Provider, mc.Model),
+		API:           ai.ApiOpenAICompletions,
+		Provider:      ai.ProviderOpenAI,
+		BaseURL:       mc.BaseURL,
+		APIKey:        mc.APIKey,
+		ContextWindow: 128000,
+		MaxTokens:     mc.MaxTokens,
+	})
+
+	systemPrompt := a.settingValue(promptSystemKey, defaultTerminalSystemPrompt)
+	ag.SetSystemPrompt(systemPrompt)
+
+	terminalTool := piagent.NewTerminalTool(a.db, a.api.jwtSecret)
+	ag.SetTools([]agent.AgentTool{agent.NewAgentTool(terminalTool)})
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		writeError(w, 500, "不支持 SSE")
+		return
+	}
+
+	var msgSeq int
+	a.db.Model(&database.OpsSessionMessage{}).Where("session_id = ?", sid).Select("COALESCE(MAX(seq),0)").Scan(&msgSeq)
+	msgSeq++
+	a.db.Create(&database.OpsSessionMessage{
+		SessionID: sid, Seq: msgSeq, Role: "user", Text: msg,
+	})
+
+	done := make(chan struct{})
+	unsub := ag.Subscribe(func(event agent.AgentEvent) {
+		switch e := event.(type) {
+		case *agent.AgentEventMessageUpdate:
+			if delta, ok := e.AssistantMessageEvent.(*ai.AssistantMessageEventTextDelta); ok {
+				data, _ := json.Marshal(map[string]string{"type": "text", "content": delta.Delta})
+				fmt.Fprintf(w, "data: %s\n\n", data)
+				flusher.Flush()
+			}
+		case *agent.AgentEventToolExecutionStart:
+			data, _ := json.Marshal(map[string]string{"type": "command", "command": e.ToolName, "status": "running"})
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		case *agent.AgentEventToolExecutionEnd:
+			status := "success"
+			if e.IsError {
+				status = "failed"
+			}
+			if e.Result != nil {
+				if result, ok := e.Result.(*agent.AgentToolResult); ok && len(result.Content) > 0 {
+					if tc, ok := result.Content[0].(*ai.TextContentBlock); ok {
+					msgSeq++
+					a.db.Create(&database.OpsSessionMessage{
+						SessionID: sid, Seq: msgSeq, Role: "result",
+						Text: tc.Text,
+					})
+					data, _ := json.Marshal(map[string]string{"type": "result", "content": tc.Text, "status": status})
+					fmt.Fprintf(w, "data: %s\n\n", data)
+					flusher.Flush()
+				}
+			}
+		case *agent.AgentEventEnd:
+			msgSeq++
+			var buf strings.Builder
+			for _, fm := range e.Messages {
+				if am, isAssistant := fm.(*ai.AssistantMessage); isAssistant {
+					for _, block := range am.Content {
+						if tb, ok := block.(*ai.TextContentBlock); ok && strings.TrimSpace(tb.Text) != "" {
+							buf.WriteString(tb.Text)
+						}
+					}
+				}
+			}
+			if buf.Len() > 0 {
+				a.db.Create(&database.OpsSessionMessage{
+					SessionID: sid, Seq: msgSeq, Role: "assistant", Text: buf.String(),
+				})
+			}
+			wrote, _ := json.Marshal(map[string]string{"type": "done"})
+			fmt.Fprintf(w, "data: %s\n\n", wrote)
+			flusher.Flush()
+			close(done)
+		}
+	})
+	defer unsub()
+
+	ag.Prompt(r.Context(), msg)
+	<-done
 }
 
 // ---------------- steps ----------------
