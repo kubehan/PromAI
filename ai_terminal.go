@@ -386,14 +386,15 @@ func (a *AiTerminalAPI) handleStream(w http.ResponseWriter, r *http.Request, sid
 			if e.Result != nil {
 				if result, ok := e.Result.(*agent.AgentToolResult); ok && len(result.Content) > 0 {
 					if tc, ok := result.Content[0].(*ai.TextContentBlock); ok {
-					msgSeq++
-					a.db.Create(&database.OpsSessionMessage{
-						SessionID: sid, Seq: msgSeq, Role: "result",
-						Text: tc.Text,
-					})
-					data, _ := json.Marshal(map[string]string{"type": "result", "content": tc.Text, "status": status})
-					fmt.Fprintf(w, "data: %s\n\n", data)
-					flusher.Flush()
+						msgSeq++
+						a.db.Create(&database.OpsSessionMessage{
+							SessionID: sid, Seq: msgSeq, Role: "result",
+							Text: tc.Text,
+						})
+						data, _ := json.Marshal(map[string]string{"type": "result", "content": tc.Text, "status": status})
+						fmt.Fprintf(w, "data: %s\n\n", data)
+						flusher.Flush()
+					}
 				}
 			}
 		case *agent.AgentEventEnd:

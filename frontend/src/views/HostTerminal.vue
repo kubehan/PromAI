@@ -989,7 +989,8 @@ async function sendAi() {
   try {
     const id = await ensureAiSession()
     if (!id) return
-    await runAgent(id, msg, pane)
+    const usedStream = await streamAgent(id, msg, pane)
+    if (!usedStream) await runAgent(id, msg, pane)
   } catch (e: any) {
     pushMsg('system', e.message || 'AI 执行失败')
   } finally {
@@ -997,6 +998,59 @@ async function sendAi() {
     aiThinking.value = false
     aiThinkingText.value = '正在分析…'
     scrollChat()
+  }
+}
+
+async function streamAgent(sessionId: number, message: string, _pane: any): Promise<boolean> {
+  const token = localStorage.getItem('token')
+  if (!token) return false
+  try {
+    const resp = await fetch(`/api/promai/ai-terminal/sessions/${sessionId}/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ message }),
+    })
+    if (!resp.ok || !resp.body) return false
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let streaming = true
+    while (streaming && !aiCancelFlag) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const parts = buffer.split('\n\n')
+      buffer = parts.pop() || ''
+      for (const part of parts) {
+        const line = part.replace(/^data: /, '').trim()
+        if (!line) continue
+        try {
+          const evt = JSON.parse(line)
+          switch (evt.type) {
+            case 'text':
+              pushMsg('assistant', evt.content)
+              break
+            case 'command':
+              pushMsg('command', '', { command: evt.command || 'run_on_host', risk: 'low', status: evt.status || 'running' })
+              break
+            case 'result':
+              pushMsg('result', evt.content, { exitCode: evt.status === 'success' ? 0 : 1 })
+              break
+            case 'done':
+              streaming = false
+              break
+            case 'error':
+              pushMsg('system', evt.content || 'Stream error')
+              streaming = false
+              break
+          }
+        } catch { /* skip malformed */ }
+      }
+    }
+    reader.cancel()
+    return true
+  } catch {
+    return false
   }
 }
 
