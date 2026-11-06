@@ -174,6 +174,10 @@ func (a *AiTerminalAPI) handleSessions(w http.ResponseWriter, r *http.Request, p
 			a.appendMessage(w, r, sid)
 			return
 		}
+		if len(parts) >= 3 && parts[2] == "stream" && r.Method == http.MethodPost {
+			a.handleStream(w, r, sid)
+			return
+		}
 		if len(parts) == 2 && r.Method == http.MethodGet {
 			a.sessionDetail(w, r, sid)
 			return
@@ -978,14 +982,41 @@ func (a *AiTerminalAPI) llmPlan(session database.OpsSession, message string, inc
 
 	history := ""
 	if includeOutput {
-		var steps []database.OpsStep
-		a.db.Where("session_id = ?", session.ID).Order("seq asc").Find(&steps)
-		for _, st := range steps {
-			if history != "" {
-				history += "\n"
+		var messages []database.OpsSessionMessage
+		a.db.Where("session_id = ?", session.ID).Order("seq asc, id asc").Find(&messages)
+		if len(messages) > 0 {
+			for _, m := range messages {
+				if history != "" {
+					history += "\n"
+				}
+				switch m.Role {
+				case "user":
+					history += fmt.Sprintf("用户: %s", m.Text)
+				case "assistant":
+					history += fmt.Sprintf("AI: %s", m.Text)
+				case "command":
+					history += fmt.Sprintf("执行命令[%s] 风险=%s 状态=%s", m.Command, m.Risk, m.Status)
+					if m.Note != "" {
+						history += fmt.Sprintf(" 说明: %s", m.Note)
+					}
+				case "result":
+					history += fmt.Sprintf("命令输出[exit=%d]: %s", m.ExitCode, truncateText(m.Text, 1200))
+				default:
+					if strings.TrimSpace(m.Text) != "" {
+						history += fmt.Sprintf("系统: %s", m.Text)
+					}
+				}
 			}
-			history += fmt.Sprintf("命令[%s] 风险=%s 状态=%s\n输出: %s",
-				st.Command, st.RiskLevel, st.Status, truncateText(st.Output, 800))
+		} else {
+			var steps []database.OpsStep
+			a.db.Where("session_id = ?", session.ID).Order("seq asc").Find(&steps)
+			for _, st := range steps {
+				if history != "" {
+					history += "\n"
+				}
+				history += fmt.Sprintf("命令[%s] 风险=%s 状态=%s\n输出: %s",
+					st.Command, st.RiskLevel, st.Status, truncateText(st.Output, 800))
+			}
 		}
 	}
 
