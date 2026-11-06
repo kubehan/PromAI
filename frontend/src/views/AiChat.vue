@@ -468,7 +468,7 @@ onMounted(() => {
 }
 
 .user .msg-content {
-  text-align: right;
+  text-align: left;
 }
 
 .msg-sender {

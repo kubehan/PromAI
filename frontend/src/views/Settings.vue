@@ -166,6 +166,13 @@
         控制 Web 终端右侧 AI 助手的规划行为。留空则使用内置默认提示词；保存后对新的 AI 请求立即生效。
       </div>
       <el-form :model="form" label-width="160px" style="max-width: 900px;">
+        <el-form-item label="AI 安全级别">
+          <el-radio-group v-model="form.ai_terminal_security_level">
+            <el-radio value="strict" border size="small">严格 — 每轮最多 2 条命令，严格执行审批</el-radio>
+            <el-radio value="standard" border size="small">标准 — 每轮最多 4 条命令，按风险审批</el-radio>
+            <el-radio value="relaxed" border size="small">宽松 — 每轮最多 6 条命令，中危也自动放行</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item label="系统提示词">
           <el-input
             v-model="form.ai_terminal_system_prompt"

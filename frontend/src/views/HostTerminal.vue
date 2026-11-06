@@ -89,8 +89,12 @@
             <div class="ai-header">
               <span><el-icon><Cpu /></el-icon> AI 助手 · {{ activeHost.name }}</span>
               <div class="ai-header-actions">
-                <el-button text size="small" @click="newAiSession">新建会话</el-button>
-                <el-button text size="small" @click="shareAiSession">会话分享</el-button>
+                <el-select v-model="selectedSessionId" size="small" placeholder="历史会话" class="ai-session-select" @change="switchSession">
+                  <el-option v-for="s in sessionList" :key="s.id" :label="(s.title||'会话#'+s.id)+' · '+ (s.created_at||'').slice(0,10)" :value="s.id"/>
+                </el-select>
+                <el-button text size="small" @click="newAiSession">新建</el-button>
+                <el-button text size="small" @click="exportSession">导出</el-button>
+                <el-button text size="small" @click="shareAiSession">分享</el-button>
                 <el-icon class="ai-close" title="关闭" @click="toggleAi"><Close /></el-icon>
               </div>
             </div>
@@ -99,11 +103,16 @@
               <div v-if="!aiMessages.length" class="ai-hint">
                 <el-icon :size="34"><Cpu /></el-icon>
                 <p>描述问题，AI 会分析并自动把放行的命令发送到终端执行，读取结果后继续分析。</p>
-                <p class="ai-hint-sub">低危命令自动执行；中高危命令需确认。</p>
+                <p class="ai-hint-sub">描述问题，AI 会分析并自动把放行的命令发送到终端执行，读取结果后继续分析。</p>
                 <div class="ai-suggests">
-                  <button class="ai-suggest" @click="useSuggestion('先检查系统负载和磁盘占用，再给我结论建议')">资源体检</button>
-                  <button class="ai-suggest" @click="useSuggestion('排查最近 15 分钟错误日志并总结风险')">日志排障</button>
-                  <button class="ai-suggest" @click="useSuggestion('帮我做一次安全检查，只输出需要处理的问题')">安全检查</button>
+                  <button class="ai-suggest" @click="useSuggestion('梳理该机器部署的服务及运行监听的端口，访问方式，占用磁盘大小')">服务梳理</button>
+                  <button class="ai-suggest" @click="useSuggestion('查询磁盘使用情况')">磁盘使用</button>
+                  <button class="ai-suggest" @click="useSuggestion('查询内存和 CPU 负载')">资源负载</button>
+                  <button class="ai-suggest" @click="useSuggestion('查看网络连接和监听端口')">网络端口</button>
+                  <button class="ai-suggest" @click="useSuggestion('查看系统进程列表，按内存排序')">进程列表</button>
+                  <button class="ai-suggest" @click="useSuggestion('查看系统日志最近 20 条关键记录')">系统日志</button>
+                  <button class="ai-suggest" @click="useSuggestion('查看最近登录记录和登录失败记录')">登录审计</button>
+                  <button class="ai-suggest" @click="useSuggestion('查看定时任务列表')">定时任务</button>
                 </div>
               </div>
 
@@ -134,6 +143,14 @@
                       <span class="cmd-status" :class="m.status">{{ cmdStatusText(m.status) }}</span>
                     </div>
                     <div v-if="m.note" class="cmd-note" :class="{ collapsible: isLongText(m.note, 3, 160) && !m.expanded }">{{ m.note }}</div>
+                    <div v-if="m.status === 'failed'" class="cmd-retry">
+                      <template v-if="retryId === m.id">
+                        <el-input v-model="retryCmd" size="small" class="retry-input"/>
+                        <el-button size="small" type="primary" @click="doRetry(m)">执行</el-button>
+                        <el-button size="small" @click="retryId=0">取消</el-button>
+                      </template>
+                      <el-button v-else size="small" type="warning" plain @click="startRetry(m)">编辑并重试</el-button>
+                    </div>
                     <div v-if="m.stepId && m.status === 'pending' && m.risk === 'high'" class="cmd-approve">
                       <el-button size="small" type="primary" @click="approveMsg(m)">批准执行</el-button>
                       <el-button size="small" type="danger" plain @click="rejectMsg(m)">拒绝</el-button>
@@ -170,9 +187,12 @@
 
             <div class="ai-input">
               <div class="ai-quick-actions">
-                <button class="ai-quick" @click="useSuggestion('检查磁盘、内存、负载并总结风险')">资源检查</button>
-                <button class="ai-quick" @click="useSuggestion('排查最近 10 分钟错误日志并给出处置建议')">日志排障</button>
-                <button class="ai-quick" @click="useSuggestion('核对关键服务状态并给出恢复建议')">服务巡检</button>
+                <button class="ai-quick" @click="useSuggestion('查询磁盘使用情况')">磁盘</button>
+                <button class="ai-quick" @click="useSuggestion('查询内存使用情况')">内存</button>
+                <button class="ai-quick" @click="useSuggestion('查询 CPU 负载情况')">CPU</button>
+                <button class="ai-quick" @click="useSuggestion('查看网络连接状态')">网络</button>
+                <button class="ai-quick" @click="useSuggestion('查看系统进程列表')">进程</button>
+                <button class="ai-quick" @click="useSuggestion('查看系统服务和运行状态')">服务</button>
               </div>
               <el-input
                 v-model="aiIntent"
@@ -185,7 +205,10 @@
               />
               <div class="ai-input-actions">
                 <span class="ai-tip">低危自动执行 · 中高危需确认</span>
-                <el-button size="small" type="primary" :loading="aiBusy" :disabled="aiBusy" @click="sendAi">发送</el-button>
+                <div class="ai-input-btns">
+                  <el-button v-if="aiBusy" size="small" type="danger" plain @click="cancelAgent">停止</el-button>
+                  <el-button size="small" type="primary" :loading="aiBusy" :disabled="aiBusy" @click="sendAi">发送</el-button>
+                </div>
               </div>
             </div>
           </aside>
@@ -225,8 +248,12 @@
           <div class="ai-header">
             <span><el-icon><Cpu /></el-icon> AI 助手 · {{ activeHost.name }}</span>
             <div class="ai-header-actions">
-              <el-button text size="small" @click="newAiSession">新建会话</el-button>
-              <el-button text size="small" @click="shareAiSession">会话分享</el-button>
+              <el-select v-model="selectedSessionId" size="small" placeholder="历史会话" class="ai-session-select" @change="switchSession">
+                <el-option v-for="s in sessionList" :key="s.id" :label="(s.title||'会话#'+s.id)+' · '+ (s.created_at||'').slice(0,10)" :value="s.id"/>
+              </el-select>
+              <el-button text size="small" @click="newAiSession">新建</el-button>
+              <el-button text size="small" @click="exportSession">导出</el-button>
+              <el-button text size="small" @click="shareAiSession">分享</el-button>
               <el-icon class="ai-close" title="关闭" @click="toggleAi"><Close /></el-icon>
             </div>
           </div>
@@ -235,7 +262,7 @@
             <div v-if="!aiMessages.length" class="ai-hint">
               <el-icon :size="34"><Cpu /></el-icon>
               <p>描述问题，AI 会分析并自动把放行的命令发送到终端执行，读取结果后继续分析。</p>
-              <p class="ai-hint-sub">低危命令自动执行；中高危命令需确认。</p>
+              <p class="ai-hint-sub">描述问题，AI 会分析并自动把放行的命令发送到终端执行，读取结果后继续分析。</p>
               <div class="ai-suggests">
                 <button class="ai-suggest" @click="useSuggestion('先检查系统负载和磁盘占用，再给我结论建议')">资源体检</button>
                 <button class="ai-suggest" @click="useSuggestion('排查最近 15 分钟错误日志并总结风险')">日志排障</button>
@@ -270,6 +297,14 @@
                     <span class="cmd-status" :class="m.status">{{ cmdStatusText(m.status) }}</span>
                   </div>
                   <div v-if="m.note" class="cmd-note" :class="{ collapsible: isLongText(m.note, 3, 160) && !m.expanded }">{{ m.note }}</div>
+                  <div v-if="m.status === 'failed'" class="cmd-retry">
+                    <template v-if="retryId === m.id">
+                      <el-input v-model="retryCmd" size="small" class="retry-input"/>
+                      <el-button size="small" type="primary" @click="doRetry(m)">执行</el-button>
+                      <el-button size="small" @click="retryId=0">取消</el-button>
+                    </template>
+                    <el-button v-else size="small" type="warning" plain @click="startRetry(m)">编辑并重试</el-button>
+                  </div>
                   <div v-if="m.stepId && m.status === 'pending' && m.risk === 'high'" class="cmd-approve">
                     <el-button size="small" type="primary" @click="approveMsg(m)">批准执行</el-button>
                     <el-button size="small" type="danger" plain @click="rejectMsg(m)">拒绝</el-button>
@@ -316,7 +351,10 @@
             />
             <div class="ai-input-actions">
               <span class="ai-tip">低危自动执行 · 中高危需确认</span>
-              <el-button size="small" type="primary" :loading="aiBusy" :disabled="aiBusy" @click="sendAi">发送</el-button>
+              <div class="ai-input-btns">
+                <el-button v-if="aiBusy" size="small" type="danger" plain @click="cancelAgent">停止</el-button>
+                <el-button size="small" type="primary" :loading="aiBusy" :disabled="aiBusy" @click="sendAi">发送</el-button>
+              </div>
             </div>
           </div>
         </aside>
@@ -437,7 +475,7 @@ import {
   getHosts, createAiSession, listAiSessions, getAiSession,
   planAiSteps, nextAiSteps, approveAiStep, recordAiStep, rejectAiStep, createAiSessionShare, appendAiSessionMessage,
 } from '../api'
-import type { Host, OpsStep } from '../types'
+import type { Host, OpsStep, OpsSession } from '../types'
 
 defineOptions({ name: 'HostTerminal' })
 
@@ -476,6 +514,12 @@ const aiOpen = ref(localStorage.getItem('terminal-ai-open') === '1')
 const aiOnLeft = ref(localStorage.getItem('terminal-ai-left') === '1')
 const aiBusy = ref(false)
 const aiThinking = ref(false)
+let aiCancelFlag = false
+const sessionList = ref<OpsSession[]>([])
+const selectedSessionId = ref<number | null>(null)
+const retryId = ref(0)
+const retryCmd = ref('')
+const defaultTitle = document.title
 const aiThinkingText = ref('正在分析…')
 const aiIntent = ref('')
 const aiSessionId = ref<number | null>(null)
@@ -650,6 +694,90 @@ async function shareAiSession() {
   shareDialogVisible.value = true
 }
 
+async function refreshSessionList(hostId: number) {
+  try {
+    const { data } = await listAiSessions()
+    sessionList.value = (data.items || []).filter(x => x.host_id === hostId)
+  } catch { /* ignore */ }
+}
+
+async function switchSession(id: number) {
+  if (!id) return
+  aiCancelFlag = true
+  clearApprovals()
+  aiSessionId.value = id
+  aiHostId = activeHost.value?.id || null
+  aiMessages.value = []
+  try {
+    const { data } = await getAiSession(id)
+    if (data.messages?.length) {
+      restoringMessages.value = true
+      try {
+        for (const m of data.messages) {
+          const msg = pushMsg(m.role as any, m.text || '', {
+            command: m.command, risk: m.risk, status: m.status,
+            exitCode: m.exit_code, note: m.note, stepId: m.step_id,
+          })
+          if (m.step_id) stepMsgIds.set(m.step_id, msg.id)
+          if (m.status === 'pending' && m.step_id) {
+            const st = { id: m.step_id, command: m.command || '', risk_level: m.risk || 'medium', purpose: m.note || '', seq: 0, status: 'pending', session_id: 0 } as OpsStep
+            if (!pendingApprovals.value.some(x => x.id === st.id)) pendingApprovals.value.push(st)
+            stepCache.set(st.id, st)
+          }
+        }
+      } finally { restoringMessages.value = false }
+      return
+    }
+    for (const st of data.steps || []) {
+      if (st.status === 'pending' || st.status === 'approved') {
+        pendingApprovals.value.push(st)
+        ensureStepMsg(st, 'pending')
+        continue
+      }
+      recordHistory(st, st.status, st.auto_approved, st.output || st.error, st.exit_code)
+      ensureStepMsg(st, st.status === 'failed' ? 'failed' : st.status === 'rejected' ? 'rejected' : 'success')
+      if (st.output || st.error) pushMsg('result', st.output || st.error || '', { exitCode: st.exit_code ?? 0 })
+    }
+  } catch { /* ignore */ }
+}
+
+async function exportSession() {
+  if (!aiSessionId.value) { ElMessage.warning('当前没有会话'); return }
+  try {
+    const { data } = await getAiSession(aiSessionId.value)
+    const lines: string[] = []
+    lines.push('# ' + (data.session.title || 'AI 运维会话'))
+    lines.push('')
+    lines.push('- 会话ID: ' + data.session.id)
+    lines.push('- 主机: ' + data.host_name)
+    lines.push('- 时间: ' + data.session.created_at)
+    lines.push('')
+    if (data.messages?.length) {
+      for (const m of data.messages) {
+        if (m.role === 'user') lines.push('### 用户\n\n' + m.text + '\n')
+        else if (m.role === 'assistant') lines.push('### AI 分析\n\n' + m.text + '\n')
+        else if (m.role === 'command') lines.push('### 命令\n- ' + (m.command||m.text) + '\n- 风险: ' + m.risk + ' 状态: ' + m.status + '\n')
+        else if (m.role === 'result') lines.push('### 执行结果\n- exit: ' + m.exit_code + '\n\n```\n' + m.text + '\n```\n')
+        else lines.push('### ' + m.role + '\n\n' + m.text + '\n')
+      }
+    } else {
+      for (const st of data.steps || []) {
+        lines.push('### 步骤 ' + st.seq)
+        lines.push('- 命令: `' + st.command + '`')
+        lines.push('- 风险: ' + st.risk_level + '  状态: ' + st.status)
+        if (st.output) lines.push('\n```\n' + st.output + '\n```')
+        lines.push('')
+      }
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'session-' + data.session.id + '-' + data.host_name + '.md'; a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('已下载会话报告')
+  } catch (e: any) { ElMessage.error(e.message || '导出失败') }
+}
+
 async function submitShare() {
   const host = activeHost.value
   if (!host?.id) {
@@ -793,6 +921,8 @@ async function loadAiForHost(hostId: number) {
     const s = (data.items || []).find(x => x.host_id === hostId)
     if (!s) return
     aiSessionId.value = s.id
+    selectedSessionId.value = s.id
+    await refreshSessionList(hostId)
     const { data: d } = await getAiSession(s.id)
     if (d.messages?.length) {
       restoringMessages.value = true
@@ -854,6 +984,7 @@ async function sendAi() {
   }
   aiIntent.value = ''
   pushMsg('user', msg)
+  aiCancelFlag = false
   aiBusy.value = true
   try {
     const id = await ensureAiSession()
@@ -874,10 +1005,12 @@ async function runAgent(sessionId: number, firstMessage: string, pane: any) {
   let useNext = false
   let rounds = 0
   let touchedFlow = false
+  const MAX_ROUNDS = 50
   const historyStart = approvalHistory.value.length
   const pendingStart = pendingApprovals.value.length
 
-  while (rounds < 6) {
+  while (rounds < MAX_ROUNDS) {
+    if (aiCancelFlag) { pushMsg('system', '已停止'); break }
     rounds += 1
     aiThinking.value = true
     aiThinkingText.value = rounds === 1 ? '正在分析问题…' : '正在读取结果并继续分析…'
@@ -934,6 +1067,8 @@ async function runAgent(sessionId: number, firstMessage: string, pane: any) {
     requestFinalConclusion()
   }
 }
+
+function cancelAgent() { aiCancelFlag = true; aiBusy.value = false; aiThinking.value = false; pushMsg("system","用户停止了自动化运维") }
 
 function requestFinalConclusion() {
   const hasPending = pendingApprovals.value.length > 0
@@ -1079,6 +1214,21 @@ async function runStandalone(st: OpsStep, approve: boolean) {
   } catch (e: any) {
     ElMessage.error(e.message || '执行失败')
   }
+}
+
+function startRetry(m: ChatMsg) { retryId.value = m.id; retryCmd.value = m.command || '' }
+async function doRetry(m: ChatMsg) {
+  const pane = activePane()
+  if (!pane) { ElMessage.warning('终端未连接'); return }
+  const cmd = retryCmd.value.trim() || m.command || ''
+  retryId.value = 0
+  const cmdMsg = pushMsg('command', '', { command: cmd, risk: m.risk, status: 'running', note: '手动重试' })
+  let output = '', exitCode = 0
+  try { const r = await pane.execCommand(cmd, 120000); output = r.output; exitCode = r.exitCode }
+  catch (e: any) { output = e.message || '执行失败'; exitCode = -1 }
+  const ok = exitCode === 0
+  updateMsg(cmdMsg.id, { status: ok ? 'success' : 'failed' })
+  pushMsg('result', output, { exitCode })
 }
 
 function riskType(r?: string) {
@@ -1296,6 +1446,16 @@ watch(
     if (route.path === '/terminal') void openRouteSession()
   },
 )
+
+watch(pendingApprovals, (list) => {
+  if (list.length === 0) { document.title = defaultTitle; return }
+  document.title = '[' + list.length + ' 条待审批] ' + defaultTitle
+})
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && pendingApprovals.value.length) {
+    document.title = '[' + pendingApprovals.value.length + ' 条待审批] ' + defaultTitle
+  }
+})
 
 onMounted(async () => {
   document.addEventListener('fullscreenchange', handleFullscreenChange)
@@ -1566,6 +1726,14 @@ onActivated(async () => {
 .ai-input-actions { display: flex; align-items: center; justify-content: space-between; }
 .ai-tip { font-size: 11px; color: #93c5fd; opacity: .9; }
 .is-loading { animation: spin 1s linear infinite; }
+
+.ai-session-select { width: 110px; }
+.ai-session-select :deep(.el-input__wrapper) { background: rgba(30,41,59,.7); border-color: rgba(96,165,250,.22); box-shadow: none; }
+.ai-session-select :deep(.el-input__inner) { color: #bfdbfe; font-size: 11px; }
+.ai-input-btns { display: flex; gap: 6px; align-items: center; }
+.cmd-retry { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+.retry-input { flex: 1; }
+.retry-input :deep(.el-input__wrapper) { background: rgba(15,23,42,.9); padding: 2px 6px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 :deep(.share-dialog .el-dialog) {

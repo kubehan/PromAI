@@ -80,7 +80,21 @@ func (a *AiTerminalAPI) handle(w http.ResponseWriter, r *http.Request) {
 const promptSystemKey = "ai_terminal_system_prompt"
 const promptContinueKey = "ai_terminal_continue_prompt"
 
-const defaultTerminalSystemPrompt = `你是运维命令助手，正在通过一个真实终端执行用户明确下达的任务。你必须只输出一个 JSON 对象，不要输出任何解释或 Markdown。JSON 结构为 {"analysis":"对当前问题/上一步结果的简要分析","steps":[{"command":"...","purpose":"...","risk":"low|medium|high"}],"done":false}。risk=low 只读查询；medium 写入或服务操作；high 破坏性/危险操作（如 rm -rf、mkfs、kill -9、dd、shutdown）。最重要的规则：只执行完成用户请求所必需的最少命令，通常一轮只给 1 条，最多 2 条；严禁执行与用户请求无关的系统检查、资源统计、性能测试、联网探测等命令（例如 free/top/df/curl/ping 等），除非用户明确要求。如果用户已明确指定要做的操作（例如删除某个压缩包），直接给出对应命令，不要做额外的环境摸底或排障发散；只有当目标不明确、确实缺少必要信息时，才允许先用一次最小范围的只读查询定位（例如 ls/find 目标目录），并在 analysis 中说明原因。每个命令的 purpose 必须直接对应用户请求。命令会在交互式终端真实执行，结果回传给你，请勿臆造输出。任务完成或无需再执行命令时，返回 done=true 且 steps 为空数组，并在 analysis 中给出结论。禁止输出 SSH/登录类命令，只给出在目标主机上执行的原始命令，命令尽量单行。`
+const defaultTerminalSystemPrompt = `你是运维命令助手，正在通过一个真实终端辅助用户。你必须先判断用户请求类型再决定输出格式：
+
+① 纯问答/咨询/解释类（不需要执行命令）：直接在 analysis 中给出答案，steps 为空数组，done=true。
+
+② 需要执行命令的任务：只输出一个 JSON 对象。JSON 结构为 {"analysis":"对当前问题的简要分析","steps":[{"command":"...","purpose":"...","risk":"low|medium|high"}],"done":false}。risk=low 只读查询（ps、ss、lsof、du、df、ls、cat、head、grep、netstat、systemctl status/list-units、journalctl 等只读命令）；medium 写入或服务操作；high 破坏性/危险操作（如 rm -rf、mkfs、kill -9、dd、shutdown）。
+
+命令数量：由你根据任务复杂度自行判断，不做硬限制。每个命令必须有明确的必要性，对应的 purpose 必须说明该命令在用户请求中的作用。严禁执行与用户请求无关的系统检查、资源统计、性能测试、联网探测等命令，除非用户明确要求
+
+其他规则：
+- 如果用户已明确指定要做的操作（例如删除某个压缩包），直接给出对应命令，不要做额外发散
+- 只有当目标不明确、确实缺少必要信息时，才允许先用一次最小范围的只读查询定位，并在 analysis 中说明原因
+- 每个命令的 purpose 必须直接对应用户请求
+- 命令会在交互式终端真实执行，结果回传给你，请勿臆造输出
+- 任务完成或无需再执行命令时，返回 done=true 且 steps 为空数组，并在 analysis 中给出结论与建议
+- 禁止 SSH/登录类命令，只给出在目标主机上执行的原始命令，命令尽量单行`
 
 const defaultTerminalContinuePrompt = `请根据以上执行结果继续。若用户请求已完成，请设置 done=true 并在 analysis 中说明结论；否则只给出完成该请求所必需的下一步命令，不要做无关的额外检查。`
 
@@ -948,6 +962,20 @@ func (a *AiTerminalAPI) llmPlan(session database.OpsSession, message string, inc
 			host.Name, host.Address, host.Port, host.Username, host.Env, host.HostKey)
 	}
 
+	if !includeOutput {
+		var stepCount int64
+		a.db.Model(&database.OpsStep{}).Where("session_id = ?", session.ID).Count(&stepCount)
+		if stepCount == 0 {
+			target, err := a.host.targetFor(&host)
+			if err == nil {
+				osInfo, _, probeErr := terminal.RunCommand(target, "uname -a && cat /etc/os-release 2>/dev/null | head -5", 8*time.Second)
+				if probeErr == nil && strings.TrimSpace(osInfo) != "" {
+					hostCtx += "\n目标主机系统信息：" + strings.TrimSpace(osInfo)
+				}
+			}
+		}
+	}
+
 	history := ""
 	if includeOutput {
 		var steps []database.OpsStep
@@ -1146,7 +1174,9 @@ func errString(err error) string {
 // ---------------- 风险分级 ----------------
 
 var riskHighPrefixes = []string{"rm -rf", "mkfs", "kill -9", "dd ", ">/dev/s", "shutdown", "reboot", "fdisk", "drop table", "delete from", "drop database", "flush"}
-var riskMediumPrefixes = []string{"mkdir", "touch", "echo", "systemctl", "service ", "mv ", "cp ", "chmod", "chown", "iptables", "kill "}
+var riskMediumPrefixes = []string{"mkdir", "touch", "echo", "mv ", "cp ", "chmod", "chown", "iptables", "kill "}
+
+var riskMediumSystemctl = []string{"start ", "stop ", "restart ", "reload ", "enable ", "disable ", "mask ", "unmask "}
 
 func riskLevelFor(command string) string {
 	cmd := strings.TrimSpace(strings.ToLower(command))
@@ -1154,6 +1184,18 @@ func riskLevelFor(command string) string {
 		if strings.HasPrefix(cmd, p) {
 			return "high"
 		}
+	}
+	if strings.HasPrefix(cmd, "systemctl ") {
+		sub := strings.TrimPrefix(cmd, "systemctl ")
+		for _, p := range riskMediumSystemctl {
+			if strings.HasPrefix(sub, p) {
+				return "medium"
+			}
+		}
+		return "low"
+	}
+	if strings.HasPrefix(cmd, "service ") {
+		return "medium"
 	}
 	for _, p := range riskMediumPrefixes {
 		if strings.HasPrefix(cmd, p) {
