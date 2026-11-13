@@ -304,11 +304,9 @@ func (a *AiTerminalAPI) appendMessage(w http.ResponseWriter, r *http.Request, si
 		writeError(w, 404, "会话不存在")
 		return
 	}
-	var maxSeq int
-	a.db.Model(&database.OpsSessionMessage{}).Where("session_id = ?", sid).Select("COALESCE(MAX(seq),0)").Scan(&maxSeq)
 	msg := database.OpsSessionMessage{
 		SessionID: sid,
-		Seq:       maxSeq + 1,
+		Seq:       a.nextSeq(sid),
 		Role:      strings.TrimSpace(req.Role),
 		Text:      req.Text,
 		Command:   req.Command,
@@ -384,9 +382,7 @@ func (a *AiTerminalAPI) handleStream(w http.ResponseWriter, r *http.Request, sid
 		return
 	}
 
-	var msgSeq int
-	a.db.Model(&database.OpsSessionMessage{}).Where("session_id = ?", sid).Select("COALESCE(MAX(seq),0)").Scan(&msgSeq)
-	msgSeq++
+	msgSeq := a.nextSeq(sid)
 	a.db.Create(&database.OpsSessionMessage{
 		SessionID: sid, Seq: msgSeq, Role: "user", Text: msg,
 	})

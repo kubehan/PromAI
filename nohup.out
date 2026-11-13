@@ -1,555 +1,1552 @@
-2026/11/13 17:21:31 使用配置文件中的 Prometheus URL: http://prometheus-k8s.monitoring.svc.cluster.local:9090
-2026/11/13 17:21:31 数据库初始化成功: promai.db (WAL on)
-2026/11/13 17:21:31 配置数据已同步到数据库
-2026/11/13 17:21:31 已加载 2 个数据源的最新巡检快照
-2026/11/13 17:21:31 [AI Agent] 已启动，监听 127.0.0.1:4096
-2026/11/13 17:21:31   前端构建产物已加载 (frontend/dist)
-2026/11/13 17:21:31 [AdminAPI] Skills 路由已注册: manifest/stats/skills/skills/
-2026/11/13 17:21:31 [AdminAPI] 管理接口已注册
-2026/11/13 17:21:31 [Host] 主机管理与 Web 终端接口已注册
-2026/11/13 17:21:31 [Embed] 嵌入式页面接口已注册
-2026/11/13 17:21:31 [AiTerminal] 自动化运维智能终端接口已注册
-2026/11/13 17:21:31 [PiAgent] 已加载 11 个 Skill 指令包
-2026/11/13 17:21:31 [PiAgent] AI Agent 路由已注册 (1 个模型配置)
-2026/11/13 17:21:31 [Cron] 已调度配置文件任务: 00 08,17 * * *
-2026/11/13 17:21:31 [Cron] 定时调度器已启动
-2026/11/13 17:21:31 [Alerting] state: recovered 8 active alert instances from DB
-2026/11/13 17:21:31 [Alerting] dispatcher: 重置 1 个分组的 next_notify_at 为当前时间
-2026/11/13 17:21:31 [Alerting] dispatcher 已启动 (buffer=8192)
-2026/11/13 17:21:31 [Alerting] evaluator 已启动 (workers=256, base_interval=15s, per-ds=4, adaptive=true)
-2026/11/13 17:21:31 [Alerting] 子系统启动成功
-2026/11/13 17:21:31 报告清理定时任务已启动，执行周期: 0 0 * * *
-2026/11/13 17:21:31 ==========================================
-2026/11/13 17:21:31 [Alerting] 规则 runner #6 已启动 (interval=15s, severity=critical)
-2026/11/13 17:21:31 PromAI 系统监控平台启动成功！
-2026/11/13 17:21:31 [Alerting] 规则 runner #7 已启动 (interval=15s, severity=critical)
-2026/11/13 17:21:31 ==========================================
-2026/11/13 17:21:31 [Alerting] 规则 runner #9 已启动 (interval=15s, severity=critical)
-2026/11/13 17:21:31 [Alerting] 规则 runner #70 已启动 (interval=15s, severity=critical)
-2026/11/13 17:21:31 [Alerting] 规则 runner #72 已启动 (interval=15s, severity=warning)
-2026/11/13 17:21:31 [Alerting] 规则 runner #73 已启动 (interval=15s, severity=warning)
-2026/11/13 17:21:31 [Alerting] 规则 runner #74 已启动 (interval=15s, severity=warning)
-2026/11/13 17:21:31 [Alerting] 规则 runner #5 已启动 (interval=15s, severity=critical)
-2026/11/13 17:21:31 [Alerting] 规则 runner #8 已启动 (interval=15s, severity=critical)
-2026/11/13 17:21:31 服务端口: :8091
-2026/11/13 17:21:31 [Alerting] 规则 runner #68 已启动 (interval=15s, severity=critical)
-2026/11/13 17:21:31 [Alerting] 规则 runner #69 已启动 (interval=15s, severity=warning)
-2026/11/13 17:21:31 [Alerting] 规则 runner #71 已启动 (interval=15s, severity=critical)
-2026/11/13 17:21:31 
-2026/11/13 17:21:31 访问地址:
-2026/11/13 17:21:31   首页: http://localhost:8091/api/promai
-2026/11/13 17:21:31   管理后台: http://localhost:8091/api/promai/admin
-2026/11/13 17:21:31   巡检进度: http://localhost:8091/api/promai/progress
-2026/11/13 17:21:31   历史报告: http://localhost:8091/api/promai/reports/history
-2026/11/13 17:21:31 
-2026/11/13 17:21:31 API接口:
-2026/11/13 17:21:31   生成报告: GET http://localhost:8091/api/promai/getreport
-2026/11/13 17:21:31   报告列表: GET http://localhost:8091/api/promai/reports/list
-2026/11/13 17:21:31   状态页面: GET http://localhost:8091/api/promai/status
-2026/11/13 17:21:31   静态文件: http://localhost:8091/api/promai/reports/
-2026/11/13 17:21:31 
-2026/11/13 17:21:31 数据源配置:
-2026/11/13 17:21:31   默认数据源: http://prometheus-k8s.monitoring.svc.cluster.local:9090
-2026/11/13 17:21:31   额外数据源:
-2026/11/13 17:21:31     - cluster1: http://prometheus.k8s.monitoring.kubehan.cn
-2026/11/13 17:21:31     - cluster2: http://prometheus.monitoring.kubehan.cn
-2026/11/13 17:21:31     - test-cluster: http://prometheus.monitoring.kubehan.cn
-2026/11/13 17:21:31 
-2026/11/13 17:21:31 定时任务:
-2026/11/13 17:21:31   巡检任务: 00 08,17 * * *
-2026/11/13 17:21:31   报告清理: 0 0 * * *
-2026/11/13 17:21:31 
-2026/11/13 17:21:31 通知配置:
-2026/11/13 17:21:31   企业微信: 已启用
-2026/11/13 17:21:31 ==========================================
-2026/11/13 17:21:31 服务器正在运行...
-2026/11/13 17:21:32 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:32 [Notify] ▶ group=cffe1f32 rule=5 instances=8 route=1 开始派发
-2026/11/13 17:21:32 [Notify] · group=cffe1f32 rule=5 候选通道: route=[3] rule=[] 合并=[3]
-2026/11/13 17:21:32 [Notify] · group=cffe1f32 rule=5 启用通道: [wechat_work/#3]
-2026/11/13 17:21:32 [Notify] · group=cffe1f32 rule=5 限流窗口=4h0m0s
+2026/11/13 17:35:39 使用配置文件中的 Prometheus URL: http://prometheus-k8s.monitoring.svc.cluster.local:9090
+2026/11/13 17:35:39 数据库初始化成功: promai.db (WAL on)
+2026/11/13 17:35:39 配置数据已同步到数据库
+2026/11/13 17:35:39 已加载 2 个数据源的最新巡检快照
+2026/11/13 17:35:39 [AI Agent] 已启动，监听 127.0.0.1:4096
+2026/11/13 17:35:39   前端构建产物已加载 (frontend/dist)
+2026/11/13 17:35:39 [AdminAPI] Skills 路由已注册: manifest/stats/skills/skills/
+2026/11/13 17:35:39 [AdminAPI] 管理接口已注册
+2026/11/13 17:35:39 [Host] 主机管理与 Web 终端接口已注册
+2026/11/13 17:35:39 [Embed] 嵌入式页面接口已注册
+2026/11/13 17:35:39 [AiTerminal] 自动化运维智能终端接口已注册
+2026/11/13 17:35:39 [PiAgent] 已加载 11 个 Skill 指令包
+2026/11/13 17:35:39 [PiAgent] AI Agent 路由已注册 (1 个模型配置)
+2026/11/13 17:35:39 [Cron] 已调度配置文件任务: 00 08,17 * * *
+2026/11/13 17:35:39 [Cron] 定时调度器已启动
+2026/11/13 17:35:39 [Alerting] state: recovered 8 active alert instances from DB
+2026/11/13 17:35:39 [Alerting] dispatcher: 重置 1 个分组的 next_notify_at 为当前时间
+2026/11/13 17:35:39 [Alerting] dispatcher 已启动 (buffer=8192)
+2026/11/13 17:35:39 [Alerting] evaluator 已启动 (workers=256, base_interval=15s, per-ds=4, adaptive=true)
+2026/11/13 17:35:39 [Alerting] 子系统启动成功
+2026/11/13 17:35:39 [Alerting] 规则 runner #6 已启动 (interval=15s, severity=critical)
+2026/11/13 17:35:39 [Alerting] 规则 runner #7 已启动 (interval=15s, severity=critical)
+2026/11/13 17:35:39 [Alerting] 规则 runner #68 已启动 (interval=15s, severity=critical)
+2026/11/13 17:35:39 [Alerting] 规则 runner #69 已启动 (interval=15s, severity=warning)
+2026/11/13 17:35:39 [Alerting] 规则 runner #71 已启动 (interval=15s, severity=critical)
+2026/11/13 17:35:39 [Alerting] 规则 runner #72 已启动 (interval=15s, severity=warning)
+2026/11/13 17:35:39 [Alerting] 规则 runner #5 已启动 (interval=15s, severity=critical)
+2026/11/13 17:35:39 [Alerting] 规则 runner #8 已启动 (interval=15s, severity=critical)
+2026/11/13 17:35:39 [Alerting] 规则 runner #9 已启动 (interval=15s, severity=critical)
+2026/11/13 17:35:39 [Alerting] 规则 runner #70 已启动 (interval=15s, severity=critical)
+2026/11/13 17:35:39 [Alerting] 规则 runner #73 已启动 (interval=15s, severity=warning)
+2026/11/13 17:35:39 [Alerting] 规则 runner #74 已启动 (interval=15s, severity=warning)
+2026/11/13 17:35:39 报告清理定时任务已启动，执行周期: 0 0 * * *
+2026/11/13 17:35:39 ==========================================
+2026/11/13 17:35:39 PromAI 系统监控平台启动成功！
+2026/11/13 17:35:39 ==========================================
+2026/11/13 17:35:39 服务端口: :8091
+2026/11/13 17:35:39 
+2026/11/13 17:35:39 访问地址:
+2026/11/13 17:35:39   首页: http://localhost:8091/api/promai
+2026/11/13 17:35:39   管理后台: http://localhost:8091/api/promai/admin
+2026/11/13 17:35:39   巡检进度: http://localhost:8091/api/promai/progress
+2026/11/13 17:35:39   历史报告: http://localhost:8091/api/promai/reports/history
+2026/11/13 17:35:39 
+2026/11/13 17:35:39 API接口:
+2026/11/13 17:35:39   生成报告: GET http://localhost:8091/api/promai/getreport
+2026/11/13 17:35:39   报告列表: GET http://localhost:8091/api/promai/reports/list
+2026/11/13 17:35:39   状态页面: GET http://localhost:8091/api/promai/status
+2026/11/13 17:35:39   静态文件: http://localhost:8091/api/promai/reports/
+2026/11/13 17:35:39 
+2026/11/13 17:35:39 数据源配置:
+2026/11/13 17:35:39   默认数据源: http://prometheus-k8s.monitoring.svc.cluster.local:9090
+2026/11/13 17:35:39   额外数据源:
+2026/11/13 17:35:39     - cluster1: http://prometheus.k8s.monitoring.kubehan.cn
+2026/11/13 17:35:39     - cluster2: http://prometheus.monitoring.kubehan.cn
+2026/11/13 17:35:39     - test-cluster: http://prometheus.monitoring.kubehan.cn
+2026/11/13 17:35:39 
+2026/11/13 17:35:39 定时任务:
+2026/11/13 17:35:39   巡检任务: 00 08,17 * * *
+2026/11/13 17:35:39   报告清理: 0 0 * * *
+2026/11/13 17:35:39 
+2026/11/13 17:35:39 通知配置:
+2026/11/13 17:35:39   企业微信: 已启用
+2026/11/13 17:35:39 ==========================================
+2026/11/13 17:35:39 服务器正在运行...
 [opencode:stdout] Warning: OPENCODE_SERVER_PASSWORD is not set; server is unsecured.
-2026/11/13 17:21:32 [Notify] · group=cffe1f32 rule=5 channel=wechat_work/#3 渲染(模板style=simple): md=3010B
+2026/11/13 17:35:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:40 [Notify] ▶ group=cffe1f32 rule=5 instances=8 route=1 开始派发
+2026/11/13 17:35:40 [Notify] · group=cffe1f32 rule=5 候选通道: route=[3] rule=[] 合并=[3]
+2026/11/13 17:35:40 [Notify] · group=cffe1f32 rule=5 启用通道: [wechat_work/#3]
+2026/11/13 17:35:40 [Notify] · group=cffe1f32 rule=5 限流窗口=4h0m0s
+2026/11/13 17:35:40 [Notify] · group=cffe1f32 rule=5 channel=wechat_work/#3 渲染(模板style=simple): md=3010B
 [opencode:stderr] [91m[1mError: [0mUnexpected error
 [opencode:stderr] 
 [opencode:stderr] ServeError
-2026/11/13 17:21:33 [Notify] ✓ group=cffe1f32 rule=5 channel=wechat_work/#3 发送成功(323ms)
-2026/11/13 17:21:33 [Notify] ◼ group=cffe1f32 rule=5 完成: 成功=1 失败=0 限流=0 耗时=358ms
-2026/11/13 17:21:33 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:34 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:35 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:35 [API] GET /api/promai/embed 200 5ms
-2026/11/13 17:21:35 [API] GET /api/promai/alert/stats 200 22ms
-2026/11/13 17:21:36 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:37 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:38 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:39 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:40 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:41 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:42 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:43 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:44 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:45 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:46 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:47 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:48 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:49 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:50 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:51 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:52 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:53 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:54 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:55 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:56 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:57 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:58 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:21:59 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:00 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:01 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:01 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:22:02 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:03 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:04 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:05 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:06 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:07 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:08 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:09 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:10 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:11 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:12 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:13 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:14 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:15 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:16 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:17 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:18 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:19 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:20 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:21 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:22 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:23 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:24 [Auth] Token 缺失: GET /api/promai/alert/stats
-2026/11/13 17:22:24 [API] GET /api/promai/alert/stats 401 1ms
-2026/11/13 17:22:24 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:25 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:25 [Auth] 登录成功: admin
-2026/11/13 17:22:25 [API] POST /api/promai/auth/login 200 6ms
-2026/11/13 17:22:25 [API] GET /api/promai/cronjobs 200 10ms
-2026/11/13 17:22:25 [API] GET /api/promai/alert/evaluator/status 200 7ms
-2026/11/13 17:22:25 [API] GET /api/promai/datasources/all 200 35ms
-2026/11/13 17:22:26 [API] GET /api/promai/notifications/all 200 129ms
-2026/11/13 17:22:26 [API] GET /api/promai/alert/stats 200 139ms
-2026/11/13 17:22:26 [API] GET /api/promai/report-records 200 197ms
-2026/11/13 17:22:26 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:27 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:28 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:29 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:30 [API] GET /api/promai/hosts 200 14ms
-2026/11/13 17:22:30 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:31 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:22:31 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:32 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:33 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:34 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:35 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:36 [API] GET /api/promai/embed 200 4ms
-2026/11/13 17:22:36 [API] GET /api/promai/alert/stats 200 18ms
-2026/11/13 17:22:36 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:37 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:38 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:39 [API] GET /api/promai/embed 200 2ms
-2026/11/13 17:22:39 [API] GET /api/promai/alert/stats 200 21ms
-2026/11/13 17:22:39 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:40 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:41 [API] GET /api/promai/ai-terminal/sessions 200 7ms
-2026/11/13 17:22:41 [API] GET /api/promai/ai-terminal/sessions 200 2ms
-2026/11/13 17:22:41 [API] GET /api/promai/ai-terminal/sessions/36 200 3ms
-2026/11/13 17:22:41 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:42 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:43 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:44 [Dispatch] 本轮到期分组 1 个
-
-2026/11/13 17:22:44 [31;1m/Users/hanwei/GolandProjects/PromAI/ai_terminal.go:132 [35;1mrecord not found
-[0m[33m[0.403ms] [34;1m[rows:0][0m SELECT * FROM `app_settings` WHERE key = "ai_terminal_system_prompt" ORDER BY `app_settings`.`id` LIMIT 1
-2026/11/13 17:22:44 [API] POST /api/promai/ai-terminal/sessions/36/messages 200 12ms
-2026/11/13 17:22:44 [DEBUG] buildRequest URL: http://192.168.10.142:38009/v1/chat/completions
-2026/11/13 17:22:44 [DEBUG] buildRequest Body: {"messages":[{"content":"你是运维命令助手，正在通过一个真实终端辅助用户。你必须先判断用户请求类型再决定输出格式：\n\n① 纯问答/咨询/解释类（不需要执行命令）：直接在 analysis 中给出答案，steps 为空数组，done=true。\n\n② 需要执行命令的任务：只输出一个 JSON 对象。JSON 结构为 {\"analysis\":\"对当前问题的简要分析\",\"steps\":[{\"command\":\"...\",\"purpose\":\"...\",\"risk\":\"low|medium|high\"}],\"done\":false}。risk=low 只读查询（ps、ss、lsof、du、df、ls、cat、head、grep、netstat、systemctl status/list-units、journalctl 等只读命令）；medium 写入或服务操作；high 破坏性/危险操作（如 rm -rf、mkfs、kill -9、dd、shutdown）。\n\n命令数量：由你根据任务复杂度自行判断，不做硬限制。每个命令必须有明确的必要性，对应的 purpose 必须说明该命令在用户请求中的作用。严禁执行与用户请求无关的系统检查、资源统计、性能测试、联网探测等命令，除非用户明确要求\n\n其他规则：\n- 如果用户已明确指定要做的操作（例如删除某个压缩包），直接给出对应命令，不要做额外发散\n- 只有当目标不明确、确实缺少必要信息时，才允许先用一次最小范围的只读查询定位，并在 analysis 中说明原因\n- 每个命令的 purpose 必须直接对应用户请求\n- 命令会在交互式终端真实执行，结果回传给你，请勿臆造输出\n- 任务完成或无需再执行命令时，返回 done=true 且 steps 为空数组，并在 analysis 中给出结论与建议\n- 禁止 SSH/登录类命令，只给出在目标主机上执行的原始命令，命令尽量单行","role":"system"},{"content":[{"text":"只执行 whoami，不要执行其他命令","type":"text"}],"role":"user"}],"model":"Qwen3.5-397B","stream":true,"tools":[{"function":{"description":"在目标主机上执行单个 Shell 命令并返回输出。用于排查问题、检查状态、执行运维操作。安全命令（ps/ls/df/du/cat/grep/systemctl status/journalctl 等只读命令）自动执行；危险命令（rm、kill、shutdown 等）需人工审批。","name":"run_on_host","parameters":{"properties":{"command":{"description":"要在目标主机上执行的 Shell 命令，单行","type":"string"},"purpose":{"description":"这个命令的目的/作用","type":"string"}},"required":["command"],"type":"object"}},"type":"function"}]}
-2026/11/13 17:22:44 [DEBUG] buildRequest Authorization: Bearer ...
-2026/11/13 17:22:44 [DEBUG] doStream sending request...
-2026/11/13 17:22:45 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:45 [DEBUG] doStream response status: 200
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"reasoning_content":null,"role":"assistant","content":""},"logprobs":null,"finish_reason":null,"matched_stop":null}]}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\n\n","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":"call_46580fdfcc384112b7650a69","index":0,"type":"function","function":{"name":"run_on_host","arguments":""}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"{"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"\"command\": \"who"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"ami\""}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":", \"purpose\": \"查看"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"当前"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561765,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"登录"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"用户\"}"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\n","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: {"id":"15fa8f5eeb9a4b3a81831b71a9126f8e","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"reasoning_content":null},"logprobs":null,"finish_reason":"tool_calls","matched_stop":1}]}
-2026/11/13 17:22:45 [DEBUG] processStream raw event: [DONE]
-2026/11/13 17:22:45 [DEBUG] processStream [DONE]
-2026/11/13 17:22:46 [DEBUG] buildRequest URL: http://192.168.10.142:38009/v1/chat/completions
-2026/11/13 17:22:46 [DEBUG] buildRequest Body: {"messages":[{"content":"你是运维命令助手，正在通过一个真实终端辅助用户。你必须先判断用户请求类型再决定输出格式：\n\n① 纯问答/咨询/解释类（不需要执行命令）：直接在 analysis 中给出答案，steps 为空数组，done=true。\n\n② 需要执行命令的任务：只输出一个 JSON 对象。JSON 结构为 {\"analysis\":\"对当前问题的简要分析\",\"steps\":[{\"command\":\"...\",\"purpose\":\"...\",\"risk\":\"low|medium|high\"}],\"done\":false}。risk=low 只读查询（ps、ss、lsof、du、df、ls、cat、head、grep、netstat、systemctl status/list-units、journalctl 等只读命令）；medium 写入或服务操作；high 破坏性/危险操作（如 rm -rf、mkfs、kill -9、dd、shutdown）。\n\n命令数量：由你根据任务复杂度自行判断，不做硬限制。每个命令必须有明确的必要性，对应的 purpose 必须说明该命令在用户请求中的作用。严禁执行与用户请求无关的系统检查、资源统计、性能测试、联网探测等命令，除非用户明确要求\n\n其他规则：\n- 如果用户已明确指定要做的操作（例如删除某个压缩包），直接给出对应命令，不要做额外发散\n- 只有当目标不明确、确实缺少必要信息时，才允许先用一次最小范围的只读查询定位，并在 analysis 中说明原因\n- 每个命令的 purpose 必须直接对应用户请求\n- 命令会在交互式终端真实执行，结果回传给你，请勿臆造输出\n- 任务完成或无需再执行命令时，返回 done=true 且 steps 为空数组，并在 analysis 中给出结论与建议\n- 禁止 SSH/登录类命令，只给出在目标主机上执行的原始命令，命令尽量单行","role":"system"},{"content":[{"text":"只执行 whoami，不要执行其他命令","type":"text"}],"role":"user"},{"content":"\n\n\n","role":"assistant","tool_calls":[{"function":{"arguments":"{\"command\":\"whoami\",\"purpose\":\"查看当前登录用户\"}","name":"run_on_host"},"id":"call_46580fdfcc384112b7650a69","type":"function"}]},{"content":"成功 [exit=0]\nroot\n","role":"tool","tool_call_id":"call_46580fdfcc384112b7650a69"}],"model":"Qwen3.5-397B","stream":true,"tools":[{"function":{"description":"在目标主机上执行单个 Shell 命令并返回输出。用于排查问题、检查状态、执行运维操作。安全命令（ps/ls/df/du/cat/grep/systemctl status/journalctl 等只读命令）自动执行；危险命令（rm、kill、shutdown 等）需人工审批。","name":"run_on_host","parameters":{"properties":{"command":{"description":"要在目标主机上执行的 Shell 命令，单行","type":"string"},"purpose":{"description":"这个命令的目的/作用","type":"string"}},"required":["command"],"type":"object"}},"type":"function"}]}
-2026/11/13 17:22:46 [DEBUG] buildRequest Authorization: Bearer ...
-2026/11/13 17:22:46 [DEBUG] doStream sending request...
-2026/11/13 17:22:46 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:46 [DEBUG] doStream response status: 200
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"reasoning_content":null,"role":"assistant","content":""},"logprobs":null,"finish_reason":null,"matched_stop":null}]}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"{\"","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"analysis","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\":\"","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"当前","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"登录","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"用户","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"为","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":" root","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"。","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\",\"","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"steps","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\":","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"[],","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\"","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"done","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\":","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561766,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"true","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561767,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"}","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: {"id":"5ef5b7ab00c04975824e05648267bd79","object":"chat.completion.chunk","created":1794561767,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"reasoning_content":null},"logprobs":null,"finish_reason":"stop","matched_stop":1}]}
-2026/11/13 17:22:46 [DEBUG] processStream raw event: [DONE]
-2026/11/13 17:22:46 [DEBUG] processStream [DONE]
-2026/11/13 17:22:46 [API] POST /api/promai/ai-terminal/sessions/36/stream 200 1.92584275s
-2026/11/13 17:22:46 [API] POST /api/promai/ai-terminal/sessions/36/messages 200 1ms
-2026/11/13 17:22:47 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:48 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:49 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:50 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:51 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:52 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:53 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:54 [API] GET /api/promai/embed 200 0ms
-2026/11/13 17:22:54 [API] GET /api/promai/alert/stats 200 6ms
-2026/11/13 17:22:54 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:55 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:56 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:57 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:58 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:22:59 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:00 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:01 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:01 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:23:02 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:03 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:04 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:05 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:06 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:07 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:08 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:09 [API] GET /api/promai/embed 200 1ms
-2026/11/13 17:23:09 [API] GET /api/promai/alert/stats 200 1ms
-2026/11/13 17:23:09 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:10 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:11 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:12 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:13 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:14 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:15 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:16 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:17 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:18 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:19 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:20 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:21 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:22 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:23 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:24 [API] GET /api/promai/embed 200 2ms
-2026/11/13 17:23:24 [API] GET /api/promai/alert/stats 200 11ms
-2026/11/13 17:23:24 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:25 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:26 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:27 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:28 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:29 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:30 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:31 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:23:31 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:32 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:33 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:34 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:35 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:36 [API] GET /api/promai/embed 200 26ms
-2026/11/13 17:23:36 [API] GET /api/promai/alert/stats 200 28ms
-2026/11/13 17:23:36 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:37 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:38 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:39 [API] GET /api/promai/embed 200 9ms
-2026/11/13 17:23:39 [API] GET /api/promai/alert/stats 200 10ms
-2026/11/13 17:23:39 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:40 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:41 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:42 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:43 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:44 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:45 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:46 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:47 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:48 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:49 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:50 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:51 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:52 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:53 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:54 [API] GET /api/promai/embed 200 2ms
-2026/11/13 17:23:54 [API] GET /api/promai/alert/stats 200 3ms
-2026/11/13 17:23:54 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:55 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:56 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:57 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:58 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:23:59 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:00 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:01 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:01 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:24:02 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:03 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:04 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:05 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:06 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:07 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:08 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:09 [API] GET /api/promai/embed 200 6ms
-2026/11/13 17:24:09 [API] GET /api/promai/alert/stats 200 17ms
-2026/11/13 17:24:09 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:10 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:11 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:12 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:13 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:14 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:15 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:16 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:17 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:18 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:19 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:20 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:21 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:22 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:23 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:24 [API] GET /api/promai/embed 200 1ms
-2026/11/13 17:24:24 [API] GET /api/promai/alert/stats 200 8ms
-2026/11/13 17:24:24 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:25 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:26 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:27 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:28 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:29 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:30 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:31 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:24:31 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:32 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:33 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:34 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:35 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:35 [API] GET /api/promai/embed 200 5ms
-2026/11/13 17:24:35 [API] GET /api/promai/alert/stats 200 11ms
-2026/11/13 17:24:36 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:37 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:38 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:39 [API] GET /api/promai/alert/stats 200 1ms
-2026/11/13 17:24:39 [API] GET /api/promai/embed 200 2ms
-2026/11/13 17:24:39 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:40 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:40 [Auth] Token 缺失: GET /api/promai/alert/stats
-2026/11/13 17:24:40 [API] GET /api/promai/alert/stats 401 2ms
-2026/11/13 17:24:41 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:41 [Auth] 登录成功: admin
-2026/11/13 17:24:41 [API] POST /api/promai/auth/login 200 0ms
-2026/11/13 17:24:41 [API] GET /api/promai/cronjobs 200 0ms
-2026/11/13 17:24:41 [API] GET /api/promai/alert/evaluator/status 200 1ms
-2026/11/13 17:24:41 [API] GET /api/promai/notifications/all 200 3ms
-2026/11/13 17:24:41 [API] GET /api/promai/alert/stats 200 4ms
-2026/11/13 17:24:41 [API] GET /api/promai/datasources/all 200 23ms
-2026/11/13 17:24:41 [API] GET /api/promai/report-records 200 80ms
-2026/11/13 17:24:42 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:43 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:44 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:45 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:46 [API] GET /api/promai/hosts 200 4ms
-2026/11/13 17:24:46 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:47 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:48 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:49 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:50 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:51 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:52 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:53 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:54 [API] GET /api/promai/embed 200 1ms
-2026/11/13 17:24:54 [API] GET /api/promai/alert/stats 200 15ms
-2026/11/13 17:24:54 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:55 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:55 [API] GET /api/promai/embed 200 1ms
-2026/11/13 17:24:55 [API] GET /api/promai/alert/stats 200 2ms
-2026/11/13 17:24:56 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:57 [API] GET /api/promai/ai-terminal/sessions 200 0ms
-2026/11/13 17:24:57 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:58 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:24:59 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:00 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:00 [API] POST /api/promai/ai-terminal/sessions 200 3ms
-
-2026/11/13 17:25:00 [31;1m/Users/hanwei/GolandProjects/PromAI/ai_terminal.go:132 [35;1mrecord not found
-[0m[33m[0.090ms] [34;1m[rows:0][0m SELECT * FROM `app_settings` WHERE key = "ai_terminal_system_prompt" ORDER BY `app_settings`.`id` LIMIT 1
-2026/11/13 17:25:00 [DEBUG] buildRequest URL: http://192.168.10.142:38009/v1/chat/completions
-2026/11/13 17:25:00 [DEBUG] buildRequest Body: {"messages":[{"content":"你是运维命令助手，正在通过一个真实终端辅助用户。你必须先判断用户请求类型再决定输出格式：\n\n① 纯问答/咨询/解释类（不需要执行命令）：直接在 analysis 中给出答案，steps 为空数组，done=true。\n\n② 需要执行命令的任务：只输出一个 JSON 对象。JSON 结构为 {\"analysis\":\"对当前问题的简要分析\",\"steps\":[{\"command\":\"...\",\"purpose\":\"...\",\"risk\":\"low|medium|high\"}],\"done\":false}。risk=low 只读查询（ps、ss、lsof、du、df、ls、cat、head、grep、netstat、systemctl status/list-units、journalctl 等只读命令）；medium 写入或服务操作；high 破坏性/危险操作（如 rm -rf、mkfs、kill -9、dd、shutdown）。\n\n命令数量：由你根据任务复杂度自行判断，不做硬限制。每个命令必须有明确的必要性，对应的 purpose 必须说明该命令在用户请求中的作用。严禁执行与用户请求无关的系统检查、资源统计、性能测试、联网探测等命令，除非用户明确要求\n\n其他规则：\n- 如果用户已明确指定要做的操作（例如删除某个压缩包），直接给出对应命令，不要做额外发散\n- 只有当目标不明确、确实缺少必要信息时，才允许先用一次最小范围的只读查询定位，并在 analysis 中说明原因\n- 每个命令的 purpose 必须直接对应用户请求\n- 命令会在交互式终端真实执行，结果回传给你，请勿臆造输出\n- 任务完成或无需再执行命令时，返回 done=true 且 steps 为空数组，并在 analysis 中给出结论与建议\n- 禁止 SSH/登录类命令，只给出在目标主机上执行的原始命令，命令尽量单行","role":"system"},{"content":[{"text":"只执行 whoami，不要执行其他命令","type":"text"}],"role":"user"}],"model":"Qwen3.5-397B","stream":true,"tools":[{"function":{"description":"在目标主机上执行单个 Shell 命令并返回输出。用于排查问题、检查状态、执行运维操作。安全命令（ps/ls/df/du/cat/grep/systemctl status/journalctl 等只读命令）自动执行；危险命令（rm、kill、shutdown 等）需人工审批。","name":"run_on_host","parameters":{"properties":{"command":{"description":"要在目标主机上执行的 Shell 命令，单行","type":"string"},"purpose":{"description":"这个命令的目的/作用","type":"string"}},"required":["command"],"type":"object"}},"type":"function"}]}
-2026/11/13 17:25:00 [DEBUG] buildRequest Authorization: Bearer ...
-2026/11/13 17:25:00 [DEBUG] doStream sending request...
-2026/11/13 17:25:01 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:25:01 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:01 [DEBUG] doStream response status: 200
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"reasoning_content":null,"role":"assistant","content":""},"logprobs":null,"finish_reason":null,"matched_stop":null}]}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\n\n","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":"call_c94a9c132b874c1ba1ad9b7a","index":0,"type":"function","function":{"name":"run_on_host","arguments":""}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"{"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"\"command\": \"who"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"ami\""}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":", \"purpose\": \"执行"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"用户"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"指定的"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":" who"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"ami"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":" 命令"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"，"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561901,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"查看"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"当前"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":null,"reasoning_content":null,"tool_calls":[{"id":null,"index":0,"type":"function","function":{"name":null,"arguments":"用户名\"}"}}]},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\n","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: {"id":"1184d25604e341a4b0f03ed440b914e1","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"reasoning_content":null},"logprobs":null,"finish_reason":"tool_calls","matched_stop":1}]}
-2026/11/13 17:25:01 [DEBUG] processStream raw event: [DONE]
-2026/11/13 17:25:01 [DEBUG] processStream [DONE]
-2026/11/13 17:25:02 [DEBUG] buildRequest URL: http://192.168.10.142:38009/v1/chat/completions
-2026/11/13 17:25:02 [DEBUG] buildRequest Body: {"messages":[{"content":"你是运维命令助手，正在通过一个真实终端辅助用户。你必须先判断用户请求类型再决定输出格式：\n\n① 纯问答/咨询/解释类（不需要执行命令）：直接在 analysis 中给出答案，steps 为空数组，done=true。\n\n② 需要执行命令的任务：只输出一个 JSON 对象。JSON 结构为 {\"analysis\":\"对当前问题的简要分析\",\"steps\":[{\"command\":\"...\",\"purpose\":\"...\",\"risk\":\"low|medium|high\"}],\"done\":false}。risk=low 只读查询（ps、ss、lsof、du、df、ls、cat、head、grep、netstat、systemctl status/list-units、journalctl 等只读命令）；medium 写入或服务操作；high 破坏性/危险操作（如 rm -rf、mkfs、kill -9、dd、shutdown）。\n\n命令数量：由你根据任务复杂度自行判断，不做硬限制。每个命令必须有明确的必要性，对应的 purpose 必须说明该命令在用户请求中的作用。严禁执行与用户请求无关的系统检查、资源统计、性能测试、联网探测等命令，除非用户明确要求\n\n其他规则：\n- 如果用户已明确指定要做的操作（例如删除某个压缩包），直接给出对应命令，不要做额外发散\n- 只有当目标不明确、确实缺少必要信息时，才允许先用一次最小范围的只读查询定位，并在 analysis 中说明原因\n- 每个命令的 purpose 必须直接对应用户请求\n- 命令会在交互式终端真实执行，结果回传给你，请勿臆造输出\n- 任务完成或无需再执行命令时，返回 done=true 且 steps 为空数组，并在 analysis 中给出结论与建议\n- 禁止 SSH/登录类命令，只给出在目标主机上执行的原始命令，命令尽量单行","role":"system"},{"content":[{"text":"只执行 whoami，不要执行其他命令","type":"text"}],"role":"user"},{"content":"\n\n\n","role":"assistant","tool_calls":[{"function":{"arguments":"{\"command\":\"whoami\",\"purpose\":\"执行用户指定的 whoami 命令，查看当前用户名\"}","name":"run_on_host"},"id":"call_c94a9c132b874c1ba1ad9b7a","type":"function"}]},{"content":"成功 [exit=0]\n","role":"tool","tool_call_id":"call_c94a9c132b874c1ba1ad9b7a"}],"model":"Qwen3.5-397B","stream":true,"tools":[{"function":{"description":"在目标主机上执行单个 Shell 命令并返回输出。用于排查问题、检查状态、执行运维操作。安全命令（ps/ls/df/du/cat/grep/systemctl status/journalctl 等只读命令）自动执行；危险命令（rm、kill、shutdown 等）需人工审批。","name":"run_on_host","parameters":{"properties":{"command":{"description":"要在目标主机上执行的 Shell 命令，单行","type":"string"},"purpose":{"description":"这个命令的目的/作用","type":"string"}},"required":["command"],"type":"object"}},"type":"function"}]}
-2026/11/13 17:25:02 [DEBUG] buildRequest Authorization: Bearer ...
-2026/11/13 17:25:02 [DEBUG] doStream sending request...
-2026/11/13 17:25:02 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:02 [DEBUG] doStream response status: 200
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"reasoning_content":null,"role":"assistant","content":""},"logprobs":null,"finish_reason":null,"matched_stop":null}]}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"{\"","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"analysis","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\":\"","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"who","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"ami","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":" ","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"命令","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"已","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"成功","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"执行","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561902,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"（","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"exit","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"=","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"0","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"）。","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\",\"","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"steps","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\":","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"[],","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\"","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"done","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"\":","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"true","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"role":null,"content":"}","reasoning_content":null,"tool_calls":null},"logprobs":null,"finish_reason":null,"matched_stop":null}],"usage":null}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: {"id":"02696bd46929476cb320c7111946b46f","object":"chat.completion.chunk","created":1794561903,"model":"Qwen3.5-397B","choices":[{"index":0,"delta":{"reasoning_content":null},"logprobs":null,"finish_reason":"stop","matched_stop":1}]}
-2026/11/13 17:25:02 [DEBUG] processStream raw event: [DONE]
-2026/11/13 17:25:02 [DEBUG] processStream [DONE]
-2026/11/13 17:25:02 [API] POST /api/promai/ai-terminal/sessions/37/stream 200 2.093551959s
-2026/11/13 17:25:02 [API] POST /api/promai/ai-terminal/sessions/37/messages 200 5ms
-2026/11/13 17:25:03 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:04 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:05 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:06 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:07 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:08 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:09 [API] GET /api/promai/embed 200 1ms
-2026/11/13 17:25:09 [API] GET /api/promai/alert/stats 200 8ms
-2026/11/13 17:25:09 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:10 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:10 [API] GET /api/promai/embed 200 0ms
-2026/11/13 17:25:10 [API] GET /api/promai/alert/stats 200 1ms
-2026/11/13 17:25:11 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:12 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:13 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:14 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:15 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:16 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:17 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:18 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:19 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:20 [API] GET /api/promai/hosts/9/terminal 200 30.229357792s
-2026/11/13 17:25:20 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:21 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:22 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:23 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:24 [API] GET /api/promai/embed 200 3ms
-2026/11/13 17:25:24 [API] GET /api/promai/alert/stats 200 14ms
-2026/11/13 17:25:24 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:25 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:26 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:27 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:28 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:29 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:30 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:31 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:25:31 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:32 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:33 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:34 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:35 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:35 [API] GET /api/promai/embed 200 2ms
-2026/11/13 17:25:36 [API] GET /api/promai/alert/stats 200 13ms
-2026/11/13 17:25:36 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:37 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:38 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:39 [API] GET /api/promai/embed 200 2ms
-2026/11/13 17:25:39 [API] GET /api/promai/alert/stats 200 6ms
-2026/11/13 17:25:39 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:40 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:41 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:42 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:43 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:44 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:45 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:46 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:47 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:48 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:49 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:50 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:51 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:52 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:53 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:54 [API] GET /api/promai/embed 200 0ms
-2026/11/13 17:25:54 [API] GET /api/promai/alert/stats 200 1ms
-2026/11/13 17:25:54 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:55 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:56 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:57 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:58 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:25:59 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:00 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:01 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:01 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
-2026/11/13 17:26:02 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:03 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:04 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:05 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:06 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:07 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:08 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:09 [API] GET /api/promai/embed 200 5ms
-2026/11/13 17:26:09 [API] GET /api/promai/alert/stats 200 8ms
-2026/11/13 17:26:09 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:10 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:11 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:12 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:13 [Dispatch] 本轮到期分组 1 个
-2026/11/13 17:26:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:40 [Notify] ✓ group=cffe1f32 rule=5 channel=wechat_work/#3 发送成功(330ms)
+2026/11/13 17:35:40 [Notify] ◼ group=cffe1f32 rule=5 完成: 成功=1 失败=0 限流=0 耗时=360ms
+2026/11/13 17:35:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:54 [API] GET /api/promai/embed 200 5ms
+2026/11/13 17:35:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:54 [API] GET /api/promai/alert/stats 200 22ms
+2026/11/13 17:35:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:35:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:36:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:09 [API] GET /api/promai/embed 200 16ms
+2026/11/13 17:36:09 [API] GET /api/promai/alert/stats 200 30ms
+2026/11/13 17:36:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:24 [API] GET /api/promai/embed 200 14ms
+2026/11/13 17:36:24 [API] GET /api/promai/alert/stats 200 26ms
+2026/11/13 17:36:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:31 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:36:31 [API] GET /api/promai/alert/stats 200 14ms
+2026/11/13 17:36:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:39 [API] GET /api/promai/alert/stats 200 16ms
+2026/11/13 17:36:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:39 [API] GET /api/promai/embed 200 16ms
+2026/11/13 17:36:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:36:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:54 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:36:54 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:36:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:36:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:09 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:37:09 [API] GET /api/promai/alert/stats 200 0ms
+2026/11/13 17:37:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:37:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:24 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:37:24 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:37:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:32 [API] GET /api/promai/embed 200 8ms
+2026/11/13 17:37:32 [API] GET /api/promai/alert/stats 200 13ms
+2026/11/13 17:37:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:37:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:39 [API] GET /api/promai/embed 200 23ms
+2026/11/13 17:37:39 [API] GET /api/promai/alert/stats 200 60ms
+2026/11/13 17:37:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:54 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:37:54 [API] GET /api/promai/alert/stats 200 6ms
+2026/11/13 17:37:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:37:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:09 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:38:09 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:38:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:38:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:24 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:38:24 [API] GET /api/promai/alert/stats 200 3ms
+2026/11/13 17:38:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:33 [API] GET /api/promai/embed 200 4ms
+2026/11/13 17:38:33 [API] GET /api/promai/alert/stats 200 5ms
+2026/11/13 17:38:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:39 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:38:39 [API] GET /api/promai/alert/stats 200 4ms
+2026/11/13 17:38:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:38:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:54 [API] GET /api/promai/embed 200 4ms
+2026/11/13 17:38:54 [API] GET /api/promai/alert/stats 200 6ms
+2026/11/13 17:38:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:38:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:09 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:39:09 [API] GET /api/promai/alert/stats 200 4ms
+2026/11/13 17:39:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:39:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:24 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:39:24 [API] GET /api/promai/alert/stats 200 4ms
+2026/11/13 17:39:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:34 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:39:34 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:39:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:39:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:39 [API] GET /api/promai/alert/stats 200 14ms
+2026/11/13 17:39:39 [API] GET /api/promai/embed 200 17ms
+2026/11/13 17:39:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:54 [API] GET /api/promai/embed 200 19ms
+2026/11/13 17:39:54 [API] GET /api/promai/alert/stats 200 23ms
+2026/11/13 17:39:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:39:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:09 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:40:09 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:40:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:40:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:24 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:40:24 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:40:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:35 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:40:35 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:40:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:39 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:40:39 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:40:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:40:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:54 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:40:54 [API] GET /api/promai/alert/stats 200 4ms
+2026/11/13 17:40:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:40:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:09 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:41:09 [API] GET /api/promai/alert/stats 200 6ms
+2026/11/13 17:41:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:41:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:24 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:41:24 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:41:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:35 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:41:35 [API] GET /api/promai/alert/stats 200 0ms
+2026/11/13 17:41:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:39 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:41:39 [API] GET /api/promai/embed 200 4ms
+2026/11/13 17:41:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:41:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:54 [API] GET /api/promai/embed 200 5ms
+2026/11/13 17:41:54 [API] GET /api/promai/alert/stats 200 8ms
+2026/11/13 17:41:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:41:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:42:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:09 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:42:09 [API] GET /api/promai/alert/stats 200 9ms
+2026/11/13 17:42:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:24 [API] GET /api/promai/embed 200 7ms
+2026/11/13 17:42:24 [API] GET /api/promai/alert/stats 200 10ms
+2026/11/13 17:42:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:36 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:42:36 [API] GET /api/promai/alert/stats 200 3ms
+2026/11/13 17:42:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:39 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:42:39 [API] GET /api/promai/alert/stats 200 7ms
+2026/11/13 17:42:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:42:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:54 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:42:54 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:42:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:42:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:09 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:43:09 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:43:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:43:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:24 [API] GET /api/promai/embed 200 4ms
+2026/11/13 17:43:24 [API] GET /api/promai/alert/stats 200 12ms
+2026/11/13 17:43:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:36 [API] GET /api/promai/embed 200 6ms
+2026/11/13 17:43:36 [API] GET /api/promai/alert/stats 200 3ms
+2026/11/13 17:43:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:39 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:43:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:39 [API] GET /api/promai/alert/stats 200 6ms
+2026/11/13 17:43:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:43:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:54 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:43:54 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:43:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:43:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:09 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:44:09 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:44:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:44:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:24 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:44:24 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:44:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:36 [API] GET /api/promai/embed 200 49ms
+2026/11/13 17:44:36 [API] GET /api/promai/alert/stats 200 56ms
+2026/11/13 17:44:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:39 [API] GET /api/promai/alert/stats 200 5ms
+2026/11/13 17:44:39 [API] GET /api/promai/embed 200 6ms
+2026/11/13 17:44:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:44:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:54 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:44:54 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:44:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:44:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:09 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:45:09 [API] GET /api/promai/alert/stats 200 1ms
+2026/11/13 17:45:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:45:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:24 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:45:24 [API] GET /api/promai/alert/stats 200 4ms
+2026/11/13 17:45:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:36 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:45:36 [API] GET /api/promai/alert/stats 200 10ms
+2026/11/13 17:45:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:45:39 [API] GET /api/promai/embed 200 5ms
+2026/11/13 17:45:39 [API] GET /api/promai/alert/stats 200 19ms
+2026/11/13 17:45:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:54 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:45:54 [API] GET /api/promai/alert/stats 200 3ms
+2026/11/13 17:45:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:45:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:09 [API] GET /api/promai/embed 200 12ms
+2026/11/13 17:46:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:09 [API] GET /api/promai/alert/stats 200 15ms
+2026/11/13 17:46:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:46:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:24 [API] GET /api/promai/embed 200 19ms
+2026/11/13 17:46:24 [API] GET /api/promai/alert/stats 200 19ms
+2026/11/13 17:46:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:38 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:46:38 [API] GET /api/promai/alert/stats 200 11ms
+2026/11/13 17:46:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:39 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:46:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:46:39 [API] GET /api/promai/alert/stats 200 9ms
+2026/11/13 17:46:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:54 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:46:54 [API] GET /api/promai/alert/stats 200 4ms
+2026/11/13 17:46:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:46:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:09 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:47:09 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:47:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:47:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:24 [API] GET /api/promai/embed 200 4ms
+2026/11/13 17:47:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:24 [API] GET /api/promai/alert/stats 200 5ms
+2026/11/13 17:47:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:36 [API] GET /api/promai/embed 200 10ms
+2026/11/13 17:47:36 [API] GET /api/promai/alert/stats 200 12ms
+2026/11/13 17:47:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:39 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:47:39 [API] GET /api/promai/alert/stats 200 3ms
+2026/11/13 17:47:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:47:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:54 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:47:54 [API] GET /api/promai/alert/stats 200 4ms
+2026/11/13 17:47:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:47:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:09 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:48:09 [API] GET /api/promai/alert/stats 200 3ms
+2026/11/13 17:48:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:48:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:24 [API] GET /api/promai/embed 200 4ms
+2026/11/13 17:48:24 [API] GET /api/promai/alert/stats 200 15ms
+2026/11/13 17:48:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:36 [API] GET /api/promai/embed 200 27ms
+2026/11/13 17:48:36 [API] GET /api/promai/alert/stats 200 28ms
+2026/11/13 17:48:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:39 [API] GET /api/promai/embed 200 12ms
+2026/11/13 17:48:39 [API] GET /api/promai/alert/stats 200 13ms
+2026/11/13 17:48:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:48:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:54 [API] GET /api/promai/embed 200 22ms
+2026/11/13 17:48:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:54 [API] GET /api/promai/alert/stats 200 26ms
+2026/11/13 17:48:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:48:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:09 [API] GET /api/promai/embed 200 4ms
+2026/11/13 17:49:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:49:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:09 [API] GET /api/promai/alert/stats 200 13ms
+2026/11/13 17:49:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:24 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:49:24 [API] GET /api/promai/alert/stats 200 15ms
+2026/11/13 17:49:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:36 [API] GET /api/promai/embed 200 34ms
+2026/11/13 17:49:36 [API] GET /api/promai/alert/stats 200 35ms
+2026/11/13 17:49:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:39 [API] GET /api/promai/embed 200 7ms
+2026/11/13 17:49:39 [API] GET /api/promai/alert/stats 200 11ms
+2026/11/13 17:49:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:49:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:54 [API] GET /api/promai/embed 200 7ms
+2026/11/13 17:49:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:54 [API] GET /api/promai/alert/stats 200 7ms
+2026/11/13 17:49:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:49:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:09 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:50:09 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:50:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:50:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:24 [API] GET /api/promai/embed 200 7ms
+2026/11/13 17:50:24 [API] GET /api/promai/alert/stats 200 21ms
+2026/11/13 17:50:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:36 [API] GET /api/promai/embed 200 16ms
+2026/11/13 17:50:36 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:50:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:39 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:50:39 [API] GET /api/promai/alert/stats 200 8ms
+2026/11/13 17:50:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:50:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:54 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:50:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:54 [API] GET /api/promai/alert/stats 200 10ms
+2026/11/13 17:50:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:50:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:09 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:51:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:51:09 [API] GET /api/promai/alert/stats 200 14ms
+2026/11/13 17:51:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:24 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:51:24 [API] GET /api/promai/alert/stats 200 13ms
+2026/11/13 17:51:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:36 [API] GET /api/promai/embed 200 10ms
+2026/11/13 17:51:36 [API] GET /api/promai/alert/stats 200 17ms
+2026/11/13 17:51:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:39 [API] GET /api/promai/embed 200 6ms
+2026/11/13 17:51:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:39 [API] GET /api/promai/alert/stats 200 17ms
+2026/11/13 17:51:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:51:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:54 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:51:54 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:51:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:51:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:09 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:52:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:09 [API] GET /api/promai/alert/stats 200 5ms
+2026/11/13 17:52:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:52:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:24 [API] GET /api/promai/embed 200 1ms
+2026/11/13 17:52:24 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:52:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:36 [API] GET /api/promai/embed 200 14ms
+2026/11/13 17:52:36 [API] GET /api/promai/alert/stats 200 16ms
+2026/11/13 17:52:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:39 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:52:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:39 [API] GET /api/promai/alert/stats 200 5ms
+2026/11/13 17:52:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:52:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:54 [API] GET /api/promai/embed 200 7ms
+2026/11/13 17:52:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:54 [API] GET /api/promai/alert/stats 200 17ms
+2026/11/13 17:52:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:52:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:53:09 [API] GET /api/promai/alert/stats 200 8ms
+2026/11/13 17:53:09 [API] GET /api/promai/embed 200 15ms
+2026/11/13 17:53:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:24 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:53:24 [API] GET /api/promai/alert/stats 200 2ms
+2026/11/13 17:53:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:38 [API] GET /api/promai/embed 200 7ms
+2026/11/13 17:53:38 [API] GET /api/promai/alert/stats 200 27ms
+2026/11/13 17:53:39 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:53:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:53:39 [API] GET /api/promai/alert/stats 200 6ms
+2026/11/13 17:53:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:54 [API] GET /api/promai/embed 200 0ms
+2026/11/13 17:53:54 [API] GET /api/promai/alert/stats 200 62ms
+2026/11/13 17:53:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:53:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:54:09 [API] GET /api/promai/embed 200 2ms
+2026/11/13 17:54:09 [API] GET /api/promai/alert/stats 200 4ms
+2026/11/13 17:54:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:24 [API] GET /api/promai/embed 200 10ms
+2026/11/13 17:54:24 [API] GET /api/promai/alert/stats 200 13ms
+2026/11/13 17:54:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:54:39 [API] GET /api/promai/embed 200 3ms
+2026/11/13 17:54:39 [API] GET /api/promai/alert/stats 200 6ms
+2026/11/13 17:54:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:54 [API] GET /api/promai/alert/stats 200 16ms
+2026/11/13 17:54:54 [API] GET /api/promai/embed 200 18ms
+2026/11/13 17:54:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:54:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:09 [API] GET /api/promai/embed 200 5ms
+2026/11/13 17:55:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:09 [API] GET /api/promai/alert/stats 200 14ms
+2026/11/13 17:55:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:55:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:14 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:15 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:16 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:17 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:18 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:19 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:20 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:21 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:22 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:23 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:24 [API] GET /api/promai/embed 200 4ms
+2026/11/13 17:55:24 [API] GET /api/promai/alert/stats 200 6ms
+2026/11/13 17:55:24 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:25 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:26 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:27 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:28 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:29 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:30 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:31 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:32 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:33 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:34 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:35 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:36 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:37 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:38 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:39 [API] GET /api/promai/embed 200 5ms
+2026/11/13 17:55:39 [API] GET /api/promai/alert/stats 200 7ms
+2026/11/13 17:55:39 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:55:39 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:40 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:41 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:42 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:43 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:44 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:45 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:46 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:47 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:48 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:49 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:50 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:51 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:52 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:53 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:54 [API] GET /api/promai/embed 200 9ms
+2026/11/13 17:55:54 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:54 [API] GET /api/promai/alert/stats 200 19ms
+2026/11/13 17:55:55 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:56 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:57 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:58 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:55:59 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:00 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:01 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:02 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:03 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:04 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:05 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:06 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:07 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:08 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:09 [Stats] runners=12 eval=0 (ok=0 fail=0 drop=0) queue=(high=0 low=0) interval=15s
+2026/11/13 17:56:09 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:09 [API] GET /api/promai/embed 200 5ms
+2026/11/13 17:56:09 [API] GET /api/promai/alert/stats 200 9ms
+2026/11/13 17:56:10 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:11 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:12 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:13 [Dispatch] 本轮到期分组 1 个
+2026/11/13 17:56:14 [Dispatch] 本轮到期分组 1 个
