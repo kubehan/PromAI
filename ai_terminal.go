@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"PromAI/pkg/aiagent/proxy"
@@ -27,10 +28,35 @@ import (
 
 // AiTerminalAPI 自动化运维智能终端：会话 / AI 规划 / 审批执行 / 审计。
 type AiTerminalAPI struct {
-	db   *gorm.DB
-	api  *AdminAPI
-	host *HostAPI
-	cfg  *config.Config
+	db       *gorm.DB
+	api      *AdminAPI
+	host     *HostAPI
+	cfg      *config.Config
+	seqMu    sync.Mutex
+	seqLocks map[uint]*sync.Mutex
+}
+
+func (a *AiTerminalAPI) lockSeq(sid uint) func() {
+	a.seqMu.Lock()
+	if a.seqLocks == nil {
+		a.seqLocks = make(map[uint]*sync.Mutex)
+	}
+	mu, ok := a.seqLocks[sid]
+	if !ok {
+		mu = &sync.Mutex{}
+		a.seqLocks[sid] = mu
+	}
+	a.seqMu.Unlock()
+	mu.Lock()
+	return mu.Unlock
+}
+
+func (a *AiTerminalAPI) nextSeq(sid uint) int {
+	unlock := a.lockSeq(sid)
+	defer unlock()
+	var maxSeq int
+	a.db.Model(&database.OpsSessionMessage{}).Where("session_id = ?", sid).Select("COALESCE(MAX(seq),0)").Scan(&maxSeq)
+	return maxSeq + 1
 }
 
 const (
@@ -1026,6 +1052,49 @@ type agentPlan struct {
 	Done     bool          `json:"done"`
 }
 
+func (a *AiTerminalAPI) aiReviewRisk(command, purpose string) (string, string) {
+	mc := proxy.ResolveAIModel(a.cfg)
+	if mc == nil {
+		return "", "AI模型未配置"
+	}
+	reviewSystem := a.settingValue("ai_terminal_risk_review_prompt", riskReviewPrompt)
+	reviewUser := fmt.Sprintf("待审查命令：\n%s\n用途说明：\n%s", command, purpose)
+	content, err := proxy.CallOpenAICompat(mc, reviewSystem, reviewUser, "")
+	if err != nil {
+		return "", fmt.Sprintf("审查调用失败: %v", err)
+	}
+	var result struct {
+		Risk        string `json:"risk"`
+		Explanation string `json:"explanation"`
+	}
+	if err := json.Unmarshal([]byte(content), &result); err != nil {
+		start := strings.Index(content, "{")
+		end := strings.LastIndex(content, "}")
+		if start >= 0 && end > start {
+			json.Unmarshal([]byte(content[start:end+1]), &result)
+		}
+	}
+	if result.Risk == "" {
+		return "", "审查AI未返回有效评级"
+	}
+	return strings.ToLower(strings.TrimSpace(result.Risk)), strings.TrimSpace(result.Explanation)
+}
+
+func (a *AiTerminalAPI) ensureRiskReview(step *database.OpsStep) {
+	reviewRisk, reviewExplain := a.aiReviewRisk(step.Command, step.Purpose)
+	if reviewRisk == "" {
+		return
+	}
+	if reviewRisk == "high" || (reviewRisk == "medium" && step.RiskLevel == "low") {
+		a.db.Model(&database.OpsStep{}).Where("id = ?", step.ID).Updates(map[string]interface{}{
+			"risk_level":    reviewRisk,
+			"reject_reason": fmt.Sprintf("[AI审查] %s", reviewExplain),
+		})
+		step.RiskLevel = reviewRisk
+		step.RejectReason = fmt.Sprintf("[AI审查] %s", reviewExplain)
+	}
+}
+
 func (a *AiTerminalAPI) plan(w http.ResponseWriter, r *http.Request, sid uint, includeOutput bool) {
 	var req struct {
 		Message string `json:"message"`
@@ -1070,6 +1139,8 @@ func (a *AiTerminalAPI) plan(w http.ResponseWriter, r *http.Request, sid uint, i
 			writeError(w, 500, err.Error())
 			return
 		}
+		// 双AI审查：独立风险评估
+		go a.ensureRiskReview(&st)
 		created = append(created, st)
 	}
 	writeJSON(w, map[string]interface{}{
@@ -1374,3 +1445,16 @@ func normalizeRisk(llmRisk, command string) string {
 	}
 	return heuristic
 }
+
+const riskReviewPrompt = `你是一位严格的主机安全审查专家。下面是即将在目标主机上执行的一条命令及其用途说明。请独立评估此命令的风险级别。
+
+评估维度：
+1. 是否会修改/删除/移动/覆盖文件或目录？
+2. 是否会启动/停止/重启/禁用服务？
+3. 是否涉及权限变更、进程管理、网络配置？
+4. 是否会消耗大量系统资源或造成服务中断？
+5. 是否包含危险操作（格式化、清空、删除、覆盖等）？
+6. 操作意图是否与执行命令匹配？是否合理且必要？
+
+只输出JSON: {"risk":"low|medium|high","explanation":"一句话说明风险判断依据"}
+low=纯信息查询；medium=常规运维写入操作；high=破坏性或高风险操作`
