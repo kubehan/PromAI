@@ -989,7 +989,7 @@ async function sendAi() {
   try {
     const id = await ensureAiSession()
     if (!id) return
-    const usedStream = await streamAgent(id, msg, pane)
+    const usedStream = false // SSE PiAgent 模式暂时禁用，使用稳定的plan/next路径
     if (!usedStream) await runAgent(id, msg, pane)
   } catch (e: any) {
     pushMsg('system', e.message || 'AI 执行失败')
